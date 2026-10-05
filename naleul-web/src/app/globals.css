@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+
+/*
+ * 디자인 토큰 — Tailwind 클래스로 바로 쓸 수 있어요.
+ * 예) bg-brand, text-ink-3, border-line, rounded-card, shadow-card
+ */
+@theme {
+  --font-sans:
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR',
+    'Malgun Gothic', sans-serif;
+
+  /* 글자 */
+  --color-ink: #111111;
+  --color-ink-2: #4b5059;
+  --color-ink-3: #8b9099;
+  --color-ink-4: #b8bcc4;
+
+  /* 면 / 선 */
+  --color-canvas: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-subtle: #f3f4f6;
+  --color-line: #eceef1;
+  --color-line-strong: #dcdfe4;
+
+  /* 포인트 */
+  --color-brand: #3d5afe;
+  --color-brand-strong: #2c47e8;
+  --color-brand-soft: #eef1ff;
+
+  /* 상태 */
+  --color-success: #12b76a;
+  --color-success-soft: #e8f8f0;
+  --color-warning: #f59e0b;
+  --color-warning-soft: #fff6e5;
+  --color-danger: #ef4444;
+  --color-danger-soft: #fdecec;
+
+  --radius-card: 18px;
+  --shadow-card: 0 1px 2px rgb(17 17 17 / 0.04);
+  --shadow-pop: 0 12px 40px rgb(17 17 17 / 0.14);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    letter-spacing: -0.01em;
+    word-break: keep-all; /* 한글이 단어 중간에서 줄바꿈되지 않게 */
+    overflow-wrap: anywhere; /* 아주 긴 영문/URL 은 넘치지 않게 */
+  }
+  :focus-visible {
+    @apply outline-brand outline-2 outline-offset-2;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

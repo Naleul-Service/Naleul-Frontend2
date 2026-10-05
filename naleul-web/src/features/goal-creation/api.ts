@@ -1,0 +1,61 @@
+import { api } from '@/lib/client/api'
+import type {
+  ConfirmRequest,
+  DraftRequested,
+  DraftResponse,
+  PlanningStyle,
+  SessionDetail,
+  SlotsPatch,
+  TurnResponse,
+} from './types'
+
+const BASE = '/v1/goal-creation/sessions'
+
+export const goalCreationKeys = {
+  all: ['goal-creation'] as const,
+  active: () => [...goalCreationKeys.all, 'active'] as const,
+  session: (sessionId: number) => [...goalCreationKeys.all, 'session', sessionId] as const,
+  draft: (sessionId: number, draftId: number) => [...goalCreationKeys.all, 'draft', sessionId, draftId] as const,
+}
+
+export const goalCreationApi = {
+  /** 세션 시작 + 첫 질문 (201) */
+  /**
+   * sourceGoalId: 임시 목표를 구체화할 때 (BE-8). 확정하면 그 임시 목표의 Task·기록이 새 목표로 옮겨져요.
+   * 첫 문장을 비우면 서버가 임시 목표 이름으로 시작해요.
+   */
+  start: (initialMessage?: string, sourceGoalId?: number) =>
+    api.post<TurnResponse>(BASE, {
+      ...(initialMessage ? { initialMessage } : {}),
+      ...(sourceGoalId ? { sourceGoalId } : {}),
+    }),
+
+  /** 진행 중인 최신 세션. 없으면 204 → null */
+  getActive: () => api.get<SessionDetail | null>(`${BASE}/active`),
+
+  getSession: (sessionId: number) => api.get<SessionDetail>(`${BASE}/${sessionId}`),
+
+  /** 답변 / 건너뛰기 */
+  answer: (sessionId: number, body: { content: string | null; skip: boolean }) =>
+    api.post<TurnResponse>(`${BASE}/${sessionId}/answers`, body),
+
+  /** "바로 계획 만들기" */
+  finishInterview: (sessionId: number) => api.post<TurnResponse>(`${BASE}/${sessionId}/finish-interview`),
+
+  /** 정리 확인 화면에서 슬롯 수정 (바꾼 것만) */
+  updateSlots: (sessionId: number, patch: SlotsPatch) => api.patch<TurnResponse>(`${BASE}/${sessionId}/slots`, patch),
+
+  /** 취소 (ABANDONED) */
+  cancel: (sessionId: number) => api.delete<null>(`${BASE}/${sessionId}`),
+
+  /** 초안 생성 / 다시 생성 (202, 비동기) */
+  requestDraft: (sessionId: number, body: { feedback?: string; planningStyle?: PlanningStyle } = {}) =>
+    api.post<DraftRequested>(`${BASE}/${sessionId}/drafts`, body),
+
+  /** 초안 폴링 */
+  getDraft: (sessionId: number, draftId: number) => api.get<DraftResponse>(`${BASE}/${sessionId}/drafts/${draftId}`),
+
+  /** "이 목표로 시작하기" → 201 { goalId }, 검증 실패 422 + data.violations */
+  confirm: (sessionId: number, body: ConfirmRequest) =>
+    api.post<{ goalId: number }>(`${BASE}/${sessionId}/confirm`, body),
+}
