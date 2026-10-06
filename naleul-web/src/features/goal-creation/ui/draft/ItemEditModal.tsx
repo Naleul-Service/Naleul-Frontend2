@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
-import { Modal } from '@/components/ui/Modal'
+import { cn } from '@/lib/cn'
 import { DAY_LABEL, DAYS } from '../../constants'
 import type { DayOfWeek, GoalPlan, PlanMilestone, PlanSubGoal, PlanTask } from '../../types'
 import { Field, inputClass, textareaClass, toNumber } from '../formParts'
@@ -251,11 +251,17 @@ function TaskForm({
     if (!Number.isInteger(m) || m < limitMin || m > limitMax)
       return onError(`${routine ? '루틴' : '할 일'}은 ${limitMin}~${limitMax}분으로 설정해 주세요.`)
 
+    // 제목에 쓴 시간("유산소 25분")은 걸리는 시간을 바꾸면 같이 바꿔요 (제목과 시간이 어긋나지 않게)
+    const oldMinutes = current?.durationMinutes
+    const syncedTitle =
+      oldMinutes && oldMinutes !== m && title.includes(`${oldMinutes}분`)
+        ? title.replace(`${oldMinutes}분`, `${m}분`)
+        : title
     const base = {
       tempId: current?.tempId ?? newTempId('t'),
       type: target.taskType,
       subGoalTempId: subGoalId || null,
-      title: title.trim(),
+      title: syncedTitle.trim(),
       emoji: emoji.trim() || null,
       durationMinutes: m,
     }
@@ -275,6 +281,7 @@ function TaskForm({
           scheduledDate: null,
           dueDate: null,
           description: howTo.trim() || null,
+          reason: current?.reason ?? null,
         },
       })
     }
@@ -406,7 +413,7 @@ function TaskForm({
   )
 }
 
-// ─── 모달 ───────────────────────────────────────────────────────
+// ─── 그 자리 편집 (모달 대신) ──────────────────────────────────────
 
 function titleOf(target: EditTarget): string {
   const isNew = 'index' in target && target.index === null
@@ -423,72 +430,121 @@ function titleOf(target: EditTarget): string {
   return `${name} ${isNew ? '추가' : '수정'}`
 }
 
-interface ItemEditModalProps {
-  target: EditTarget | null
+/** 두 편집 대상이 같은 항목인지 (카드가 "이 줄을 편집기로 바꿀지" 판단할 때) */
+export function sameTarget(a: EditTarget | null, b: EditTarget): boolean {
+  if (!a || a.kind !== b.kind) return false
+  if (a.kind === 'goal') return true
+  if (a.kind === 'task' && b.kind === 'task' && a.taskType !== b.taskType) return false
+  return (a as { index: number | null }).index === (b as { index: number | null }).index
+}
+
+interface InlineItemEditorProps {
+  target: EditTarget
   plan: GoalPlan
   onClose: () => void
   onSave: (result: EditResult) => void
-  /** 기존 항목 삭제. 최소 개수 등으로 지울 수 없으면 undefined */
+  /** 기존 항목 삭제 */
   onDelete?: () => void
+  /** 최소 개수 등으로 지울 수 없을 때 이유 */
   deleteDisabledReason?: string | null
+  className?: string
 }
 
-export function ItemEditModal({ target, plan, onClose, onSave, onDelete, deleteDisabledReason }: ItemEditModalProps) {
+/**
+ * 초안 항목을 그 자리에서 고치는 편집기 (노션처럼).
+ * - Enter 저장 (여러 줄 칸은 Shift+Enter 로 줄바꿈), Esc 취소
+ * - 삭제는 같은 자리에서 한 번 더 확인
+ */
+export function InlineItemEditor({
+  target,
+  plan,
+  onClose,
+  onSave,
+  onDelete,
+  deleteDisabledReason,
+  className,
+}: InlineItemEditorProps) {
   const [error, setError] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const formId = 'plan-item-form'
 
-  const close = () => {
-    setError(null)
-    onClose()
-  }
   const done = (result: EditResult) => {
     setError(null)
     onSave(result)
   }
-
   const formProps = { plan, formId, onDone: done, onError: setError }
-  const key = target ? JSON.stringify(target) : 'none'
-  const canDelete = target && 'index' in target && target.index !== null && onDelete
+  const canDelete = 'index' in target && target.index !== null && !!onDelete
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.nativeEvent.isComposing) return
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      if (confirmDelete) setConfirmDelete(false)
+      else onClose()
+      return
+    }
+    // 여러 줄 칸에서도 Enter 는 저장 (Shift+Enter 는 줄바꿈)
+    if (e.key === 'Enter' && !e.shiftKey && e.target instanceof HTMLTextAreaElement) {
+      e.preventDefault()
+      ;(document.getElementById(formId) as HTMLFormElement | null)?.requestSubmit()
+    }
+  }
 
   return (
-    <Modal
-      open={!!target}
-      onClose={close}
-      title={target ? titleOf(target) : undefined}
-      footer={
-        <div className="flex w-full items-center gap-2">
+    <div
+      onKeyDown={onKeyDown}
+      className={cn('border-brand/40 bg-brand-soft/30 rounded-2xl border p-4 text-left', className)}
+      role="group"
+      aria-label={titleOf(target)}
+    >
+      <p className="text-brand mb-3 text-[13px] font-bold">{titleOf(target)}</p>
+      {target.kind === 'goal' && <GoalForm target={target} {...formProps} />}
+      {target.kind === 'subGoal' && <SubGoalForm target={target} {...formProps} />}
+      {target.kind === 'milestone' && <MilestoneForm target={target} {...formProps} />}
+      {target.kind === 'task' && <TaskForm target={target} {...formProps} />}
+      {error && (
+        <p role="alert" className="text-danger mt-3 text-sm font-medium">
+          {error}
+        </p>
+      )}
+
+      {confirmDelete ? (
+        <div className="border-danger/30 bg-danger-soft/60 mt-4 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2.5">
+          <p className="min-w-0 flex-1 text-[14px] font-semibold">이 항목을 초안에서 뺄까요?</p>
+          <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
+            취소
+          </Button>
+          <Button variant="danger" size="sm" autoFocus onClick={() => onDelete?.()}>
+            삭제
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           {canDelete && (
             <Button
               variant="ghost"
-              className="text-danger hover:bg-danger-soft mr-auto"
+              size="sm"
+              className="text-danger hover:bg-danger-soft"
               onClick={() => {
                 if (deleteDisabledReason) return setError(deleteDisabledReason)
                 setError(null)
-                onDelete()
+                setConfirmDelete(true)
               }}
             >
               <Trash2 className="size-4" />
               삭제
             </Button>
           )}
-          <Button variant="secondary" className="ml-auto" onClick={close}>
+          <span className="text-ink-4 ml-auto hidden text-[12px] sm:inline">Enter 저장 · Esc 취소</span>
+          <Button variant="ghost" size="sm" className="max-sm:ml-auto" onClick={onClose}>
             취소
           </Button>
-          <Button type="submit" form={formId}>
+          <Button size="sm" type="submit" form={formId}>
             저장
           </Button>
         </div>
-      }
-    >
-      {target?.kind === 'goal' && <GoalForm key={key} target={target} {...formProps} />}
-      {target?.kind === 'subGoal' && <SubGoalForm key={key} target={target} {...formProps} />}
-      {target?.kind === 'milestone' && <MilestoneForm key={key} target={target} {...formProps} />}
-      {target?.kind === 'task' && <TaskForm key={key} target={target} {...formProps} />}
-      {error && (
-        <p role="alert" className="text-danger mt-3 text-sm font-medium">
-          {error}
-        </p>
       )}
-    </Modal>
+    </div>
   )
 }

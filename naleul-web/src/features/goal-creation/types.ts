@@ -159,6 +159,8 @@ export interface PlanTask {
   dueDate: string | null
   /** 루틴의 구체적인 방법 (예: "스쿼트 4x10, 런지 3x12…") */
   description?: string | null
+  /** AI 가 이렇게 정한 이유 (예: "초보라 주 3회로 시작해요") — 검토 화면에서만 보여요 */
+  reason?: string | null
 }
 
 export interface PlanIssue {

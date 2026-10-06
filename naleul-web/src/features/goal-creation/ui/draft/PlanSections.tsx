@@ -12,6 +12,9 @@ import { LIMITS, dDay, daysBetween, formatMd, formatYmdDot, isRoutine } from './
 
 type Issues = Map<string, string[]>
 
+/** 이 항목을 지금 편집 중이면 그 자리에 놓을 편집기, 아니면 null */
+export type EditorSlot = (t: EditTarget) => ReactNode | null
+
 // ─── 공통 ───────────────────────────────────────────────────────
 
 /** 검증 실패 표시 틀: data-vkey 로 스크롤 대상이 되고, 문제가 있으면 빨간 테두리 + 메시지 */
@@ -121,10 +124,12 @@ export function GoalHeroCard({
   colors,
   colorId,
   onColor,
+  editor,
 }: {
   plan: GoalPlan
   issues: Issues
   onEdit: (t: EditTarget) => void
+  editor: EditorSlot
   styleChip: ReactNode
   colors: UserColor[] | undefined
   colorId: number | null
@@ -146,28 +151,30 @@ export function GoalHeroCard({
       </div>
 
       <IssueFrame vkey="goal" issues={issues} className="-mx-2 mt-3">
-        <button
-          type="button"
-          onClick={() => onEdit({ kind: 'goal' })}
-          className="group hover:bg-canvas w-full rounded-2xl px-2 py-1 text-left"
-        >
-          <h2 className="flex items-center gap-2 text-[26px] leading-tight font-bold tracking-tight sm:text-[30px]">
-            {goal.emoji && <span>{goal.emoji}</span>}
-            {goal.title}
-            <Pencil className="text-ink-4 group-hover:text-ink-2 size-4 shrink-0" />
-          </h2>
-          <p className="text-ink-3 mt-1.5 text-sm">
-            {formatYmdDot(goal.startDate)} – {formatYmdDot(goal.endDate)} · {weeks}주
-            {perWeek !== null && goal.metric && (
-              <>
-                {' '}
-                · 주 평균 {perWeek > 0 ? '+' : ''}
-                {perWeek.toFixed(1)}
-                {goal.metric.unit}
-              </>
-            )}
-          </p>
-        </button>
+        {editor({ kind: 'goal' }) ?? (
+          <button
+            type="button"
+            onClick={() => onEdit({ kind: 'goal' })}
+            className="group hover:bg-canvas w-full rounded-2xl px-2 py-1 text-left"
+          >
+            <h2 className="flex items-center gap-2 text-[26px] leading-tight font-bold tracking-tight sm:text-[30px]">
+              {goal.emoji && <span>{goal.emoji}</span>}
+              {goal.title}
+              <Pencil className="text-ink-4 group-hover:text-ink-2 size-4 shrink-0" />
+            </h2>
+            <p className="text-ink-3 mt-1.5 text-sm">
+              {formatYmdDot(goal.startDate)} – {formatYmdDot(goal.endDate)} · {weeks}주
+              {perWeek !== null && goal.metric && (
+                <>
+                  {' '}
+                  · 주 평균 {perWeek > 0 ? '+' : ''}
+                  {perWeek.toFixed(1)}
+                  {goal.metric.unit}
+                </>
+              )}
+            </p>
+          </button>
+        )}
       </IssueFrame>
 
       {goal.aiNote && (
@@ -208,7 +215,7 @@ export function GoalHeroCard({
         </div>
       </div>
 
-      <MilestoneTimeline plan={plan} issues={issues} onEdit={onEdit} />
+      <MilestoneTimeline plan={plan} issues={issues} onEdit={onEdit} editor={editor} />
     </section>
   )
 }
@@ -217,11 +224,15 @@ function MilestoneTimeline({
   plan,
   issues,
   onEdit,
+  editor,
 }: {
   plan: GoalPlan
   issues: Issues
   onEdit: (t: EditTarget) => void
+  editor: EditorSlot
 }) {
+  // 타임라인 칸은 좁아서, 편집기는 타임라인 아래 전체 폭으로 열어요
+  const editingIndex = editingMilestoneIndex(plan, editor)
   const { milestones, goal } = plan
   const unit = goal.metric?.unit ?? ''
   const messages = issues.get('milestones')
@@ -243,7 +254,9 @@ function MilestoneTimeline({
         <ol className="flex gap-1 px-2">
           {milestones.map((ms, i) => {
             const last = i === milestones.length - 1
-            const months = Math.max(Math.round(daysBetween(goal.startDate, ms.dueDate) / 30), 1)
+            const days = daysBetween(goal.startDate, ms.dueDate)
+            // 한 달 안쪽은 주 단위로 (2주 목표에 "1개월"이라고 나오지 않게)
+            const when = days < 28 ? `${Math.max(Math.round(days / 7), 1)}주` : `${Math.round(days / 30)}개월`
             return (
               <li key={ms.tempId} className="min-w-[190px] flex-1">
                 <div className="flex items-center" aria-hidden>
@@ -263,10 +276,14 @@ function MilestoneTimeline({
                   <button
                     type="button"
                     onClick={() => onEdit({ kind: 'milestone', index: i })}
-                    className="hover:bg-canvas w-full rounded-2xl p-2 text-left"
+                    className={cn(
+                      'group hover:bg-canvas w-full rounded-2xl p-2 text-left',
+                      editingIndex === i && 'bg-brand-soft ring-brand/40 ring-1'
+                    )}
                   >
-                    <p className="text-ink-3 text-xs">
-                      {months}개월 · ~{formatMd(ms.dueDate, false)}
+                    <p className="text-ink-3 flex items-center gap-1 text-xs">
+                      {when} · ~{formatMd(ms.dueDate, false)}
+                      <Pencil className="text-ink-4 group-hover:text-ink-2 ml-auto size-3" />
                     </p>
                     <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[15px] font-bold">
                       {ms.title}
@@ -285,13 +302,24 @@ function MilestoneTimeline({
           })}
         </ol>
       </div>
-      <AddButton
-        label="마일스톤 추가"
-        onClick={() => onEdit({ kind: 'milestone', index: null })}
-        disabled={milestones.length >= LIMITS.milestones[1]}
-      />
+      {editingIndex !== null && editingIndex >= 0 && (
+        <div className="mt-3">{editor({ kind: 'milestone', index: editingIndex })}</div>
+      )}
+      {editor({ kind: 'milestone', index: null }) ?? (
+        <AddButton
+          label="마일스톤 추가"
+          onClick={() => onEdit({ kind: 'milestone', index: null })}
+          disabled={milestones.length >= LIMITS.milestones[1]}
+        />
+      )}
     </div>
   )
+}
+
+/** 지금 편집 중인 마일스톤 index (없으면 null) */
+function editingMilestoneIndex(plan: GoalPlan, editor: EditorSlot): number | null {
+  const i = plan.milestones.findIndex((_, idx) => editor({ kind: 'milestone', index: idx }) !== null)
+  return i >= 0 ? i : null
 }
 
 // ─── 수치 카드 (오른쪽 파란 카드) ───────────────────────────────
@@ -413,38 +441,44 @@ export function SubGoalsCard({
   plan,
   issues,
   onEdit,
+  editor,
 }: {
   plan: GoalPlan
   issues: Issues
   onEdit: (t: EditTarget) => void
+  editor: EditorSlot
 }) {
   return (
     <PanelCard title="세부 목표" aside={`${plan.subGoals.length}개`} vkey="subGoals" issues={issues}>
       <div className="space-y-2.5">
         {plan.subGoals.map((sg, i) => (
           <IssueFrame key={sg.tempId} vkey={`subGoals[${i}]`} issues={issues}>
-            <button
-              type="button"
-              onClick={() => onEdit({ kind: 'subGoal', index: i })}
-              className="border-line hover:border-line-strong flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition-colors"
-            >
-              <EmojiBox emoji={sg.emoji} tone={SUBGOAL_TONES[i % SUBGOAL_TONES.length]} />
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-bold">{sg.title}</span>
-                {sg.description && (
-                  <span className="text-ink-3 mt-0.5 block text-[13px] leading-relaxed">{sg.description}</span>
-                )}
-              </span>
-              <Pencil className="text-ink-4 mt-1 size-3.5 shrink-0" />
-            </button>
+            {editor({ kind: 'subGoal', index: i }) ?? (
+              <button
+                type="button"
+                onClick={() => onEdit({ kind: 'subGoal', index: i })}
+                className="border-line hover:border-line-strong flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition-colors"
+              >
+                <EmojiBox emoji={sg.emoji} tone={SUBGOAL_TONES[i % SUBGOAL_TONES.length]} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold">{sg.title}</span>
+                  {sg.description && (
+                    <span className="text-ink-3 mt-0.5 block text-[13px] leading-relaxed">{sg.description}</span>
+                  )}
+                </span>
+                <Pencil className="text-ink-4 mt-1 size-3.5 shrink-0" />
+              </button>
+            )}
           </IssueFrame>
         ))}
       </div>
-      <AddButton
-        label="세부 목표 추가"
-        onClick={() => onEdit({ kind: 'subGoal', index: null })}
-        disabled={plan.subGoals.length >= LIMITS.subGoals[1]}
-      />
+      {editor({ kind: 'subGoal', index: null }) ?? (
+        <AddButton
+          label="세부 목표 추가"
+          onClick={() => onEdit({ kind: 'subGoal', index: null })}
+          disabled={plan.subGoals.length >= LIMITS.subGoals[1]}
+        />
+      )}
     </PanelCard>
   )
 }
@@ -455,10 +489,12 @@ export function OneTimeTasksCard({
   plan,
   issues,
   onEdit,
+  editor,
 }: {
   plan: GoalPlan
   issues: Issues
   onEdit: (t: EditTarget) => void
+  editor: EditorSlot
 }) {
   // 원래 배열 위치(index)를 유지해야 서버 violations 의 tasks[i] 와 맞아요
   const items = plan.tasks
@@ -481,35 +517,40 @@ export function OneTimeTasksCard({
         {items.map(({ task, index }) => (
           <li key={task.tempId}>
             <IssueFrame vkey={`tasks[${index}]`} issues={issues} className="my-1">
-              <button
-                type="button"
-                onClick={() => onEdit({ kind: 'task', index, taskType: 'ONE_TIME' })}
-                className="hover:bg-canvas flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-semibold">
-                    {task.emoji} {task.title}
+              {editor({ kind: 'task', index, taskType: 'ONE_TIME' }) ?? (
+                <button
+                  type="button"
+                  onClick={() => onEdit({ kind: 'task', index, taskType: 'ONE_TIME' })}
+                  className="hover:bg-canvas flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-semibold">
+                      {task.emoji} {task.title}
+                    </span>
+                    <span className="text-ink-3 mt-0.5 block text-[13px]">
+                      {task.scheduledDate ? formatMd(task.scheduledDate) : '날짜 자동'}
+                      {task.dueDate && ` · 마감 ${formatMd(task.dueDate, false)}`} · {task.durationMinutes}분
+                    </span>
                   </span>
-                  <span className="text-ink-3 mt-0.5 block text-[13px]">
-                    {task.scheduledDate ? formatMd(task.scheduledDate) : '날짜 자동'}
-                    {task.dueDate && ` · 마감 ${formatMd(task.dueDate, false)}`} · {task.durationMinutes}분
-                  </span>
-                </span>
-                {subGoalName(task) && (
-                  <Badge tone="neutral" className="max-w-[96px] shrink-0 truncate">
-                    {subGoalName(task)}
-                  </Badge>
-                )}
-              </button>
+                  {subGoalName(task) && (
+                    <Badge tone="neutral" className="max-w-[96px] shrink-0 truncate">
+                      {subGoalName(task)}
+                    </Badge>
+                  )}
+                  <Pencil className="text-ink-4 size-3.5 shrink-0" />
+                </button>
+              )}
             </IssueFrame>
           </li>
         ))}
       </ul>
-      <AddButton
-        label="Task 추가"
-        onClick={() => onEdit({ kind: 'task', index: null, taskType: 'ONE_TIME' })}
-        disabled={items.length >= LIMITS.oneTimes[1]}
-      />
+      {editor({ kind: 'task', index: null, taskType: 'ONE_TIME' }) ?? (
+        <AddButton
+          label="Task 추가"
+          onClick={() => onEdit({ kind: 'task', index: null, taskType: 'ONE_TIME' })}
+          disabled={items.length >= LIMITS.oneTimes[1]}
+        />
+      )}
     </PanelCard>
   )
 }
@@ -520,64 +561,90 @@ export function RoutinesCard({
   plan,
   issues,
   onEdit,
+  editor,
 }: {
   plan: GoalPlan
   issues: Issues
   onEdit: (t: EditTarget) => void
+  editor: EditorSlot
 }) {
   const items = plan.tasks.map((task, index) => ({ task, index })).filter(({ task }) => isRoutine(task))
+
+  /** 목표 기간 전체가 아니면 "10.21부터", "~10.20", "10.7~10.20" */
+  const periodOf = (t: PlanTask) => {
+    const from = t.startDate && t.startDate > plan.goal.startDate ? t.startDate : null
+    const to = t.endDate && t.endDate < plan.goal.endDate ? t.endDate : null
+    if (from && to) return `${formatMd(from, false)}~${formatMd(to, false)}`
+    if (from) return `${formatMd(from, false)}부터`
+    if (to) return `~${formatMd(to, false)}`
+    return null
+  }
 
   return (
     <PanelCard title="필요 루틴" aside={`반복 · ${items.length}개`} vkey="routines" issues={issues}>
       <ul className="divide-line divide-y">
-        {items.map(({ task, index }) => (
-          <li key={task.tempId}>
-            <IssueFrame vkey={`tasks[${index}]`} issues={issues} className="my-1">
-              <button
-                type="button"
-                onClick={() => onEdit({ kind: 'task', index, taskType: 'ROUTINE' })}
-                className="hover:bg-canvas flex w-full gap-3 rounded-xl px-2 py-3 text-left"
-              >
-                <span className="w-6 shrink-0 text-lg" aria-hidden>
-                  {task.emoji}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px] font-semibold">{task.title}</span>
-                  <span className="text-ink-3 mt-0.5 block text-[13px]">
-                    {task.preferredStartTime ?? '시간 자동'} · {task.durationMinutes}분
-                  </span>
-                  {task.description && (
-                    <span className="bg-subtle text-ink-2 mt-2 block rounded-lg px-2.5 py-1.5 text-[13px] leading-relaxed whitespace-pre-wrap">
-                      {task.description}
+        {items.map(({ task, index }) => {
+          const period = periodOf(task)
+          return (
+            <li key={task.tempId}>
+              <IssueFrame vkey={`tasks[${index}]`} issues={issues} className="my-1">
+                {editor({ kind: 'task', index, taskType: 'ROUTINE' }) ?? (
+                  <button
+                    type="button"
+                    onClick={() => onEdit({ kind: 'task', index, taskType: 'ROUTINE' })}
+                    className="group hover:bg-canvas flex w-full gap-3 rounded-xl px-2 py-3 text-left"
+                  >
+                    <span className="w-6 shrink-0 text-lg" aria-hidden>
+                      {task.emoji}
                     </span>
-                  )}
-                  <span className="mt-2 flex gap-1">
-                    {DAYS.map((d) => {
-                      const on = task.routineDays?.includes(d)
-                      return (
-                        <span
-                          key={d}
-                          className={cn(
-                            'grid size-7 place-items-center rounded-lg text-xs font-semibold',
-                            on ? 'bg-brand text-white' : 'bg-subtle text-ink-4'
-                          )}
-                        >
-                          {DAY_LABEL[d]}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-start gap-2">
+                        <span className="min-w-0 flex-1 text-[15px] font-semibold">{task.title}</span>
+                        <Pencil className="text-ink-4 group-hover:text-ink-2 mt-1 size-3.5 shrink-0" />
+                      </span>
+                      <span className="text-ink-3 mt-0.5 block text-[13px]">
+                        {task.preferredStartTime ?? '시간 자동'} · {task.durationMinutes}분
+                        {period && <b className="text-brand font-semibold"> · {period}</b>}
+                      </span>
+                      <span className="mt-2 flex gap-1">
+                        {DAYS.map((d) => {
+                          const on = task.routineDays?.includes(d)
+                          return (
+                            <span
+                              key={d}
+                              className={cn(
+                                'grid size-7 place-items-center rounded-lg text-xs font-semibold',
+                                on ? 'bg-brand text-white' : 'bg-subtle text-ink-4'
+                              )}
+                            >
+                              {DAY_LABEL[d]}
+                            </span>
+                          )
+                        })}
+                      </span>
+                      {task.description && (
+                        <span className="bg-subtle text-ink-2 mt-2 block rounded-lg px-2.5 py-1.5 text-[13px] leading-relaxed whitespace-pre-wrap">
+                          {task.description}
                         </span>
-                      )
-                    })}
-                  </span>
-                </span>
-              </button>
-            </IssueFrame>
-          </li>
-        ))}
+                      )}
+                      {task.reason && (
+                        <span className="text-ink-3 mt-1.5 block text-[12px] leading-relaxed">💡 {task.reason}</span>
+                      )}
+                    </span>
+                  </button>
+                )}
+              </IssueFrame>
+            </li>
+          )
+        })}
       </ul>
-      <AddButton
-        label="루틴 추가"
-        onClick={() => onEdit({ kind: 'task', index: null, taskType: 'ROUTINE' })}
-        disabled={items.length >= LIMITS.routines[1]}
-      />
+      {editor({ kind: 'task', index: null, taskType: 'ROUTINE' }) ?? (
+        <AddButton
+          label="루틴 추가"
+          onClick={() => onEdit({ kind: 'task', index: null, taskType: 'ROUTINE' })}
+          disabled={items.length >= LIMITS.routines[1]}
+        />
+      )}
     </PanelCard>
   )
 }

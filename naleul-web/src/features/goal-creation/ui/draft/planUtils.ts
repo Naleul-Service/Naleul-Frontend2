@@ -60,19 +60,19 @@ export const weeklyRoutineMinutes = (tasks: PlanTask[]) =>
 // path 형식을 서버 violations 와 같게 맞춰서, 화면 표시 로직을 하나로 써요.
 
 /**
- * 서버 GoalPlanValidator 와 같은 값.
- * 루틴 중심 · 최소 실천: 일회성 Task 는 0개가 기본, 루틴은 운동·공부 세션까지 담을 수 있게 90분까지.
+ * 사용자가 초안을 고칠 때의 한도 = 서버 GoalPlanValidator.USER_LIMITS.
+ * AI 는 더 엄격하게(루틴 5~30분, 일회성 0~5개) 만들지만, 사람이 직접 늘리거나 길게 잡는 건 막지 않아요.
+ * 주간 루틴 합계는 막지 않고 서버가 경고만 해요.
  */
 export const LIMITS = {
   title: 40,
-  subGoals: [1, 3],
-  milestones: [1, 4],
-  routines: [1, 5],
-  oneTimes: [0, 5],
-  routineMinutes: [1, 90],
-  oneTimeMinutes: [5, 180],
+  subGoals: [1, 5],
+  milestones: [1, 8],
+  routines: [1, 10],
+  oneTimes: [0, 30],
+  routineMinutes: [1, 240],
+  oneTimeMinutes: [1, 480],
   routineDescription: 300,
-  weeklyRoutineMinutes: 420,
 } as const
 
 export function validatePlan(plan: GoalPlan): PlanIssue[] {
@@ -131,9 +131,6 @@ export function validatePlan(plan: GoalPlan): PlanIssue[] {
         add(`${p}.dueDate`, `마감일은 연결된 마일스톤(${formatMd(ms.dueDate, false)})보다 늦을 수 없어요.`)
     }
   })
-
-  if (weeklyRoutineMinutes(plan.tasks) > LIMITS.weeklyRoutineMinutes)
-    add('tasks', `루틴 시간이 일주일에 ${LIMITS.weeklyRoutineMinutes}분을 넘지 않게 해 주세요.`)
 
   return issues
 }

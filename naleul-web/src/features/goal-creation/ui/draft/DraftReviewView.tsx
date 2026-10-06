@@ -20,7 +20,7 @@ import { goalFlowPath } from '../../routes'
 import type { DraftResponse, GoalPlan, PlanIssue, PlanningStyle, SessionDetail } from '../../types'
 import { FlowShell } from '../SessionGate'
 import { textareaClass } from '../formParts'
-import { ItemEditModal, type EditResult, type EditTarget } from './ItemEditModal'
+import { InlineItemEditor, sameTarget, type EditResult, type EditTarget } from './ItemEditModal'
 import { GoalHeroCard, MetricCard, OneTimeTasksCard, RoutinesCard, SubGoalsCard } from './PlanSections'
 import { LIMITS, groupIssues, isRoutine, itemKeyOf, validatePlan } from './planUtils'
 
@@ -116,6 +116,20 @@ export function DraftReviewView({ session, draft }: Props) {
       return `할 일은 최소 ${LIMITS.oneTimes[0]}개가 필요해요.`
     return null
   }
+
+  /** 편집 중인 항목 자리에 들어갈 편집기 (카드들이 각 줄마다 물어봐요) */
+  const editor = (t: EditTarget) =>
+    editTarget && sameTarget(editTarget, t) ? (
+      <InlineItemEditor
+        key={JSON.stringify(editTarget)}
+        target={editTarget}
+        plan={plan}
+        onClose={() => setEditTarget(null)}
+        onSave={applyEdit}
+        onDelete={deleteTarget}
+        deleteDisabledReason={deleteBlockReason(editTarget)}
+      />
+    ) : null
 
   const deleteTarget = () => {
     const t = editTarget
@@ -257,7 +271,9 @@ export function DraftReviewView({ session, draft }: Props) {
                 <Sparkles className="size-6" />
                 AI 목표 설계
               </h1>
-              <p className="text-ink-3 mt-1 text-sm">AI가 만든 초안이에요. 항목을 눌러 직접 수정할 수 있어요.</p>
+              <p className="text-ink-3 mt-1 text-sm">
+                AI가 만든 초안이에요. 항목을 누르면 그 자리에서 바로 고칠 수 있어요 (Enter 저장 · Esc 취소).
+              </p>
             </div>
             <Button variant="ghost" size="sm" onClick={() => setCancelOpen(true)} disabled={busy}>
               그만 만들기
@@ -320,6 +336,7 @@ export function DraftReviewView({ session, draft }: Props) {
               plan={plan}
               issues={issueMap}
               onEdit={setEditTarget}
+              editor={editor}
               styleChip={styleChip}
               colors={colors.data}
               colorId={colorId}
@@ -330,10 +347,10 @@ export function DraftReviewView({ session, draft }: Props) {
 
           {/* 하단: 세부 목표 · Task · 루틴 */}
           <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-3">
-            <SubGoalsCard plan={plan} issues={issueMap} onEdit={setEditTarget} />
+            <SubGoalsCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
             {/* 루틴이 계획의 중심이라 먼저, 일회성 Task 는 꼭 필요한 것만 */}
-            <RoutinesCard plan={plan} issues={issueMap} onEdit={setEditTarget} />
-            <OneTimeTasksCard plan={plan} issues={issueMap} onEdit={setEditTarget} />
+            <RoutinesCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
+            <OneTimeTasksCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
           </div>
         </main>
       </div>
@@ -365,16 +382,6 @@ export function DraftReviewView({ session, draft }: Props) {
           </div>
         </div>
       </div>
-
-      {/* 항목 수정 */}
-      <ItemEditModal
-        target={editTarget}
-        plan={plan}
-        onClose={() => setEditTarget(null)}
-        onSave={applyEdit}
-        onDelete={deleteTarget}
-        deleteDisabledReason={deleteBlockReason(editTarget)}
-      />
 
       {/* 다시 생성 (피드백) */}
       <Modal
