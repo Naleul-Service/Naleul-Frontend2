@@ -13,6 +13,7 @@ import { GoalHeader, GoalNotes } from './GoalHeader'
 import { GoalTaskList } from './GoalTaskList'
 import { MilestonesSection } from './MilestonesSection'
 import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
+import { ProgressSection } from './progress/ProgressSection'
 import { RefineWithAiCard } from './RefineWithAiCard'
 import { RoutinesSection } from './RoutinesSection'
 import { Section } from './sections'
@@ -146,6 +147,8 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-5">
+          {/* 목표 지점까지 지금 어디쯤인지 (수치 기록 그래프 · Task 누적) */}
+          {!goal.temporary && <ProgressSection goal={goal} />}
           <GoalNotes goal={goal} />
           <SubGoalsSection goal={goal} />
           <RoutinesSection goal={goal} />
