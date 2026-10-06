@@ -228,7 +228,7 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
         <div className="mt-2">
           <InlineConfirm
             message={`'${goal.goalCategoryName}' 목표를 삭제할까요?`}
-            detail="세부 목표·루틴과 앞으로의 루틴 Task도 함께 삭제돼요. 되돌릴 수 없어요."
+            detail="지금 이후로 예정된 Task와 루틴은 모두 지워지고, 지난 Task·완료한 기록은 남아요. 되돌릴 수 없어요."
             loading={remove.isPending}
             onCancel={del.close}
             onConfirm={() =>
