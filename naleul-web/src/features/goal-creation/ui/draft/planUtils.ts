@@ -105,11 +105,9 @@ export function validatePlan(plan: GoalPlan): PlanIssue[] {
     )
 
   const routines = plan.tasks.filter(isRoutine)
-  const oneTimes = plan.tasks.filter((t) => !isRoutine(t))
   const [rMin, rMax] = LIMITS.routines
-  const [oMin, oMax] = LIMITS.oneTimes
   if (routines.length < rMin || routines.length > rMax) add('tasks', `루틴은 ${rMin}~${rMax}개여야 해요.`)
-  if (oneTimes.length < oMin || oneTimes.length > oMax) add('tasks', `할 일(Task)은 ${oMin}~${oMax}개여야 해요.`)
+  // 일회성 Task 개수는 검사하지 않아요 — AI 목표는 루틴 중심이라 0개가 기본이에요 (추가 버튼만 30개에서 막혀요)
 
   plan.tasks.forEach((t, i) => {
     const p = `tasks[${i}]`
