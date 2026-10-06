@@ -6,6 +6,8 @@ import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from './
 
 export const DEFAULT_START_HOUR = 7
 export const DEFAULT_END_HOUR = 24
+/** 취침이 자정을 넘기면(예: 01:00) 격자를 다음 날 새벽까지 늘려요. 최대 다음 날 06:00 */
+export const MAX_END_HOUR = 30
 const MIN_TASK_MINUTES = 15 // 너무 짧은 블록도 글자가 보이도록
 
 export interface ShownTime {
@@ -60,14 +62,15 @@ export function visibleHours(days: TimetableDay[], activities: ActualActivity[] 
     for (const a of activities) {
       const as = minutesFrom(d.date, a.startAt)
       const ae = minutesFrom(d.date, a.endAt)
-      if (ae <= 0 || as >= 1440) continue
+      if (ae <= 0 || as >= MAX_END_HOUR * 60) continue
       start = Math.min(start, Math.max(as, 0))
-      end = Math.max(end, Math.min(ae, 1440))
+      end = Math.max(end, Math.min(ae, MAX_END_HOUR * 60))
     }
   }
   const startHour = Math.max(0, Math.min(DEFAULT_END_HOUR - 1, Math.floor(start / 60)))
-  // 끝은 항상 24시까지 — 취침 직전·늦은 밤으로도 끌어다 놓을 수 있게
-  const endHour = Math.min(24, Math.max(startHour + 1, Math.ceil(end / 60), DEFAULT_END_HOUR))
+  // 끝은 최소 24시 — 취침 직전·늦은 밤으로도 끌어다 놓을 수 있게.
+  // 취침이 자정 뒤(예: 01:00)면 그 시각까지 (그날 하루는 다음 날 01:00 까지라서)
+  const endHour = Math.min(MAX_END_HOUR, Math.max(startHour + 1, Math.ceil(end / 60), DEFAULT_END_HOUR))
   return { startHour, endHour }
 }
 
@@ -245,9 +248,9 @@ export function placeActivities(dayYmd: string, activities: ActualActivity[], fr
   for (const a of activities) {
     const start = minutesFrom(dayYmd, a.startAt)
     const end = minutesFrom(dayYmd, a.endAt)
-    if (end <= 0 || start >= 1440) continue // 이 날과 안 겹침
+    if (end <= 0 || start >= to) continue // 이 날 칸과 안 겹침
     const top = Math.max(start, 0, from)
-    const bottom = Math.min(Math.max(end, start + MIN_TASK_MINUTES), 1440, to)
+    const bottom = Math.min(Math.max(end, start + MIN_TASK_MINUTES), to)
     if (bottom <= top) continue
     out.push({
       item: a,

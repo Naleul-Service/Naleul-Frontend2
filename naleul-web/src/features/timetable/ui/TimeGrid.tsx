@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { cn } from '@/lib/cn'
 import { blockingOverlap, placeActivities, placeFixed, placeTasks } from '../layout'
-import { WEEKDAY_LABEL, dayOfMonth, formatMinutes, minutesFrom, nowKst, weekdayIndex } from '../time'
+import { WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, minutesFrom, nowKst, weekdayIndex } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityBlock, FixedBlockView, HATCH, TaskBlock, taskColors } from './Blocks'
 import { canUnschedule, useGridDrag, type DragSource, type DragState, type DropTarget } from './useGridDrag'
@@ -141,6 +141,15 @@ export function TimeGrid({
   const selectFixed = (b: FixedBlock, e: MouseEvent<HTMLElement>) => {
     if (!consumeClick()) onSelectFixed(b, e)
   }
+  /**
+   * 그날 칸에서 "지금" 빨간 선 위치 (분). 없으면 null.
+   * 새벽 00:30 이고 어제 칸이 01:00 까지 이어지면 어제 칸 맨 아래(24:30)에 그려요.
+   */
+  const nowLine = (date: string) => {
+    if (date === now.date && now.minutes >= from && now.minutes <= to) return now.minutes
+    if (addDays(date, 1) === now.date && now.minutes + 1440 <= to) return now.minutes + 1440
+    return null
+  }
   const selectActivity = (a: ActualActivity, e: MouseEvent<HTMLElement>) => {
     if (!consumeClick()) onSelectActivity?.(a, e)
   }
@@ -149,7 +158,9 @@ export function TimeGrid({
     if (!onEmptyClick || consumeClick() || e.target !== e.currentTarget) return
     const rect = e.currentTarget.getBoundingClientRect()
     const minutes = Math.floor((from + (e.clientY - rect.top) / PPM) / 30) * 30
-    if (date > now.date || (date === now.date && minutes >= now.minutes)) return
+    // 자정 뒤 칸(24:00~)은 다음 날 시각
+    const nowOnDay = date === now.date ? now.minutes : addDays(date, 1) === now.date ? now.minutes + 1440 : null
+    if (date > now.date || (nowOnDay !== null && minutes >= nowOnDay)) return
     onEmptyClick(date, minutes, e)
   }
 
@@ -241,7 +252,8 @@ export function TimeGrid({
               className="text-ink-4 absolute right-2 -translate-y-1/2 text-[11px] tabular-nums"
               style={{ top: i * HOUR_PX }}
             >
-              {i === 0 ? '' : `${String(h).padStart(2, '0')}:00`}
+              {/* 24시 이후는 다음 날 새벽 (취침이 자정 뒤일 때) */}
+              {i === 0 ? '' : `${String(h % 24).padStart(2, '0')}:00`}
             </span>
           ))}
         </div>
@@ -330,10 +342,10 @@ export function TimeGrid({
               {drag?.target?.type === 'grid' && drag.target.date === d.date && (
                 <DragGhost drag={drag} target={drag.target} from={from} />
               )}
-              {isToday && now.minutes >= from && now.minutes <= to && (
+              {nowLine(d.date) !== null && (
                 <div
                   className="pointer-events-none absolute inset-x-0 z-20 h-0 border-t-2 border-red-500"
-                  style={{ top: (now.minutes - from) * PPM }}
+                  style={{ top: (nowLine(d.date)! - from) * PPM }}
                   aria-hidden
                 >
                   <span className="absolute -top-[5px] -left-[5px] size-2 rounded-full bg-red-500" />
