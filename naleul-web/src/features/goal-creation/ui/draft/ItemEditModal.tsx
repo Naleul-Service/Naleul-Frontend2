@@ -234,6 +234,7 @@ function TaskForm({
   // 루틴
   const [days, setDays] = useState<DayOfWeek[]>(current?.routineDays ?? [])
   const [startTime, setStartTime] = useState(current?.preferredStartTime ?? '')
+  const [howTo, setHowTo] = useState(current?.description ?? '')
   // 일회성
   const [milestoneId, setMilestoneId] = useState(current?.milestoneTempId ?? '')
   const [scheduledDate, setScheduledDate] = useState(current?.scheduledDate ?? '')
@@ -273,6 +274,7 @@ function TaskForm({
           endDate: current?.endDate ?? null,
           scheduledDate: null,
           dueDate: null,
+          description: howTo.trim() || null,
         },
       })
     }
@@ -308,7 +310,7 @@ function TaskForm({
         title={title}
         onEmoji={setEmoji}
         onTitle={setTitle}
-        placeholder={routine ? '예) 유산소 40분' : '예) 인바디 측정하기'}
+        placeholder={routine ? '예) 하체 근력 50분' : '예) 5km 기록 측정'}
       />
 
       <div className="grid grid-cols-2 gap-3">
@@ -351,6 +353,16 @@ function TaskForm({
               className={inputClass}
               value={startTime}
               onChange={(e) => setStartTime(e.target.value)}
+            />
+          </Field>
+          <Field label="하는 방법 (선택)" hint={`${howTo.length}/${LIMITS.routineDescription}`}>
+            <textarea
+              rows={3}
+              maxLength={LIMITS.routineDescription}
+              className={textareaClass}
+              value={howTo}
+              placeholder="예) 스쿼트 4x10 → 런지 3x12(각) → 레그프레스 3x12, 세트 사이 60~90초 휴식"
+              onChange={(e) => setHowTo(e.target.value)}
             />
           </Field>
         </>

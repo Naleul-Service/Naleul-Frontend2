@@ -59,15 +59,20 @@ export const weeklyRoutineMinutes = (tasks: PlanTask[]) =>
 // 서버 HARD 규칙 중 프론트에서 바로 확인 가능한 것들 (인수인계 3-4).
 // path 형식을 서버 violations 와 같게 맞춰서, 화면 표시 로직을 하나로 써요.
 
+/**
+ * 서버 GoalPlanValidator 와 같은 값.
+ * 루틴 중심 · 최소 실천: 일회성 Task 는 0개가 기본, 루틴은 운동·공부 세션까지 담을 수 있게 90분까지.
+ */
 export const LIMITS = {
   title: 40,
-  subGoals: [2, 4],
-  milestones: [2, 8],
-  routines: [1, 6],
-  oneTimes: [3, 30],
-  routineMinutes: [5, 30],
-  oneTimeMinutes: [5, 60],
-  weeklyRoutineMinutes: 300,
+  subGoals: [1, 3],
+  milestones: [1, 4],
+  routines: [1, 5],
+  oneTimes: [0, 5],
+  routineMinutes: [1, 90],
+  oneTimeMinutes: [5, 180],
+  routineDescription: 300,
+  weeklyRoutineMinutes: 420,
 } as const
 
 export function validatePlan(plan: GoalPlan): PlanIssue[] {

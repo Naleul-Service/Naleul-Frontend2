@@ -331,8 +331,9 @@ export function DraftReviewView({ session, draft }: Props) {
           {/* 하단: 세부 목표 · Task · 루틴 */}
           <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-3">
             <SubGoalsCard plan={plan} issues={issueMap} onEdit={setEditTarget} />
-            <OneTimeTasksCard plan={plan} issues={issueMap} onEdit={setEditTarget} />
+            {/* 루틴이 계획의 중심이라 먼저, 일회성 Task 는 꼭 필요한 것만 */}
             <RoutinesCard plan={plan} issues={issueMap} onEdit={setEditTarget} />
+            <OneTimeTasksCard plan={plan} issues={issueMap} onEdit={setEditTarget} />
           </div>
         </main>
       </div>

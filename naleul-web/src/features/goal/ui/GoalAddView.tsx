@@ -11,6 +11,8 @@ import { useUserColors } from '@/features/color/api'
 import { addDays, todayKst } from '@/features/timetable/time'
 import { useCreateGoal } from '../edit/mutations'
 import { ColorSwatches, Field, InlineForm, colorIdOf, inlineInput, toNum } from '../edit/inline'
+import { isKindComplete, kindBody, type GoalKindValue } from '../kind'
+import { GoalKindPicker } from './GoalKindPicker'
 
 /** 직접 목표 만들기 폼 — Enter 로 만들기, Esc 로 닫기 */
 function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
@@ -32,6 +34,7 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
     targetValue: '',
   })
   const [showMetric, setShowMetric] = useState(false)
+  const [kind, setKind] = useState<GoalKindValue | null>(null)
   const [subs, setSubs] = useState<string[]>([])
   const [subDraft, setSubDraft] = useState('')
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }))
@@ -46,7 +49,9 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
         ? '종료일이 시작일보다 빨라요.'
         : nums.some((n) => n !== null && Number.isNaN(n))
           ? '수치는 숫자로 입력해 주세요.'
-          : null
+          : !isKindComplete(kind)
+            ? '카테고리를 골라 주세요. (기타는 이름 1~10자)'
+            : null
   const valid = !!f.name.trim() && !error && colorId !== null
 
   const addSub = () => {
@@ -73,6 +78,7 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
         colorId: colorId!,
         motive: f.motive.trim() || undefined,
         emoji: f.emoji.trim() || undefined,
+        ...kindBody(kind),
         ...(showMetric && f.metricName.trim()
           ? {
               metricName: f.metricName.trim(),
@@ -117,6 +123,10 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
             data-autofocus
           />
         </Field>
+      </div>
+      <div>
+        <span className="text-ink-3 mb-1 block text-[12px] font-medium">카테고리</span>
+        <GoalKindPicker value={kind} onChange={setKind} compact />
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Field label="시작일">
@@ -248,7 +258,7 @@ export function GoalAddView({ initialManual = false }: { initialManual?: boolean
             AI로 설계하기 <Badge tone="brand">추천</Badge>
           </p>
           <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
-            한 문장만 말하면 몇 가지 질문을 하고, 세부 목표·마일스톤·루틴까지 계획을 짜 드려요.
+            카테고리와 한 문장만 고르면 몇 가지 질문을 하고, 그 분야에 맞는 루틴 위주로 꼭 필요한 것만 계획해 드려요.
           </p>
           <span className="text-brand mt-4 flex items-center gap-1 text-sm font-semibold">
             <MessageCircle className="size-4" />

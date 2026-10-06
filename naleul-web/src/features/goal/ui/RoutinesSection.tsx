@@ -66,6 +66,7 @@ function RoutineForm({
   const [start, setStart] = useState(routine?.repeatStartDate ?? (period.start < today ? today : period.start))
   const [end, setEnd] = useState(routine?.repeatEndDate ?? (period.end < today ? today : period.end))
   const [notify, setNotify] = useState(routine?.notificationEnabled ?? true)
+  const [howTo, setHowTo] = useState(routine?.description ?? '')
 
   if (!subs.length) {
     return (
@@ -108,6 +109,7 @@ function RoutineForm({
       repeatStartTime: startTime || null,
       repeatEndTime: endTime || null,
       notificationEnabled: notify,
+      description: howTo.trim(),
     }
     if (routine) update.mutate({ id: routine.routineId, ...body }, { onSuccess: onDone })
     else create.mutate(body, { onSuccess: onDone })
@@ -185,6 +187,16 @@ function RoutineForm({
           <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={inlineInput} />
         </Field>
       </div>
+      <Field label="하는 방법 (선택)">
+        <textarea
+          value={howTo}
+          onChange={(e) => setHowTo(e.target.value)}
+          rows={2}
+          maxLength={300}
+          placeholder="예) 스쿼트 4x10 → 런지 3x12(각), 세트 사이 60초 휴식 · Shift+Enter 로 줄바꿈"
+          className={`${inlineInput} h-auto resize-none py-2 leading-relaxed`}
+        />
+      </Field>
       <p className="text-ink-3 text-xs">
         {startTime ? '정한 시간에 매번 고정돼요.' : '시간을 비워 두면 자동 배치가 빈 시간에 넣어 줘요.'}
         {routine && ' 저장하면 오늘 이후의 루틴 Task가 새 설정으로 바뀌어요 (지난 기록은 그대로).'}
@@ -248,7 +260,13 @@ function RoutineRow({
         <p className="text-ink-3 mt-0.5 text-[13px]">
           {subGoal}
           {start ? ` · ${start}${end ? `~${end}` : ''}` : ' · 시간 자동'}
+          {!start && routine.durationMinutes ? ` · ${routine.durationMinutes}분` : ''}
         </p>
+        {routine.description && (
+          <p className="bg-subtle text-ink-2 mt-2 rounded-lg px-2.5 py-1.5 text-[13px] leading-relaxed whitespace-pre-wrap">
+            {routine.description}
+          </p>
+        )}
       </button>
       {/* 좁은 화면에선 요일을 아랫줄로 */}
       <div className="order-3 w-full sm:order-none sm:w-auto">

@@ -1,3 +1,4 @@
+import type { GoalSubType } from '@/features/goal/kind'
 /**
  * AI 목표 생성 — 백엔드 응답 타입 (인수인계 문서 3장 기준)
  */
@@ -116,6 +117,8 @@ export interface PlanGoal {
   endDate: string
   planningStyle: PlanningStyle
   aiNote: string | null
+  /** 목표 카테고리 2단계 (AI 가 분류하거나 사용자가 고른 값) */
+  subType?: GoalSubType | null
 }
 
 export interface PlanSubGoal {
@@ -154,6 +157,8 @@ export interface PlanTask {
   endDate: string | null
   scheduledDate: string | null
   dueDate: string | null
+  /** 루틴의 구체적인 방법 (예: "스쿼트 4x10, 런지 3x12…") */
+  description?: string | null
 }
 
 export interface PlanIssue {

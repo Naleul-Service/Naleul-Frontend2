@@ -4,6 +4,7 @@ import { toast } from '@/stores/toastStore'
 import { timetableKeys } from '@/features/timetable/api'
 import type { TimeBlockTask } from '@/features/timetable/types'
 import { goalKeys, type GoalCategory, type JavaDayOfWeek, type MilestoneInfo } from '../api'
+import type { GoalSubType, GoalType } from '../kind'
 
 /**
  * 목표 상세에서 쓰는 추가·수정·삭제 API.
@@ -42,6 +43,9 @@ export interface GoalCreateInput {
   metricUnit?: string
   startValue?: number | null
   targetValue?: number | null
+  goalType?: GoalType
+  goalSubType?: GoalSubType
+  goalKindLabel?: string
 }
 
 /**
@@ -92,6 +96,10 @@ export interface GoalUpdateInput {
   startValue?: number | null
   currentValue?: number | null
   targetValue?: number | null
+  /** 목표 카테고리 — "기타"면 goalKindLabel 1~10자 */
+  goalType?: GoalType
+  goalSubType?: GoalSubType
+  goalKindLabel?: string
 }
 
 export const useUpdateGoal = (goalId: number) =>
@@ -140,6 +148,8 @@ export interface RoutineInput {
   repeatStartTime: string | null
   repeatEndTime: string | null
   notificationEnabled: boolean
+  /** 하는 방법 — 수정 때 "" 를 보내면 지워져요 */
+  description?: string
 }
 
 export const useCreateRoutine = (goalId: number) =>

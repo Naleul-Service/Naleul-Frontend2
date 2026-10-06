@@ -20,6 +20,8 @@ import {
   useEditing,
 } from '../edit/inline'
 import { formatDot, goalColor, periodProgress, statusLabel } from '../format'
+import { isKindComplete, kindBody, type GoalKindValue } from '../kind'
+import { GoalKindPicker } from './GoalKindPicker'
 
 const numStr = (v: number | null | undefined) => (v == null ? '' : String(v))
 
@@ -40,6 +42,11 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
     currentValue: numStr(goal.currentValue),
     targetValue: numStr(goal.targetValue),
   })
+  const [kind, setKind] = useState<GoalKindValue | null>(
+    goal.goalType && goal.goalSubType
+      ? { goalType: goal.goalType, goalSubType: goal.goalSubType, goalKindLabel: goal.goalKindLabel ?? '' }
+      : null
+  )
   const [showMetric, setShowMetric] = useState(goal.targetValue != null || !!goal.metricName)
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }))
 
@@ -51,7 +58,9 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
       ? '종료일이 시작일보다 빨라요.'
       : nums.some((n) => n !== null && Number.isNaN(n))
         ? '수치는 숫자로 입력해 주세요.'
-        : null
+        : kind && !isKindComplete(kind)
+          ? '기타 카테고리 이름을 1~10자로 적어 주세요.'
+          : null
 
   const submit = () =>
     update.mutate(
@@ -62,6 +71,8 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
         goalCategoryStartDate: f.start || undefined,
         goalCategoryEndDate: f.end || undefined,
         ...(f.colorId !== null ? { colorId: f.colorId } : {}),
+        // 카테고리는 2단계까지 고른 경우에만 (1단계만 고르다 만 건 기존 값 유지)
+        ...(isKindComplete(kind) ? kindBody(kind) : {}),
         ...(showMetric
           ? {
               metricName: f.metricName.trim(),
@@ -120,6 +131,10 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
         <Field label="종료일">
           <input type="date" value={f.end} onChange={(e) => set('end', e.target.value)} className={inlineInput} />
         </Field>
+      </div>
+      <div>
+        <span className="text-ink-3 mb-1 block text-[12px] font-medium">카테고리</span>
+        <GoalKindPicker value={kind} onChange={setKind} compact />
       </div>
       <Field label="색상">
         <ColorSwatches colors={colors.data} value={colorId} onChange={(id) => set('colorId', id)} />
@@ -242,6 +257,7 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
               {statusLabel(goal.goalCategoryStatus)}
             </Badge>
             {goal.temporary && <Badge tone="warning">임시 목표</Badge>}
+            {goal.goalKindName && <Badge tone="brand">{goal.goalKindName}</Badge>}
             <button
               type="button"
               onClick={edit.open}

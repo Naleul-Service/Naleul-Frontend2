@@ -3,6 +3,7 @@ import { api, isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
 import { timetableKeys } from '@/features/timetable/api'
 import type { TimeBlockTask } from '@/features/timetable/types'
+import type { GoalSubType, GoalType } from './kind'
 
 /**
  * 백엔드 GoalCategoryResponse (목표 = goal_category)
@@ -23,6 +24,9 @@ export interface RoutineSummary {
   repeatEndTime: string | null
   repeatDays: JavaDayOfWeek[]
   notificationEnabled: boolean
+  /** 하는 방법 (AI 루틴: "스쿼트 4x10, 런지 3x12…") */
+  description?: string | null
+  durationMinutes?: number | null
 }
 
 export interface SubGoalInfo {
@@ -33,6 +37,9 @@ export interface SubGoalInfo {
   generalCategoryEndDate: string | null
   generalCategoryStatus: GoalStatus
   routines: RoutineSummary[]
+  /** 세부 목표의 실천 원칙 (AI: "하루 1,600kcal, 단백질 90g…") */
+  description?: string | null
+  emoji?: string | null
 }
 
 export interface MilestoneInfo {
@@ -61,6 +68,12 @@ export interface GoalCategory {
   aiGenerated?: boolean
   /** Brain dump 에서 자동으로 만든 임시 목표 (종료일·마일스톤 없음) → "AI로 구체화하기"를 권해요 */
   temporary?: boolean
+  /** 목표 카테고리 2단계 (명세 6.A.1.2). 예전 목표는 null */
+  goalType?: GoalType | null
+  goalSubType?: GoalSubType | null
+  goalKindLabel?: string | null
+  /** "건강 · 다이어트" */
+  goalKindName?: string | null
   planningStyle?: 'PLANNER' | 'SPONTANEOUS' | null
   aiNote?: string | null
   metricName?: string | null

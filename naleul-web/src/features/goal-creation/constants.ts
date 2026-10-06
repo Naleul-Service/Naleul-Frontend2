@@ -32,7 +32,7 @@ export const PROGRESS_STEPS = [
   { step: 'ANALYZING', label: '목표를 분석하고 있어요' },
   { step: 'SUB_GOALS', label: '세부 목표를 나누고 있어요' },
   { step: 'MILESTONES', label: '마일스톤을 정하고 있어요' },
-  { step: 'TASKS', label: '작은 Task로 쪼개고 있어요' },
+  { step: 'TASKS', label: '꼭 필요한 루틴만 짜고 있어요' },
   { step: 'VALIDATING', label: '계획을 점검하고 있어요' },
 ] as const
 

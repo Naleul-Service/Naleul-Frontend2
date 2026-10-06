@@ -149,7 +149,14 @@ function SubGoalCard({ goal, sub }: { goal: GoalCategory; sub: SubGoalInfo }) {
         <RowActions label={sub.generalCategoryName} onEdit={edit.open} onDelete={del.open} className="-mt-1 -mr-1" />
       </div>
       <button type="button" onClick={edit.open} className="mt-2 block w-full text-left">
-        <p className="text-[15px] font-bold">{sub.generalCategoryName}</p>
+        <p className="text-[15px] font-bold">
+          {sub.emoji ? `${sub.emoji} ` : ''}
+          {sub.generalCategoryName}
+        </p>
+        {/* AI 가 정한 실천 원칙 (예: 식단 — 하루 1,600kcal, 단백질 90g …) */}
+        {sub.description && (
+          <p className="text-ink-2 mt-1.5 text-[13px] leading-relaxed whitespace-pre-wrap">{sub.description}</p>
+        )}
         <p className="text-ink-3 mt-1 text-[13px]">
           루틴 {sub.routines.length}개
           {sub.generalCategoryStartDate && (

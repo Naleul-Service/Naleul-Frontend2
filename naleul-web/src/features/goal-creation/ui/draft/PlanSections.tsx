@@ -345,7 +345,7 @@ export function MetricCard({ plan }: { plan: GoalPlan }) {
   const stats = [
     ['세부 목표', `${plan.subGoals.length}개`],
     ['마일스톤', `${plan.milestones.length}단계`],
-    ['생성될 Task', `${oneTimes}개`],
+    ['일회성 Task', `${oneTimes}개`],
     ['루틴', `주 ${weeklyCount}회`],
   ] as const
 
@@ -472,6 +472,11 @@ export function OneTimeTasksCard({
 
   return (
     <PanelCard title="생성될 Task" aside={`일회성 · ${items.length}개`} vkey="tasks" issues={issues}>
+      {items.length === 0 && (
+        <p className="text-ink-3 px-2 py-2 text-[13px] leading-relaxed">
+          따로 챙길 일회성 Task는 없어요. 위의 루틴만 꾸준히 하면 돼요.
+        </p>
+      )}
       <ul className="divide-line divide-y">
         {items.map(({ task, index }) => (
           <li key={task.tempId}>
@@ -541,6 +546,11 @@ export function RoutinesCard({
                   <span className="text-ink-3 mt-0.5 block text-[13px]">
                     {task.preferredStartTime ?? '시간 자동'} · {task.durationMinutes}분
                   </span>
+                  {task.description && (
+                    <span className="bg-subtle text-ink-2 mt-2 block rounded-lg px-2.5 py-1.5 text-[13px] leading-relaxed whitespace-pre-wrap">
+                      {task.description}
+                    </span>
+                  )}
                   <span className="mt-2 flex gap-1">
                     {DAYS.map((d) => {
                       const on = task.routineDays?.includes(d)
