@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check, PenLine, Sparkles } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { cn } from '@/lib/cn'
 import { isApiError } from '@/lib/client/api'
@@ -11,6 +11,7 @@ import { isOngoing } from '@/features/goal/format'
 import { hm, todayKst } from '@/features/timetable/time'
 import { useConfirmBrainDump, useParseBrainDump, useTaskQuota } from '../api'
 import type { ConfirmResponse, ParseResponse, TempGoalInput } from '../types'
+import { ManualTaskAdd } from './ManualTaskAdd'
 import { StepGoals, type MapItem } from './StepGoals'
 import { StepInput, type DumpLine } from './StepInput'
 import { StepResult } from './StepResult'
@@ -51,8 +52,10 @@ function toMapItems(res: ParseResponse): { items: MapItem[]; tempGoals: TempGoal
  *   2. 목표 연결 → POST /brain-dump/confirm
  *   3. TimeBlock 확인
  */
-export function TaskAddView() {
+export function TaskAddView({ initialMode = 'ai' }: { initialMode?: 'ai' | 'manual' }) {
   const today = todayKst()
+  // 목표 만들기처럼 "AI로 정리하기 / 직접 추가하기" 중에서 골라요
+  const [mode, setMode] = useState<'ai' | 'manual'>(initialMode)
   const [step, setStep] = useState<0 | 1 | 2>(0)
   const [lines, setLines] = useState<DumpLine[]>([])
   const [items, setItems] = useState<MapItem[]>([])
@@ -151,64 +154,113 @@ export function TaskAddView() {
 
   return (
     <>
-      <PageHeader title="Task 추가" description="생각나는 일을 쏟아내면, AI가 목표에 연결하고 빈 시간에 배치해요." />
+      <PageHeader title="Task 추가" description="AI로 한 번에 정리하거나, 직접 하나씩 추가할 수 있어요." />
 
-      <ol className="mt-5 mb-4 flex flex-wrap items-center gap-2" aria-label="진행 단계">
-        {STEPS.map((label, i) => (
-          <li key={label} className="flex items-center gap-2" aria-current={step === i ? 'step' : undefined}>
+      {/* 추가 방식 고르기 */}
+      <div className="mt-5 grid max-w-5xl gap-3 sm:grid-cols-2" role="tablist" aria-label="추가 방식">
+        {(
+          [
+            ['ai', Sparkles, 'AI로 정리하기', '생각나는 일을 쏟아내면 목표에 연결하고 빈 시간에 배치해요.'],
+            ['manual', PenLine, '직접 추가하기', '목표·날짜·시간을 정해서 하나씩 바로 추가해요.'],
+          ] as const
+        ).map(([key, Icon, title, desc]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={mode === key}
+            onClick={() => setMode(key)}
+            disabled={mode === 'ai' && key === 'manual' && step > 0 && !result}
+            title={
+              mode === 'ai' && key === 'manual' && step > 0 && !result
+                ? 'AI 정리를 마치거나 처음으로 돌아가면 바꿀 수 있어요'
+                : undefined
+            }
+            className={cn(
+              'flex items-start gap-3 rounded-2xl border p-4 text-left transition-colors disabled:opacity-40',
+              mode === key ? 'border-ink bg-surface ring-ink ring-1' : 'border-line bg-surface hover:border-line-strong'
+            )}
+          >
             <span
               className={cn(
-                'grid size-6 place-items-center rounded-full text-xs font-bold',
-                i < step ? 'bg-success text-white' : i === step ? 'bg-ink text-white' : 'bg-subtle text-ink-3'
+                'grid size-9 shrink-0 place-items-center rounded-xl',
+                mode === key ? 'bg-ink text-white' : 'bg-subtle text-ink-3'
               )}
             >
-              {i < step ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+              <Icon className="size-4" />
             </span>
-            <span className={cn('text-sm', i === step ? 'font-bold' : 'text-ink-3')}>{label}</span>
-            {i < STEPS.length - 1 && <span className="bg-line-strong mx-1 h-px w-6" aria-hidden />}
-          </li>
+            <span className="min-w-0">
+              <span className="block text-[15px] font-bold">{title}</span>
+              <span className="text-ink-3 mt-0.5 block text-[13px] leading-snug">{desc}</span>
+            </span>
+          </button>
         ))}
-      </ol>
-
-      <div className="max-w-5xl">
-        {step === 0 && (
-          <StepInput
-            lines={lines}
-            onChange={setLines}
-            quota={quota.data}
-            quotaLoading={quota.isPending}
-            today={today}
-            loading={parse.isPending}
-            onNext={goParse}
-          />
-        )}
-        {step === 1 && (
-          <StepGoals
-            items={items}
-            tempGoals={tempGoals}
-            goals={ongoingGoals}
-            aiFailed={aiFailed}
-            conflicts={conflicts}
-            today={today}
-            loading={confirm.isPending}
-            onChange={(nextItems, nextTemps) => {
-              setItems(nextItems)
-              setTempGoals(nextTemps)
-              // 고친 Task 는 겹침 표시를 지워요
-              setConflicts((c) => {
-                const changed = nextItems.filter((n) => items.find((o) => o.clientKey === n.clientKey) !== n)
-                if (!changed.length) return c
-                const next = { ...c }
-                changed.forEach((n) => delete next[n.clientKey])
-                return next
-              })
-            }}
-            onBack={() => setStep(0)}
-            onConfirm={goConfirm}
-          />
-        )}
-        {step === 2 && result && <StepResult result={result} today={today} onAddMore={reset} />}
       </div>
+
+      {mode === 'manual' ? (
+        <div className="mt-4 max-w-5xl">
+          <ManualTaskAdd />
+        </div>
+      ) : (
+        <>
+          <ol className="mt-5 mb-4 flex flex-wrap items-center gap-2" aria-label="진행 단계">
+            {STEPS.map((label, i) => (
+              <li key={label} className="flex items-center gap-2" aria-current={step === i ? 'step' : undefined}>
+                <span
+                  className={cn(
+                    'grid size-6 place-items-center rounded-full text-xs font-bold',
+                    i < step ? 'bg-success text-white' : i === step ? 'bg-ink text-white' : 'bg-subtle text-ink-3'
+                  )}
+                >
+                  {i < step ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+                </span>
+                <span className={cn('text-sm', i === step ? 'font-bold' : 'text-ink-3')}>{label}</span>
+                {i < STEPS.length - 1 && <span className="bg-line-strong mx-1 h-px w-6" aria-hidden />}
+              </li>
+            ))}
+          </ol>
+
+          <div className="max-w-5xl">
+            {step === 0 && (
+              <StepInput
+                lines={lines}
+                onChange={setLines}
+                quota={quota.data}
+                quotaLoading={quota.isPending}
+                today={today}
+                loading={parse.isPending}
+                onNext={goParse}
+              />
+            )}
+            {step === 1 && (
+              <StepGoals
+                items={items}
+                tempGoals={tempGoals}
+                goals={ongoingGoals}
+                aiFailed={aiFailed}
+                conflicts={conflicts}
+                today={today}
+                loading={confirm.isPending}
+                onChange={(nextItems, nextTemps) => {
+                  setItems(nextItems)
+                  setTempGoals(nextTemps)
+                  // 고친 Task 는 겹침 표시를 지워요
+                  setConflicts((c) => {
+                    const changed = nextItems.filter((n) => items.find((o) => o.clientKey === n.clientKey) !== n)
+                    if (!changed.length) return c
+                    const next = { ...c }
+                    changed.forEach((n) => delete next[n.clientKey])
+                    return next
+                  })
+                }}
+                onBack={() => setStep(0)}
+                onConfirm={goConfirm}
+              />
+            )}
+            {step === 2 && result && <StepResult result={result} today={today} onAddMore={reset} />}
+          </div>
+        </>
+      )}
     </>
   )
 }

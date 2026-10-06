@@ -193,8 +193,9 @@ export function DraftReviewView({ session, draft }: Props) {
       })
       queryClient.removeQueries({ queryKey: goalCreationKeys.all })
       queryClient.invalidateQueries({ queryKey: goalKeys.all }) // 사이드바 · 목표 목록 갱신
-      toast.success('목표가 만들어졌어요. Task가 TimeBlock에 배치돼요.')
-      router.replace(`/goal/${goalId}`)
+      toast.success('목표가 만들어졌어요.')
+      // 상세 화면에서 "이어서 TimeTable 에 배치할까요?"를 물어봐요
+      router.replace(`/goal/${goalId}?created=1`)
     } catch (error) {
       setConfirming(false)
       if (!isApiError(error)) return toast.error('목표를 만들지 못했어요. 다시 시도해 주세요.')

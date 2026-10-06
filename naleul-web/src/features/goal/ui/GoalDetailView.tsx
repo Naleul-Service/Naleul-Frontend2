@@ -12,6 +12,7 @@ import { dDayLabel, periodProgress } from '../format'
 import { GoalHeader, GoalNotes } from './GoalHeader'
 import { GoalTaskList } from './GoalTaskList'
 import { MilestonesSection } from './MilestonesSection'
+import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
 import { RefineWithAiCard } from './RefineWithAiCard'
 import { RoutinesSection } from './RoutinesSection'
 import { Section } from './sections'
@@ -96,7 +97,7 @@ function Hero({ goal }: { goal: GoalCategory }) {
 // ─── 화면 ──────────────────────────────────────────────────────
 
 /** /goal/[goalId] — 목표 상세. 각 영역을 그 자리에서 바로 추가·수정·삭제할 수 있어요 */
-export function GoalDetailView({ goalId }: { goalId: number }) {
+export function GoalDetailView({ goalId, justCreated = false }: { goalId: number; justCreated?: boolean }) {
   const { data: goal, isPending, isError, error, refetch } = useGoalCategory(goalId)
   // 한 번에 하나의 입력창만 열어요 (다른 걸 열면 앞의 것은 닫힘)
   const [editing, setEditing] = useState<string | null>(null)
@@ -133,6 +134,7 @@ export function GoalDetailView({ goalId }: { goalId: number }) {
     <EditingContext.Provider value={editingCtx}>
       <GoalHeader goal={goal} />
 
+      {justCreated && <PlaceAfterCreateCard goal={goal} className="mt-6" />}
       {goal.temporary && <RefineWithAiCard goal={goal} className="mt-6" />}
 
       {/* 임시 목표는 기간·수치가 없어 진행률이 의미 없어요 → 구체화 카드만 보여줘요 */}

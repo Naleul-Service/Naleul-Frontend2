@@ -19,12 +19,15 @@ export function GoalTaskForm({
   task,
   onDone,
   onNeedSubGoal,
+  onCreated,
 }: {
   goal: GoalCategory
   /** 없으면 새로 추가 */
   task?: TimeBlockTask
   onDone: () => void
   onNeedSubGoal: () => void
+  /** 새로 만든 Task (추가일 때만) — 예: "이날 빈 시간에 배치하기" 안내 */
+  onCreated?: (t: TimeBlockTask) => void
 }) {
   const subs = activeSubGoals(goal)
   const milestones = [...(goal.milestones ?? [])].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
@@ -91,7 +94,13 @@ export function GoalTaskForm({
       dueDate: f.dueDate || null,
     }
     if (task) update.mutate({ taskId: task.taskId, ...body }, { onSuccess: onDone })
-    else create.mutate(body, { onSuccess: onDone })
+    else
+      create.mutate(body, {
+        onSuccess: (created) => {
+          if (created) onCreated?.(created)
+          onDone()
+        },
+      })
   }
 
   return (

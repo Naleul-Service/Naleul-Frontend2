@@ -13,6 +13,7 @@ import { visibleHours } from '../layout'
 import { addDays, addMonths, formatRange, isYmd, startOfWeek, todayKst } from '../time'
 import { HATCH } from './Blocks'
 import { MonthView } from './MonthView'
+import { AutoPlaceBar } from './AutoPlaceBar'
 import { TimeGrid } from './TimeGrid'
 import { useTimetableInteractions } from './useTimetableInteractions'
 
@@ -168,20 +169,23 @@ export function CalendarView() {
           </div>
         </Card>
       ) : (
-        <TimeGrid
-          days={days}
-          startHour={startHour}
-          endHour={endHour}
-          selection={selection}
-          onSelectTask={onSelectTask}
-          onSelectFixed={onSelectFixed}
-          onDrop={onDrop}
-          onDragStart={close}
-          onDayClick={(d) => {
-            close()
-            go({ view: 'day', date: d })
-          }}
-        />
+        <>
+          <AutoPlaceBar days={rawDays} today={today} />
+          <TimeGrid
+            days={days}
+            startHour={startHour}
+            endHour={endHour}
+            selection={selection}
+            onSelectTask={onSelectTask}
+            onSelectFixed={onSelectFixed}
+            onDrop={onDrop}
+            onDragStart={close}
+            onDayClick={(d) => {
+              close()
+              go({ view: 'day', date: d })
+            }}
+          />
+        </>
       )}
 
       {overlays}

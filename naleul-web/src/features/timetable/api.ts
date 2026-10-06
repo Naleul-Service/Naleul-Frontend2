@@ -238,3 +238,40 @@ export function useReplan() {
     }
   )
 }
+
+// ─── AI로 TimeTable 배치하기 (시간 미정 Task 만 빈 시간에) ──────────────
+
+export interface FillResponse {
+  days: { date: string; placed: number; unscheduled: number }[]
+  placedCount: number
+  unscheduledCount: number
+}
+
+/**
+ * POST /daily-plans/fill?startDate&endDate (최대 7일)
+ * 직접 정한 시간(🔒)·이미 배치된 블록·고정 시간은 그대로 두고, 시간 미정 Task 만 남은 빈 시간에 넣어요.
+ * 오늘은 지금 + 10분 이후만 써요.
+ */
+export function useFillTimetable() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: { startDate: string; endDate: string }) =>
+      api.post<FillResponse>(`/v1/daily-plans/fill?startDate=${v.startDate}&endDate=${v.endDate}`),
+    onSuccess: (r) => {
+      if (!r) return
+      if (!r.placedCount && !r.unscheduledCount) toast.show('배치할 시간 미정 Task가 없었어요.')
+      else if (!r.placedCount) toast.error(`빈 시간이 없어 ${r.unscheduledCount}개는 시간 미정으로 남았어요.`)
+      else
+        toast.success(
+          `${r.placedCount}개 Task를 빈 시간에 배치했어요.` +
+            (r.unscheduledCount ? ` ${r.unscheduledCount}개는 빈 시간이 없어 시간 미정으로 남았어요.` : '')
+        )
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: timetableKeys.all })
+      // 목표 상세의 관련 Task 도 시간이 바뀌어요 (goal/api 를 import 하면 순환 참조라 키를 그대로 써요)
+      qc.invalidateQueries({ queryKey: ['goals'] })
+    },
+  })
+}
