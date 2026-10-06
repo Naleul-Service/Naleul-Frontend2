@@ -19,6 +19,7 @@ import {
   periodProgress,
   statusLabel,
 } from '../format'
+import { GoalTaskList } from './GoalTaskList'
 
 // ─── 작은 조각들 ───────────────────────────────────────────────
 
@@ -314,6 +315,7 @@ export function GoalDetailView({ goalId }: { goalId: number }) {
           )}
           <SubGoals goal={goal} />
           <Routines goal={goal} />
+          <GoalTaskList goalId={goal.goalCategoryId} />
         </div>
 
         <div className="space-y-5">
