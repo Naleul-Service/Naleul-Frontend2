@@ -140,6 +140,75 @@ export function useDeletePatternOverride() {
 
 export const lifePatternKeys = { list: ['life-patterns'] as const }
 
+// ─── 범위 골라 바꾸기 (이날만 / 이번 주 / 앞으로) ───────────────────
+
+export type ChangeScope = 'DAY' | 'WEEK' | 'FOLLOWING'
+
+export interface RoutineScheduleResponse {
+  scope: ChangeScope
+  result: TaskScheduleResponse
+  /** 같이 옮긴 다른 날짜 */
+  changedDates: string[]
+  /** 잠긴 일정과 겹쳐 건너뛴 날짜 (그날은 원래 시간 그대로) */
+  skippedDates: string[]
+}
+
+const skippedNote = (dates: string[]) =>
+  dates.length
+    ? ` ${dates.map((d) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`).join(', ')}은 다른 일정과 겹쳐 그대로예요.`
+    : ''
+
+/** 루틴 블록 시간 변경 + 범위. DAY 는 기존 드래그와 같아요 */
+export function useRoutineScopedReschedule() {
+  return useTimetableMutation(
+    (v: { taskId: number; plannedStartAt: string; plannedEndAt: string; scope: ChangeScope }) =>
+      api.patch<RoutineScheduleResponse>(`/v1/tasks/${v.taskId}/routine-schedule`, {
+        plannedStartAt: v.plannedStartAt,
+        plannedEndAt: v.plannedEndAt,
+        scope: v.scope,
+      }),
+    {
+      success: (r, v) => {
+        if (!r || v.scope === 'DAY') return scheduleResultMessage(r?.result ?? null)
+        const n = r.changedDates.length + 1
+        const head = v.scope === 'WEEK' ? `이번 주 루틴 ${n}일의 시간을 바꿨어요.` : `앞으로의 루틴 시간을 바꿨어요.`
+        return head + skippedNote(r.skippedDates)
+      },
+    }
+  )
+}
+
+/** 고정 시간 변경 + 범위. FOLLOWING 은 기본값이 바뀌므로 패턴 목록도 다시 불러와요 */
+export function usePatternScopedChange() {
+  const qc = useQueryClient()
+  return useTimetableMutation(
+    async (v: {
+      lifePatternId: number
+      targetDate: string
+      startTime: string
+      endTime: string
+      scope: ChangeScope
+    }) => {
+      const r = await api.put(`/v1/life-patterns/${v.lifePatternId}/scoped-change`, {
+        targetDate: v.targetDate,
+        startTime: v.startTime,
+        endTime: v.endTime,
+        scope: v.scope,
+      })
+      if (v.scope === 'FOLLOWING') qc.invalidateQueries({ queryKey: lifePatternKeys.list })
+      return r
+    },
+    {
+      success: (_, v) =>
+        v.scope === 'DAY'
+          ? '이날만 시간을 바꿨어요.'
+          : v.scope === 'WEEK'
+            ? '이번 주 시간을 바꿨어요.'
+            : '앞으로의 기본 시간을 바꿨어요. 지난 기록은 그대로예요.',
+    }
+  )
+}
+
 /** 기본 생활 패턴 목록 */
 export function useLifePatterns(enabled = true) {
   return useQuery({

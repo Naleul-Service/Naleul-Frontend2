@@ -4,7 +4,7 @@ import type { CSSProperties, MouseEvent, PointerEvent } from 'react'
 import { Check, Lock, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { hexOf, shownTime, withAlpha, type Placed } from '../layout'
-import { formatMinutes } from '../time'
+import { formatMinutes, todayKst } from '../time'
 import type { FixedBlock, TimeBlockTask } from '../types'
 
 /** 빗금 배경 (고정 시간) */
@@ -195,7 +195,8 @@ export function FixedBlockView({
       <span className="truncate font-semibold">
         {b.emoji ? `${b.emoji} ` : ''}
         {b.title}
-        {b.overridden && <span className="text-brand ml-1 font-medium">· 이날만</span>}
+        {/* 기본 시간과 다르게 바꾼 날 (이날만·이번 주로 바꾼 경우). 지난 날짜는 "앞으로" 변경 때 예전 시간으로 고정해 둔 것이라 표시하지 않아요 */}
+        {b.overridden && b.targetDate >= todayKst() && <span className="text-brand ml-1 font-medium">· 변경</span>}
       </span>
       {heightPx >= 30 && (
         <span className="truncate">

@@ -25,7 +25,7 @@ export function FixedDetail({ block: b, busy, actions }: { block: FixedBlock; bu
     <div className="p-5">
       <div className="flex flex-wrap items-center gap-1.5 pr-8">
         <Badge>고정 시간 · {TYPE_LABEL[b.patternType]}</Badge>
-        {b.overridden && <Badge tone="brand">이날만 바뀐 시간</Badge>}
+        {b.overridden && <Badge tone="brand">기본과 다른 시간</Badge>}
       </div>
 
       <h3 className="mt-2.5 text-lg font-bold">
@@ -52,7 +52,7 @@ export function FixedDetail({ block: b, busy, actions }: { block: FixedBlock; bu
         {canEditTime && (
           <Button variant="secondary" onClick={() => actions.onEditTime(b)} disabled={busy}>
             <Clock className="size-4" />
-            이날만 시간 변경
+            시간 변경
           </Button>
         )}
         <Button
@@ -75,7 +75,9 @@ export function FixedDetail({ block: b, busy, actions }: { block: FixedBlock; bu
           기본 패턴 수정
         </Link>
       </div>
-      <p className="text-ink-4 mt-3 text-center text-[11px]">이날만 바꾼 내용은 다음 날부터 기본 패턴으로 돌아와요.</p>
+      <p className="text-ink-4 mt-3 text-center text-[11px]">
+        시간을 옮기면 이날만 · 이번 주 · 앞으로 중에서 고를 수 있어요.
+      </p>
     </div>
   )
 }

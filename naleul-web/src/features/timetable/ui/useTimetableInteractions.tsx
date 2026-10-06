@@ -9,15 +9,19 @@ import {
   useDeleteTask,
   useLifePatterns,
   usePatternOverride,
+  usePatternScopedChange,
   useRescheduleTask,
+  useRoutineScopedReschedule,
+  type ChangeScope,
   useToggleComplete,
   useUnlockTask,
   useUnscheduleTask,
 } from '../api'
 import { applyPending, type Pending } from '../layout'
-import { formatMonthDay, minutesFrom, minutesToTime, timeToMinutes, toDateTime } from '../time'
+import { formatMinutes, formatMonthDay, minutesFrom, minutesToTime, timeToMinutes, toDateTime, todayKst } from '../time'
 import type { FixedBlock, TimeBlockTask, TimetableDay } from '../types'
 import { FixedDetail } from './FixedDetail'
+import { ScopeChooser, scopeOptions } from './ScopeChooser'
 import { TaskDetail } from './TaskDetail'
 import { TimeEditModal, type TimeValue } from './TimeEditModal'
 import { fixedKey, type Selection } from './TimeGrid'
@@ -34,6 +38,14 @@ type Editing =
   /** 실제로 한 시간 입력 후 완료 */
   | { kind: 'actual'; task: TimeBlockTask; initial: TimeValue }
   | null
+
+/** 드래그 직후 "어디까지 바꿀까요?"를 묻는 중인 변경 (그동안 새 자리에 임시로 그려 둬요) */
+type ScopeAsk =
+  | { kind: 'routine'; task: TimeBlockTask; date: string; start: number; end: number; pending: Pending }
+  | { kind: 'fixed'; block: FixedBlock; date: string; start: number; end: number; pending: Pending }
+
+/** 루틴 Task 가 속한 날짜 (루틴 인스턴스 날짜) */
+const routineDay = (t: TimeBlockTask) => t.date ?? t.plannedStartAt?.slice(0, 10) ?? null
 
 /** 고정 블록이 자정을 넘기면(화면엔 24:00까지만) 다음 날 조각이나 패턴에서 실제 종료 시각을 찾아요 */
 function fullFixedEnd(block: FixedBlock, days: TimetableDay[], patternEnd?: string) {
@@ -63,6 +75,8 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   const [confirmDelete, setConfirmDelete] = useState<TimeBlockTask | null>(null)
   // 드래그로 옮긴 뒤 서버 응답을 기다리는 동안 새 위치에 그려 둘 블록들
   const [pending, setPending] = useState<Pending[]>([])
+  const [ask, setAsk] = useState<ScopeAsk | null>(null)
+  const today = todayKst()
 
   const toggleComplete = useToggleComplete()
   const deleteTask = useDeleteTask()
@@ -71,6 +85,8 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   const reschedule = useRescheduleTask()
   const completeWithActual = useCompleteWithActual()
   const override = usePatternOverride()
+  const routineScoped = useRoutineScopedReschedule()
+  const patternScoped = usePatternScopedChange()
   const resetOverride = useDeletePatternOverride()
   // 자정을 넘기는 고정 시간 수정 때만 필요 → 그때만 불러와요
   const needsPatterns = editing?.kind === 'fixed' || opened?.kind === 'fixed'
@@ -154,8 +170,50 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
       resetOverride.mutate({ lifePatternId: b.lifePatternId, targetDate: b.targetDate }, { onSuccess: close }),
   }
 
+  // ── 범위를 골라 실제로 저장 (이날만 / 이번 주 / 앞으로) ──
+  const saveRoutine = (
+    task: TimeBlockTask,
+    date: string,
+    start: number,
+    end: number,
+    scope: ChangeScope,
+    opts: object
+  ) =>
+    routineScoped.mutate(
+      { taskId: task.taskId, plannedStartAt: toDateTime(date, start), plannedEndAt: toDateTime(date, end), scope },
+      opts
+    )
+  const saveFixed = (block: FixedBlock, start: number, end: number, scope: ChangeScope, opts: object) =>
+    patternScoped.mutate(
+      {
+        lifePatternId: block.lifePatternId,
+        targetDate: block.targetDate,
+        startTime: minutesToTime(start),
+        endTime: minutesToTime(end),
+        scope,
+      },
+      opts
+    )
+
+  const dropPending = (p: Pending) => setPending((list) => list.filter((x) => x !== p))
+
+  const chooseScope = (scope: ChangeScope) => {
+    if (!ask) return
+    // 성공·실패 모두 TimeTable 을 다시 불러온 뒤 임시 표시를 지워요
+    const opts = { onSettled: () => dropPending(ask.pending) }
+    if (ask.kind === 'routine') saveRoutine(ask.task, ask.date, ask.start, ask.end, scope, opts)
+    else saveFixed(ask.block, ask.start, ask.end, scope, opts)
+    setAsk(null)
+  }
+  const cancelAsk = () => {
+    if (ask) dropPending(ask.pending)
+    setAsk(null)
+  }
+
   // ── 드래그 앤 드롭 (명세 3-4) ──
   const onDrop = (source: DragSource, target: DropTarget) => {
+    // 묻고 있던 게 있으면 원래대로 두고 새 드래그를 처리해요
+    if (ask) cancelAsk()
     const p: Pending | null =
       source.kind === 'task'
         ? target.type === 'grid'
@@ -166,9 +224,37 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
           : null
     if (!p) return
     setPending((list) => [...list, p])
-    // 성공·실패 모두 TimeTable 을 다시 불러온 뒤(useTimetableMutation 의 onSettled) 임시 표시를 지워요
-    const done = { onSettled: () => setPending((list) => list.filter((x) => x !== p)) }
 
+    // 루틴을 같은 날 안에서 옮겼거나, 고정 시간을 옮겼으면 → 범위를 물어봐요
+    if (
+      source.kind === 'task' &&
+      target.type === 'grid' &&
+      source.task.sourceType === 'ROUTINE' &&
+      routineDay(source.task) === target.date
+    ) {
+      setAsk({
+        kind: 'routine',
+        task: source.task,
+        date: target.date,
+        start: target.start,
+        end: target.end,
+        pending: p,
+      })
+      return
+    }
+    if (source.kind === 'fixed' && target.type === 'grid') {
+      setAsk({
+        kind: 'fixed',
+        block: source.block,
+        date: target.date,
+        start: target.start,
+        end: target.end,
+        pending: p,
+      })
+      return
+    }
+
+    const done = { onSettled: () => dropPending(p) }
     if (source.kind === 'task' && target.type === 'grid') {
       reschedule.mutate(
         {
@@ -180,20 +266,10 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
       )
     } else if (source.kind === 'task') {
       unschedule.mutate(source.task.taskId, done)
-    } else if (target.type === 'grid') {
-      override.mutate(
-        {
-          lifePatternId: source.block.lifePatternId,
-          targetDate: source.block.targetDate,
-          startTime: minutesToTime(target.start),
-          endTime: minutesToTime(target.end),
-        },
-        done
-      )
     }
   }
 
-  const submitEdit = (v: TimeValue) => {
+  const submitEdit = (v: TimeValue, scope: ChangeScope) => {
     if (!editing) return
     const done = { onSuccess: () => setEditing(null) }
     if (editing.kind === 'actual') {
@@ -205,6 +281,8 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
         },
         done
       )
+    } else if (editing.kind === 'task' && editing.task.sourceType === 'ROUTINE') {
+      saveRoutine(editing.task, v.date, v.start, v.end, scope, done)
     } else if (editing.kind === 'task') {
       reschedule.mutate(
         {
@@ -215,20 +293,12 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
         done
       )
     } else {
-      override.mutate(
-        {
-          lifePatternId: editing.block.lifePatternId,
-          targetDate: editing.block.targetDate,
-          startTime: minutesToTime(v.start),
-          endTime: minutesToTime(v.end),
-        },
-        done
-      )
+      saveFixed(editing.block, v.start, v.end, scope, done)
     }
   }
 
   const busyTask = toggleComplete.isPending || unlock.isPending || unschedule.isPending
-  const busyFixed = override.isPending || resetOverride.isPending
+  const busyFixed = override.isPending || resetOverride.isPending || patternScoped.isPending
 
   const overlays = (
     <>
@@ -264,13 +334,40 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
               ? '실제로 시작하고 끝낸 시각을 남기면 완료로 표시되고, 나의 패턴의 시작 지연이 더 정확해져요.'
               : editing.kind === 'task'
                 ? '직접 정한 시간은 잠겨서 자동 배치가 옮기지 않아요. 다른 블록과 겹치면 그 블록이 비켜나요.'
-                : '이날만 바뀌고, 다음 날부터는 기본 패턴 시간이에요.'
+                : '적용 범위를 골라 주세요. 이날만 바꾸면 다음 날부터는 기본 시간이에요.'
+          }
+          scope={
+            editing.kind === 'fixed'
+              ? { kind: 'fixed', today }
+              : editing.kind === 'task' && editing.task.sourceType === 'ROUTINE'
+                ? { kind: 'routine', today }
+                : undefined
           }
           initial={editing.initial}
           dateEditable={editing.kind === 'task'}
-          loading={reschedule.isPending || override.isPending || completeWithActual.isPending}
+          loading={
+            reschedule.isPending || patternScoped.isPending || routineScoped.isPending || completeWithActual.isPending
+          }
           onSubmit={submitEdit}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {/* 드래그 후 범위 고르기 */}
+      {ask && (
+        <ScopeChooser
+          title={
+            ask.kind === 'routine'
+              ? `'${ask.task.taskName}' → ${formatMinutes(ask.start)}–${formatMinutes(ask.end)}`
+              : `${ask.block.emoji ? `${ask.block.emoji} ` : ''}${ask.block.title} → ${formatMinutes(ask.start)}–${formatMinutes(ask.end)}`
+          }
+          options={scopeOptions({
+            kind: ask.kind,
+            isToday: ask.date === today,
+            crossesMidnight: ask.end >= 1440,
+          })}
+          onChoose={chooseScope}
+          onCancel={cancelAsk}
         />
       )}
 
