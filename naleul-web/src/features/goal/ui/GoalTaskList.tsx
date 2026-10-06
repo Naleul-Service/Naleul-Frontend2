@@ -10,7 +10,10 @@ import { cn } from '@/lib/cn'
 import { hexOf, shownTime } from '@/features/timetable/layout'
 import { WEEKDAY_LABEL, addDays, hm, todayKst, weekdayIndex } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
-import { useGoalTasks, useToggleGoalTask } from '../api'
+import { useGoalTasks, useToggleGoalTask, type GoalCategory } from '../api'
+import { useDeleteGoalTask } from '../edit/mutations'
+import { AddButton, InlineConfirm, RowActions, useEditing } from '../edit/inline'
+import { GoalTaskForm } from './GoalTaskForm'
 
 type StatusFilter = 'ALL' | 'TODO' | 'DONE'
 type KindFilter = 'ALL' | 'ONE_TIME' | 'ROUTINE'
@@ -37,16 +40,64 @@ function dayLabel(ymd: string, today: string) {
   return `${date} (${WEEKDAY_LABEL[weekdayIndex(ymd)]})`
 }
 
+/** 한 줄 — 수정(일회성 Task 만)·삭제(미션 제외)는 그 줄이 입력창/확인창으로 바뀌어요 */
+function TaskItem(props: {
+  goal: GoalCategory
+  task: TimeBlockTask
+  today: string
+  onToggle: (t: TimeBlockTask) => void
+  toggling: boolean
+}) {
+  const t = props.task
+  const key = `task:${t.taskId}`
+  const edit = useEditing(key)
+  const del = useEditing(`del:${key}`)
+  const addSub = useEditing('sub:new')
+  const remove = useDeleteGoalTask()
+
+  if (edit.isOpen) {
+    return (
+      <li className="py-2">
+        <GoalTaskForm goal={props.goal} task={t} onDone={edit.close} onNeedSubGoal={addSub.open} />
+      </li>
+    )
+  }
+  if (del.isOpen) {
+    return (
+      <li className="py-2">
+        <InlineConfirm
+          message={`'${t.taskName}'을 삭제할까요?`}
+          detail={t.sourceType === 'ROUTINE' ? '이 날짜의 루틴 Task 하나만 지워져요. 루틴은 그대로예요.' : undefined}
+          loading={remove.isPending}
+          onCancel={del.close}
+          onConfirm={() => remove.mutate(t.taskId, { onSuccess: del.close })}
+        />
+      </li>
+    )
+  }
+  return (
+    <TaskRow
+      {...props}
+      onEdit={t.sourceType === 'MANUAL' ? edit.open : undefined}
+      onDelete={t.sourceType !== 'MISSION' ? del.open : undefined}
+    />
+  )
+}
+
 function TaskRow({
   task: t,
   today,
   onToggle,
   toggling,
+  onEdit,
+  onDelete,
 }: {
   task: TimeBlockTask
   today: string
   onToggle: (t: TimeBlockTask) => void
   toggling: boolean
+  onEdit?: () => void
+  onDelete?: () => void
 }) {
   const done = isDone(t)
   const shown = shownTime(t)
@@ -55,7 +106,7 @@ function TaskRow({
   const sub = [t.generalCategoryName, t.milestoneTitle].filter(Boolean).join(' · ')
 
   return (
-    <li className="flex items-center gap-3 py-3">
+    <li className="group flex items-center gap-3 py-3">
       <button
         type="button"
         onClick={() => onToggle(t)}
@@ -71,7 +122,7 @@ function TaskRow({
       </button>
 
       {/* 날짜 */}
-      <div className="w-[76px] shrink-0">
+      <div className="w-[88px] shrink-0">
         <p
           className={cn(
             'text-[13px] font-semibold',
@@ -80,7 +131,7 @@ function TaskRow({
         >
           {day ? dayLabel(day, today) : '날짜 미정'}
         </p>
-        <p className="text-ink-4 text-[11px] tabular-nums">
+        <p className="text-ink-4 text-[11px] whitespace-nowrap tabular-nums">
           {shown?.actual && '실제 '}
           {time}
         </p>
@@ -125,6 +176,7 @@ function TaskRow({
           </Badge>
         )}
       </div>
+      <RowActions label={t.taskName} onEdit={onEdit} onDelete={onDelete} />
     </li>
   )
 }
@@ -134,8 +186,11 @@ function TaskRow({
  * AI 가 만든 Task · 직접 추가한 Task · 루틴 Task 를 한 번에 보고, 완료/미완료 · 할 일/루틴으로 거를 수 있어요.
  * 정렬은 서버 순서 그대로: 미완료 위 · 오늘과 가까운 날짜일수록 위 · 완료는 아래.
  */
-export function GoalTaskList({ goalId }: { goalId: number }) {
+export function GoalTaskList({ goal }: { goal: GoalCategory }) {
+  const goalId = goal.goalCategoryId
   const { data, isPending, isError, refetch } = useGoalTasks(goalId)
+  const add = useEditing('task:new')
+  const addSub = useEditing('sub:new')
   const toggle = useToggleGoalTask(goalId)
   const [status, setStatus] = useState<StatusFilter>('ALL')
   const [kind, setKind] = useState<KindFilter>('ALL')
@@ -174,6 +229,15 @@ export function GoalTaskList({ goalId }: { goalId: number }) {
         )}
       </div>
 
+      {/* 추가: 이름·날짜만 넣고 Enter */}
+      <div className="mb-4">
+        {add.isOpen ? (
+          <GoalTaskForm goal={goal} onDone={add.close} onNeedSubGoal={addSub.open} />
+        ) : (
+          <AddButton onClick={add.open}>Task 추가</AddButton>
+        )}
+      </div>
+
       {isPending ? (
         <div className="grid min-h-[120px] place-items-center">
           <Spinner className="text-ink-3 size-5" />
@@ -186,7 +250,9 @@ export function GoalTaskList({ goalId }: { goalId: number }) {
           </button>
         </div>
       ) : all.length === 0 ? (
-        <p className="text-ink-3 py-6 text-center text-sm">이 목표에 연결된 Task가 아직 없어요.</p>
+        <p className="text-ink-3 py-4 text-center text-sm">
+          이 목표에 연결된 Task가 아직 없어요. 위에서 바로 추가해 보세요.
+        </p>
       ) : (
         <>
           {/* 필터 */}
@@ -232,7 +298,8 @@ export function GoalTaskList({ goalId }: { goalId: number }) {
                   {t.taskId === firstDoneId && (
                     <li className="text-ink-3 pt-5 pb-1 text-xs font-semibold">완료한 Task</li>
                   )}
-                  <TaskRow
+                  <TaskItem
+                    goal={goal}
                     task={t}
                     today={today}
                     onToggle={(x) => toggle.mutate(x)}
