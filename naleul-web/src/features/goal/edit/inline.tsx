@@ -168,6 +168,7 @@ export function InlineConfirm({
       aria-label="삭제 확인"
       onKeyDown={(e) => {
         if (e.key === 'Escape' && !loading) {
+          e.preventDefault()
           e.stopPropagation()
           onCancel()
         }

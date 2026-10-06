@@ -85,10 +85,11 @@ export function useGoalCategories() {
   })
 }
 
-export function useGoalCategory(id: number) {
+export function useGoalCategory(id: number, enabled = true) {
   return useQuery({
     queryKey: goalKeys.detail(id),
     queryFn: () => api.get<GoalCategory>(`/v1/goal-categories/${id}`),
+    enabled,
   })
 }
 

@@ -69,7 +69,8 @@ export function Popover({ anchor, onClose, children, width = 320, label, classNa
       if (!inside(e.target)) onCloseRef.current()
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCloseRef.current()
+      // 안쪽 입력칸이 Esc 를 먼저 처리했으면(편집 취소) 창은 닫지 않아요
+      if (e.key === 'Escape' && !e.defaultPrevented) onCloseRef.current()
     }
     const onScroll = (e: Event) => {
       if (!inside(e.target)) onCloseRef.current()
