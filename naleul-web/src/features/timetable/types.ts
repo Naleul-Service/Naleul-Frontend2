@@ -191,3 +191,33 @@ export interface ReplanResponse {
   movedToOtherDays: { taskId: number; date: string; start: string; end: string; reason?: string | null }[]
   unscheduled: number[]
 }
+
+/**
+ * 실제로 한 일 (GET /activities) — 계획(Task)과 상관없이 그 시간에 실제로 한 활동.
+ * TimeTable 에서 계획 블록 옆 "실제" 칸에 그려요. 시각은 한국 시간 "YYYY-MM-DDTHH:mm:ss".
+ */
+export interface ActualActivity {
+  activityId: number
+  title: string
+  emoji: string | null
+  startAt: string
+  endAt: string
+  durationMinutes: number
+  goalCategoryId: number | null
+  goalCategoryName: string | null
+  goalColorCode: string | null
+  /** 원래 이 시간에 계획했던 Task (선택) */
+  replacedTaskId: number | null
+  replacedTaskName: string | null
+  memo: string | null
+}
+
+export interface ActivityInput {
+  title: string
+  emoji?: string | null
+  startAt: string
+  endAt: string
+  goalCategoryId?: number | null
+  replacedTaskId?: number | null
+  memo?: string | null
+}

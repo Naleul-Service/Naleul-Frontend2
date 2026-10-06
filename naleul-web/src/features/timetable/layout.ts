@@ -2,7 +2,7 @@
  * TimeTable 격자에 블록을 놓기 위한 순수 계산 (화면과 분리해서 테스트하기 쉽게).
  */
 import { minutesFrom, toDateTime } from './time'
-import type { FixedBlock, TimeBlockTask, TimetableDay } from './types'
+import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from './types'
 
 export const DEFAULT_START_HOUR = 7
 export const DEFAULT_END_HOUR = 24
@@ -43,7 +43,7 @@ function shownMinutes(dayYmd: string, t: TimeBlockTask, fallbackMinutes = t.plan
  * 기본은 하루 범위(기상 ~ 취침)이고, 그 밖에 Task 가 있으면 넓혀요.
  * 수면 패턴이 없으면 백엔드가 00:00~24:00 을 주므로 그대로 0~24시.
  */
-export function visibleHours(days: TimetableDay[]) {
+export function visibleHours(days: TimetableDay[], activities: ActualActivity[] = []) {
   if (!days.length) return { startHour: DEFAULT_START_HOUR, endHour: DEFAULT_END_HOUR }
   let start = Infinity
   let end = -Infinity
@@ -55,6 +55,14 @@ export function visibleHours(days: TimetableDay[]) {
       if (!m) continue
       start = Math.min(start, m.start)
       end = Math.max(end, m.end)
+    }
+    // 실제로 한 일도 보이게 (그날 범위 안 조각만)
+    for (const a of activities) {
+      const as = minutesFrom(d.date, a.startAt)
+      const ae = minutesFrom(d.date, a.endAt)
+      if (ae <= 0 || as >= 1440) continue
+      start = Math.min(start, Math.max(as, 0))
+      end = Math.max(end, Math.min(ae, 1440))
     }
   }
   const startHour = Math.max(0, Math.min(DEFAULT_END_HOUR - 1, Math.floor(start / 60)))
@@ -225,4 +233,33 @@ export function blockingOverlap(day: TimetableDay, start: number, end: number, s
     const e = t.plannedEndAt ? minutesFrom(day.date, t.plannedEndAt) : s + 30
     return s < end && e > start
   })
+}
+
+/**
+ * 그날 칸에 그릴 "실제로 한 일" 블록.
+ * 기록끼리는 겹치지 않아서(서버가 막음) 열 나누기 없이 위치만 계산해요.
+ * 자정을 넘긴 기록은 날짜마다 잘린 조각으로 그려요.
+ */
+export function placeActivities(dayYmd: string, activities: ActualActivity[], from: number, to: number) {
+  const out: Placed<ActualActivity>[] = []
+  for (const a of activities) {
+    const start = minutesFrom(dayYmd, a.startAt)
+    const end = minutesFrom(dayYmd, a.endAt)
+    if (end <= 0 || start >= 1440) continue // 이 날과 안 겹침
+    const top = Math.max(start, 0, from)
+    const bottom = Math.min(Math.max(end, start + MIN_TASK_MINUTES), 1440, to)
+    if (bottom <= top) continue
+    out.push({
+      item: a,
+      top,
+      bottom,
+      start,
+      end,
+      clippedTop: start < top,
+      clippedBottom: end > bottom,
+      col: 0,
+      cols: 1,
+    })
+  }
+  return out
 }

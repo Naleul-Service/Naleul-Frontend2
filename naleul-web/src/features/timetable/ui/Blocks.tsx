@@ -5,7 +5,7 @@ import { Check, Lock, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { hexOf, shownTime, withAlpha, type Placed } from '../layout'
 import { formatMinutes, todayKst } from '../time'
-import type { FixedBlock, TimeBlockTask } from '../types'
+import type { ActualActivity, FixedBlock, TimeBlockTask } from '../types'
 
 /** 빗금 배경 (고정 시간) */
 export const HATCH: CSSProperties = {
@@ -204,6 +204,65 @@ export function FixedBlockView({
         </span>
       )}
       {drag && !placed.clippedBottom && <ResizeHandle onDrag={drag} />}
+    </button>
+  )
+}
+
+/**
+ * 실제로 한 일 블록 — 그날 칸 오른쪽 "실제" 칸에 그려요.
+ * 계획(Task) 블록과 헷갈리지 않게 흰 바탕 + 초록 왼쪽 선 + "실제" 표시, 목표를 연결했으면 그 색 선.
+ */
+export function ActivityBlock({
+  placed,
+  geometry,
+  selected,
+  onSelect,
+}: {
+  placed: Placed<ActualActivity>
+  geometry: Geometry
+  selected: boolean
+  onSelect: (a: ActualActivity, e: MouseEvent<HTMLButtonElement>) => void
+}) {
+  const a = placed.item
+  const heightPx = (placed.bottom - placed.top) * geometry.ppm
+  const short = heightPx < 34
+  const color = a.goalColorCode ? (a.goalColorCode.startsWith('#') ? a.goalColorCode : `#${a.goalColorCode}`) : null
+  return (
+    <button
+      type="button"
+      data-activity-id={a.activityId}
+      onClick={(e) => {
+        e.stopPropagation()
+        onSelect(a, e)
+      }}
+      style={{
+        ...pos(placed, geometry),
+        ...NO_CALLOUT,
+        borderLeftColor: color ?? 'var(--color-success)',
+      }}
+      aria-label={`실제로 한 일 ${a.title} ${formatMinutes(placed.start)}~${formatMinutes(placed.end)}`}
+      className={cn(
+        'border-line bg-surface absolute inset-x-0.5 z-10 flex flex-col overflow-hidden rounded-lg border border-l-[3px] px-1.5 text-left text-[11px] leading-tight shadow-[0_1px_2px_rgb(17_17_17/0.06)]',
+        'hover:shadow-[0_2px_8px_rgb(17_17_17/0.16)]',
+        short ? 'justify-center py-0' : 'py-1',
+        selected && 'ring-ink ring-2 ring-offset-1',
+        placed.clippedTop && 'rounded-t-none',
+        placed.clippedBottom && 'rounded-b-none'
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-1">
+        <span className="text-success shrink-0 text-[10px] font-bold">✓</span>
+        <span className="truncate font-semibold">
+          {a.emoji ? `${a.emoji} ` : ''}
+          {a.title}
+        </span>
+      </span>
+      {!short && (
+        <span className="text-ink-3 truncate tabular-nums">
+          {formatMinutes(placed.start)}–{formatMinutes(placed.end)}
+        </span>
+      )}
+      {heightPx >= 56 && a.replacedTaskName && <span className="text-ink-4 truncate">대신: {a.replacedTaskName}</span>}
     </button>
   )
 }

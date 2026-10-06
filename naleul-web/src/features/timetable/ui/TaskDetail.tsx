@@ -30,6 +30,7 @@ import {
   formatMonthDay,
   minutesFrom,
   minutesToTime,
+  nowKst,
   timeToMinutes,
   toDateTime,
   todayKst,
@@ -45,6 +46,8 @@ export interface TaskActions {
   onDelete: (t: TimeBlockTask) => void
   /** "계획과 다른 시간에 했어요" — 실제 시각을 입력하고 완료 (나의 패턴 시작 지연 계산용) */
   onCompleteWithTime?: (t: TimeBlockTask) => void
+  /** "이 시간에 다른 일을 했어요" — 계획 대신 실제로 한 일 기록 */
+  onRecordInstead?: (t: TimeBlockTask) => void
 }
 
 /** 어떤 작업을 할 수 있는지 (백엔드 규칙과 같게) */
@@ -604,6 +607,20 @@ export function TaskDetail({
           계획과 다른 시간에 했어요
         </button>
       )}
+      {/* 계획 시각이 이미 시작됐는데 안 했으면: 그 시간에 실제로 한 일을 남길 수 있게 */}
+      {!done &&
+        !confirmingDelete &&
+        t.plannedStartAt &&
+        t.plannedStartAt <= toDateTime(nowKst().date, nowKst().minutes) &&
+        actions.onRecordInstead && (
+          <button
+            type="button"
+            onClick={() => actions.onRecordInstead?.(t)}
+            className="text-success hover:bg-success-soft mt-1 w-full rounded-lg py-1.5 text-center text-[13px] font-semibold"
+          >
+            이 시간에 다른 일을 했어요
+          </button>
+        )}
     </div>
   )
 }

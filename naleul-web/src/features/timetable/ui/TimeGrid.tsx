@@ -2,17 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { cn } from '@/lib/cn'
-import { blockingOverlap, placeFixed, placeTasks } from '../layout'
+import { blockingOverlap, placeActivities, placeFixed, placeTasks } from '../layout'
 import { WEEKDAY_LABEL, dayOfMonth, formatMinutes, minutesFrom, nowKst, weekdayIndex } from '../time'
-import type { FixedBlock, TimeBlockTask, TimetableDay } from '../types'
-import { FixedBlockView, HATCH, TaskBlock, taskColors } from './Blocks'
+import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
+import { ActivityBlock, FixedBlockView, HATCH, TaskBlock, taskColors } from './Blocks'
 import { canUnschedule, useGridDrag, type DragSource, type DragState, type DropTarget } from './useGridDrag'
 
 export const HOUR_PX = 60
 const PPM = HOUR_PX / 60
 const UNSCHEDULED_VISIBLE = 3
 
-export type Selection = { kind: 'task'; id: number } | { kind: 'fixed'; key: string } | null
+export type Selection =
+  { kind: 'task'; id: number } | { kind: 'fixed'; key: string } | { kind: 'activity'; id: number } | null
 
 export const fixedKey = (b: FixedBlock) => `${b.lifePatternId}-${b.targetDate}-${b.start}`
 
@@ -45,6 +46,11 @@ interface Props {
   highlightIds?: ReadonlySet<number>
   /** 격자 최대 높이 (기본: 화면 높이에 맞춤) */
   maxHeightClass?: string
+  /** 실제로 한 일 — 있으면 그날 칸 오른쪽에 "실제" 칸이 생겨요 */
+  activities?: ActualActivity[]
+  onSelectActivity?: (a: ActualActivity, e: MouseEvent<HTMLElement>) => void
+  /** 빈 칸(지난 시간)을 눌렀을 때 — 그 시각으로 "실제로 한 일" 기록 열기 */
+  onEmptyClick?: (date: string, minutes: number, e: MouseEvent<HTMLElement>) => void
 }
 
 function sameAsSource(source: DragSource, target: DropTarget) {
@@ -74,6 +80,9 @@ export function TimeGrid({
   onDragStart,
   highlightIds,
   maxHeightClass = 'max-h-[max(480px,calc(100dvh-230px))]',
+  activities = [],
+  onSelectActivity,
+  onEmptyClick,
 }: Props) {
   const now = useNowKst()
   const from = startHour * 60
@@ -131,6 +140,17 @@ export function TimeGrid({
   }
   const selectFixed = (b: FixedBlock, e: MouseEvent<HTMLElement>) => {
     if (!consumeClick()) onSelectFixed(b, e)
+  }
+  const selectActivity = (a: ActualActivity, e: MouseEvent<HTMLElement>) => {
+    if (!consumeClick()) onSelectActivity?.(a, e)
+  }
+  // 블록이 없는 빈 곳을 누르면 그 시각(30분 단위)으로 실제 기록 열기 — 지난 시간만
+  const clickEmpty = (date: string, e: MouseEvent<HTMLDivElement>) => {
+    if (!onEmptyClick || consumeClick() || e.target !== e.currentTarget) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const minutes = Math.floor((from + (e.clientY - rect.top) / PPM) / 30) * 30
+    if (date > now.date || (date === now.date && minutes >= now.minutes)) return
+    onEmptyClick(date, minutes, e)
   }
 
   // 날짜 수만큼 칸 (주간 7칸, Task 추가 결과 화면은 1~7칸)
@@ -230,12 +250,21 @@ export function TimeGrid({
         {days.map((d) => {
           const fixed = placeFixed(d, from, to)
           const tasks = placeTasks(d, from, to)
+          const acts = placeActivities(d.date, activities, from, to)
+          // 실제 기록이 있는 날은 "계획 | 실제"로 나눠서 나란히 보여줘요
+          const split = acts.length > 0
           const isToday = d.date === now.date
+          const canClickEmpty = !!onEmptyClick && d.date <= now.date
           return (
             <div
               key={d.date}
               data-date={d.date}
-              className={cn('border-line relative border-l', isToday && 'bg-brand-soft/30')}
+              onClick={(e) => clickEmpty(d.date, e)}
+              className={cn(
+                'border-line relative border-l',
+                isToday && 'bg-brand-soft/30',
+                canClickEmpty && 'cursor-cell'
+              )}
               style={{ height: (to - from) * PPM }}
             >
               {hours.map((h, i) => (
@@ -261,23 +290,43 @@ export function TimeGrid({
                   }
                 />
               ))}
-              {tasks.map((p) => (
-                <TaskBlock
-                  key={p.item.taskId}
-                  placed={p}
-                  geometry={geometry}
-                  selected={selection?.kind === 'task' && selection.id === p.item.taskId}
-                  onSelect={selectTask}
-                  dimmed={isDragging('task', p.item.taskId)}
-                  isNew={highlightIds?.has(p.item.taskId)}
-                  drag={
-                    enabled && canDragTask(p.item)
-                      ? (e, mode) =>
-                          startDrag(e, { kind: 'task', task: p.item, date: d.date, start: p.start, end: p.end }, mode)
-                      : undefined
-                  }
-                />
-              ))}
+              <div
+                className={cn(
+                  'pointer-events-none absolute inset-y-0 left-0 *:pointer-events-auto',
+                  split ? 'right-[40%]' : 'right-0'
+                )}
+              >
+                {tasks.map((p) => (
+                  <TaskBlock
+                    key={p.item.taskId}
+                    placed={p}
+                    geometry={geometry}
+                    selected={selection?.kind === 'task' && selection.id === p.item.taskId}
+                    onSelect={selectTask}
+                    dimmed={isDragging('task', p.item.taskId)}
+                    isNew={highlightIds?.has(p.item.taskId)}
+                    drag={
+                      enabled && canDragTask(p.item)
+                        ? (e, mode) =>
+                            startDrag(e, { kind: 'task', task: p.item, date: d.date, start: p.start, end: p.end }, mode)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+              {split && (
+                <div className="border-line/70 pointer-events-none absolute inset-y-0 right-0 w-[40%] border-l border-dashed *:pointer-events-auto">
+                  {acts.map((p) => (
+                    <ActivityBlock
+                      key={p.item.activityId}
+                      placed={p}
+                      geometry={geometry}
+                      selected={selection?.kind === 'activity' && selection.id === p.item.activityId}
+                      onSelect={selectActivity}
+                    />
+                  ))}
+                </div>
+              )}
               {drag?.target?.type === 'grid' && drag.target.date === d.date && (
                 <DragGhost drag={drag} target={drag.target} from={from} />
               )}

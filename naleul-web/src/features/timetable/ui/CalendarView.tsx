@@ -2,15 +2,16 @@
 
 import { useCallback, useMemo } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { rectOf } from '@/components/ui/Popover'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
-import { useTimetable } from '../api'
+import { useActivities, useTimetable } from '../api'
 import { visibleHours } from '../layout'
-import { addDays, addMonths, formatRange, isYmd, startOfWeek, todayKst } from '../time'
+import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst } from '../time'
 import { HATCH } from './Blocks'
 import { MonthView } from './MonthView'
 import { AutoPlaceBar } from './AutoPlaceBar'
@@ -50,9 +51,23 @@ export function CalendarView() {
 
   // 표시 중인 데이터가 지금 보는 기간의 것인지 (placeholderData 로 이전 주가 잠깐 보일 수 있음)
   const rawDays = useMemo(() => (data?.days ?? []).filter((d) => d.date >= start && d.date <= end), [data, start, end])
-  const { days, selection, onSelectTask, onSelectFixed, onDrop, close, toggleComplete, overlays } =
-    useTimetableInteractions(rawDays, date)
-  const { startHour, endHour } = useMemo(() => visibleHours(days), [days])
+  // 실제로 한 일 (월간은 시간 격자가 없어서 안 불러요)
+  const activities = useActivities(start, end, view !== 'month')
+  const acts = useMemo(() => activities.data ?? [], [activities.data])
+  const {
+    days,
+    selection,
+    onSelectTask,
+    onSelectFixed,
+    onSelectActivity,
+    onEmptyClick,
+    openActivity,
+    onDrop,
+    close,
+    toggleComplete,
+    overlays,
+  } = useTimetableInteractions(rawDays, date)
+  const { startHour, endHour } = useMemo(() => visibleHours(days, acts), [days, acts])
 
   // ── 이동 ──
   const move = (n: number) => {
@@ -66,7 +81,7 @@ export function CalendarView() {
     <>
       <PageHeader
         title="캘린더"
-        description="블록을 눌러 배치 이유를 보고, 끌어서 시간을 바꿔요. 직접 옮긴 블록은 잠겨요."
+        description="블록을 눌러 배치 이유를 보고, 끌어서 시간을 바꿔요. 지난 빈 시간을 누르면 실제로 한 일을 남길 수 있어요."
         actions={
           <div className="bg-subtle flex rounded-xl p-1" role="tablist" aria-label="보기">
             {(
@@ -134,6 +149,23 @@ export function CalendarView() {
         </h2>
         {isFetching && !isPending && <Spinner className="text-ink-4 size-3.5" />}
         {view !== 'month' && <Legend />}
+        {view !== 'month' && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="max-md:ml-auto"
+            onClick={(e) => {
+              // 오늘(또는 보고 있는 지난 날)의 최근 1시간으로 열어요
+              const now = nowKst()
+              const day = view === 'day' && date < today ? date : today
+              const endMin = day === today ? Math.floor(now.minutes / 10) * 10 : 13 * 60
+              openActivity({ date: day, start: Math.max(endMin - 60, 0), end: endMin }, rectOf(e.currentTarget))
+            }}
+          >
+            <Plus className="size-4" />
+            실제로 한 일
+          </Button>
+        )}
       </div>
 
       {view === 'month' ? (
@@ -178,6 +210,9 @@ export function CalendarView() {
             selection={selection}
             onSelectTask={onSelectTask}
             onSelectFixed={onSelectFixed}
+            activities={acts}
+            onSelectActivity={onSelectActivity}
+            onEmptyClick={onEmptyClick}
             onDrop={onDrop}
             onDragStart={close}
             onDayClick={(d) => {
@@ -210,6 +245,10 @@ function Legend() {
         고정 시간
       </li>
       <li className={item}>🔒 직접 정한 시간</li>
+      <li className={item}>
+        <span className="border-success border-line bg-surface size-2.5 rounded-sm border border-l-2" />
+        실제로 한 일
+      </li>
     </ul>
   )
 }

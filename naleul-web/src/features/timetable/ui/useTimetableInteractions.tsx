@@ -17,8 +17,18 @@ import {
   useUnscheduleTask,
 } from '../api'
 import { applyPending, type Pending } from '../layout'
-import { formatMinutes, formatMonthDay, minutesFrom, minutesToTime, timeToMinutes, toDateTime, todayKst } from '../time'
-import type { FixedBlock, TimeBlockTask, TimetableDay } from '../types'
+import {
+  formatMinutes,
+  formatMonthDay,
+  minutesFrom,
+  minutesToTime,
+  nowKst,
+  timeToMinutes,
+  toDateTime,
+  todayKst,
+} from '../time'
+import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
+import { ActivityForm, draftOf, type ActivityDraft } from './ActivityForm'
 import { FixedDetail } from './FixedDetail'
 import { ScopeChooser, scopeOptions } from './ScopeChooser'
 import { TaskDetail } from './TaskDetail'
@@ -29,6 +39,8 @@ import type { DragSource, DropTarget } from './useGridDrag'
 type Opened =
   | { kind: 'task'; task: TimeBlockTask; anchor: AnchorRect }
   | { kind: 'fixed'; block: FixedBlock; anchor: AnchorRect }
+  /** 실제로 한 일 기록 · 수정 */
+  | { kind: 'activity'; draft: ActivityDraft; anchor: AnchorRect }
   | null
 
 type Editing =
@@ -102,7 +114,9 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
       ? { kind: 'task', id: opened.task.taskId }
       : opened?.kind === 'fixed'
         ? { kind: 'fixed', key: fixedKey(opened.block) }
-        : null
+        : opened?.kind === 'activity' && opened.draft.activity
+          ? { kind: 'activity', id: opened.draft.activity.activityId }
+          : null
 
   const close = () => {
     setOpened(null)
@@ -122,8 +136,43 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     )
   }
 
+  // ── 실제로 한 일 ──
+  const onSelectActivity = (a: ActualActivity, e: MouseEvent<HTMLElement>) => {
+    const anchor = rectOf(e.currentTarget)
+    setConfirmDeleteId(null)
+    setOpened((o) =>
+      o?.kind === 'activity' && o.draft.activity?.activityId === a.activityId
+        ? null
+        : { kind: 'activity', draft: draftOf(a), anchor }
+    )
+  }
+  /** 새 기록 열기 (끝은 지금을 넘지 않게) */
+  const openActivity = (draft: ActivityDraft, anchor: AnchorRect) => {
+    const now = nowKst()
+    const nowMin = draft.date === now.date ? now.minutes : Infinity
+    const end = Math.min(draft.end, nowMin)
+    const start = Math.min(draft.start, end - 10)
+    setConfirmDeleteId(null)
+    setOpened({ kind: 'activity', draft: { ...draft, start: Math.max(start, 0), end }, anchor })
+  }
+  /** 빈 칸 클릭 → 그 시각부터 1시간 */
+  const onEmptyClick = (date: string, minutes: number, e: MouseEvent<HTMLElement>) =>
+    openActivity(
+      { date, start: minutes, end: minutes + 60 },
+      { top: e.clientY, bottom: e.clientY, left: e.clientX, right: e.clientX }
+    )
+
   // ── Task 작업 ──
   const taskActions = {
+    // 계획했던 시간에 다른 일을 했어요 → 그 시간으로 실제 기록 (계획 Task 연결)
+    onRecordInstead: (t: TimeBlockTask) => {
+      if (!t.plannedStartAt) return
+      const day = t.plannedStartAt.slice(0, 10)
+      const s = minutesFrom(day, t.plannedStartAt)
+      const e = t.plannedEndAt ? minutesFrom(day, t.plannedEndAt) : s + (t.plannedDurationMinutes ?? 30)
+      const anchor = opened?.anchor ?? { top: 120, bottom: 120, left: 120, right: 120 }
+      openActivity({ date: day, start: s, end: e, replaced: { id: t.taskId, name: t.taskName } }, anchor)
+    },
     onToggleComplete: (t: TimeBlockTask) => toggleComplete.mutate(t, { onSuccess: close }),
     onCompleteWithTime: (t: TimeBlockTask) => {
       if (!t.plannedStartAt) return
@@ -331,6 +380,15 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
           />
         </Popover>
       )}
+      {opened?.kind === 'activity' && (
+        <Popover anchor={opened.anchor} onClose={close} label="실제로 한 일" width={340}>
+          <ActivityForm
+            key={`${opened.draft.activity?.activityId ?? 'new'}-${opened.draft.date}-${opened.draft.start}`}
+            draft={opened.draft}
+            onDone={close}
+          />
+        </Popover>
+      )}
       {opened?.kind === 'fixed' && (
         <Popover anchor={opened.anchor} onClose={close} label="고정 시간 상세">
           <FixedDetail block={opened.block} busy={busyFixed} actions={fixedActions} />
@@ -382,5 +440,17 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     </>
   )
 
-  return { days, selection, onSelectTask, onSelectFixed, onDrop, close, toggleComplete, overlays }
+  return {
+    days,
+    selection,
+    onSelectTask,
+    onSelectFixed,
+    onSelectActivity,
+    onEmptyClick,
+    openActivity,
+    onDrop,
+    close,
+    toggleComplete,
+    overlays,
+  }
 }

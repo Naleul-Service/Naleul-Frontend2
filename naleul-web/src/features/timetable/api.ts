@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
 import type {
+  ActivityInput,
+  ActualActivity,
   LifePattern,
   MonthlyTimetableResponse,
   ReplanResponse,
@@ -273,5 +275,46 @@ export function useFillTimetable() {
       // 목표 상세의 관련 Task 도 시간이 바뀌어요 (goal/api 를 import 하면 순환 참조라 키를 그대로 써요)
       qc.invalidateQueries({ queryKey: ['goals'] })
     },
+  })
+}
+
+// ─── 실제로 한 일 ────────────────────────────────────────────────
+
+export const activityKeys = {
+  all: ['activities'] as const,
+  range: (start: string, end: string) => [...activityKeys.all, start, end] as const,
+}
+
+/** 기간(시작일~종료일, 최대 42일)과 겹치는 실제 기록 */
+export function useActivities(start: string, end: string, enabled = true) {
+  return useQuery({
+    queryKey: activityKeys.range(start, end),
+    queryFn: async () => (await api.get<ActualActivity[]>(`/v1/activities?startDate=${start}&endDate=${end}`)) ?? [],
+    enabled,
+    placeholderData: (prev) => prev,
+  })
+}
+
+/** 추가(activityId 없음) · 수정 */
+export function useSaveActivity() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ activityId, ...body }: ActivityInput & { activityId?: number }) =>
+      activityId
+        ? api.put<ActualActivity>(`/v1/activities/${activityId}`, body)
+        : api.post<ActualActivity>('/v1/activities', body),
+    onSuccess: (_, v) => toast.success(v.activityId ? '기록을 수정했어요.' : '실제로 한 일을 기록했어요.'),
+    onError: (e) => toast.error(errorMessage(e)),
+    onSettled: () => qc.invalidateQueries({ queryKey: activityKeys.all }),
+  })
+}
+
+export function useDeleteActivity() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (activityId: number) => api.delete(`/v1/activities/${activityId}`),
+    onSuccess: () => toast.success('기록을 지웠어요.'),
+    onError: (e) => toast.error(errorMessage(e)),
+    onSettled: () => qc.invalidateQueries({ queryKey: activityKeys.all }),
   })
 }
