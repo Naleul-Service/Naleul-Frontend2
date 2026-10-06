@@ -8,6 +8,36 @@ export const DEFAULT_START_HOUR = 7
 export const DEFAULT_END_HOUR = 24
 const MIN_TASK_MINUTES = 15 // 너무 짧은 블록도 글자가 보이도록
 
+export interface ShownTime {
+  startAt: string
+  endAt: string | null
+  /** true 면 실제로 한 시각, false 면 계획 시각 */
+  actual: boolean
+}
+
+/**
+ * 블록을 그릴 시각 (백엔드 TimetableQueryService.blockRange 와 같은 규칙)
+ *  - 완료 전: 계획 시각 (plannedStartAt ~ plannedEndAt)
+ *  - 완료 후: 실제 시각이 기록돼 있으면 실제로 한 시각, 없으면 계획 시각 ("계획대로 했다"로 봐요)
+ * 시간이 없으면 null (시간 미정)
+ */
+export function shownTime(t: TimeBlockTask): ShownTime | null {
+  if (t.taskStatus === 'COMPLETED' && t.actualStartAt && t.actualEndAt) {
+    return { startAt: t.actualStartAt, endAt: t.actualEndAt, actual: true }
+  }
+  if (!t.plannedStartAt) return null
+  return { startAt: t.plannedStartAt, endAt: t.plannedEndAt ?? null, actual: false }
+}
+
+/** 그날(dayYmd) 0시 기준 분으로 바꾼 블록 구간. 끝이 없으면 소요 시간(없으면 30분)으로 */
+function shownMinutes(dayYmd: string, t: TimeBlockTask, fallbackMinutes = t.plannedDurationMinutes ?? 30) {
+  const st = shownTime(t)
+  if (!st) return null
+  const start = minutesFrom(dayYmd, st.startAt)
+  const end = st.endAt ? minutesFrom(dayYmd, st.endAt) : start + fallbackMinutes
+  return { start, end }
+}
+
 /**
  * 격자에 보여줄 시간 범위 (시 단위).
  * 기본은 하루 범위(기상 ~ 취침)이고, 그 밖에 Task 가 있으면 넓혀요.
@@ -21,10 +51,10 @@ export function visibleHours(days: TimetableDay[]) {
     start = Math.min(start, minutesFrom(d.date, d.dayRange.start))
     end = Math.max(end, minutesFrom(d.date, d.dayRange.end))
     for (const t of d.tasks) {
-      if (!t.plannedStartAt) continue
-      const s = minutesFrom(d.date, t.plannedStartAt)
-      start = Math.min(start, s)
-      end = Math.max(end, t.plannedEndAt ? minutesFrom(d.date, t.plannedEndAt) : s + 30)
+      const m = shownMinutes(d.date, t, 30)
+      if (!m) continue
+      start = Math.min(start, m.start)
+      end = Math.max(end, m.end)
     }
   }
   const startHour = Math.max(0, Math.min(DEFAULT_END_HOUR - 1, Math.floor(start / 60)))
@@ -71,12 +101,12 @@ export function placeFixed(day: TimetableDay, from: number, to: number): Placed<
  */
 export function placeTasks(day: TimetableDay, from: number, to: number): Placed<TimeBlockTask>[] {
   const items = day.tasks
-    .filter((t) => t.plannedStartAt)
     .map((t) => {
-      const s = minutesFrom(day.date, t.plannedStartAt!)
-      const rawEnd = t.plannedEndAt ? minutesFrom(day.date, t.plannedEndAt) : s + (t.plannedDurationMinutes ?? 30)
-      const c = clip(s, Math.max(rawEnd, s + MIN_TASK_MINUTES), from, to)
-      return { t, c: c && { ...c, end: rawEnd } }
+      // 완료 전엔 계획 시각, 완료 후엔 실제 시각 (shownTime)
+      const m = shownMinutes(day.date, t)
+      if (!m) return { t, c: null }
+      const c = clip(m.start, Math.max(m.end, m.start + MIN_TASK_MINUTES), from, to)
+      return { t, c: c && { ...c, end: m.end } }
     })
     .filter((x): x is { t: TimeBlockTask; c: NonNullable<ReturnType<typeof clip>> } => !!x.c)
     .sort((a, b) => a.c.top - b.c.top || b.c.bottom - a.c.bottom)
@@ -190,6 +220,7 @@ export const isBlockingTask = (t: TimeBlockTask) =>
 export function blockingOverlap(day: TimetableDay, start: number, end: number, selfId: number) {
   return day.tasks.find((t) => {
     if (t.taskId === selfId || !t.plannedStartAt || !isBlockingTask(t)) return false
+    // 백엔드(TaskScheduleService)와 같게 계획 시각 기준으로 봐요 (완료한 Task 도 계획 자리를 차지)
     const s = minutesFrom(day.date, t.plannedStartAt)
     const e = t.plannedEndAt ? minutesFrom(day.date, t.plannedEndAt) : s + 30
     return s < end && e > start

@@ -3,7 +3,7 @@
 import type { CSSProperties, MouseEvent, PointerEvent } from 'react'
 import { Check, Lock, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { hexOf, withAlpha, type Placed } from '../layout'
+import { hexOf, shownTime, withAlpha, type Placed } from '../layout'
 import { formatMinutes } from '../time'
 import type { FixedBlock, TimeBlockTask } from '../types'
 
@@ -94,6 +94,8 @@ export function TaskBlock({
   const heightPx = (placed.bottom - placed.top) * geometry.ppm
   const short = heightPx < 26 // 10~20분 블록: 한 줄로 가운데 정렬
   const done = t.taskStatus === 'COMPLETED'
+  // 완료 후 실제 시각에 그려진 블록 ("실제" 표시)
+  const actual = shownTime(t)?.actual ?? false
   const solid = t.sourceType !== 'ROUTINE'
   const width = 100 / placed.cols
   const style: CSSProperties = {
@@ -111,7 +113,7 @@ export function TaskBlock({
       onClick={(e) => onSelect(t, e)}
       onPointerDown={drag ? (e) => drag(e, 'move') : undefined}
       style={style}
-      aria-label={`${t.taskName} ${formatMinutes(placed.start)}~${formatMinutes(placed.end)}`}
+      aria-label={`${t.taskName} ${actual ? '실제 ' : ''}${formatMinutes(placed.start)}~${formatMinutes(placed.end)}`}
       className={cn(
         'absolute z-10 flex flex-col overflow-hidden rounded-lg px-2 text-left text-xs leading-tight transition-shadow',
         short ? 'justify-center rounded-md py-0 text-[11px]' : 'py-1',
@@ -146,6 +148,7 @@ export function TaskBlock({
       </span>
       {heightPx >= 34 && (
         <span className={cn('mt-0.5 truncate', solid ? 'text-white/80' : 'text-ink-3')}>
+          {actual && '실제 '}
           {formatMinutes(placed.start)} – {formatMinutes(placed.end)}
         </span>
       )}

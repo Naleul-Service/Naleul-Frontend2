@@ -17,7 +17,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
-import { hexOf } from '../layout'
+import { hexOf, shownTime } from '../layout'
 import { formatDuration, formatMonthDay, minutesFrom } from '../time'
 import type { TimeBlockTask } from '../types'
 
@@ -43,16 +43,21 @@ export function taskPermissions(t: TimeBlockTask) {
   }
 }
 
-function timeLine(t: TimeBlockTask) {
-  const day = t.date ?? t.scheduledDate
-  if (!t.plannedStartAt) return day ? `${formatMonthDay(day)} · 시간 미정` : '날짜 미정'
-  const base = t.plannedStartAt.slice(0, 10)
-  const s = minutesFrom(base, t.plannedStartAt)
-  const e = t.plannedEndAt ? minutesFrom(base, t.plannedEndAt) : null
+/** "11월 18일 (수) · 09:00 – 10:30 (1시간 30분)" */
+function rangeText(startAt: string, endAt?: string | null) {
+  const base = startAt.slice(0, 10)
+  const s = minutesFrom(base, startAt)
+  const e = endAt ? minutesFrom(base, endAt) : null
   const hhmm = (m: number) =>
     `${String(Math.floor((m % 1440) / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
   const range = e !== null ? `${hhmm(s)} – ${e >= 1440 ? `다음 날 ${hhmm(e)}` : hhmm(e)}` : hhmm(s)
   return `${formatMonthDay(base)} · ${range}${e !== null && e > s ? ` (${formatDuration(e - s)})` : ''}`
+}
+
+function timeLine(t: TimeBlockTask) {
+  const day = t.date ?? t.scheduledDate
+  if (!t.plannedStartAt) return day ? `${formatMonthDay(day)} · 시간 미정` : '날짜 미정'
+  return rangeText(t.plannedStartAt, t.plannedEndAt)
 }
 
 export function TaskDetail({ task: t, busy, actions }: { task: TimeBlockTask; busy?: boolean; actions: TaskActions }) {
@@ -60,6 +65,8 @@ export function TaskDetail({ task: t, busy, actions }: { task: TimeBlockTask; bu
   const perm = taskPermissions(t)
   const done = t.taskStatus === 'COMPLETED'
   const color = hexOf(t.goalColorCode)
+  const shown = shownTime(t)
+  const actual = shown?.actual ? shown : null
 
   return (
     <div className="p-5">
@@ -96,10 +103,30 @@ export function TaskDetail({ task: t, busy, actions }: { task: TimeBlockTask; bu
       </h3>
 
       <dl className="text-ink-2 mt-3 space-y-2 text-sm">
-        <div className="flex items-start gap-2">
-          <Clock className="text-ink-3 mt-0.5 size-4 shrink-0" />
-          <dd>{timeLine(t)}</dd>
-        </div>
+        {actual ? (
+          <>
+            {/* 완료 후에는 실제로 한 시간에 블록이 놓여요 */}
+            <div className="flex items-start gap-2">
+              <Check className="text-success mt-0.5 size-4 shrink-0" />
+              <dd>
+                <span className="text-ink-3 mr-1">실제</span>
+                {rangeText(actual.startAt, actual.endAt)}
+              </dd>
+            </div>
+            <div className="flex items-start gap-2">
+              <Clock className="text-ink-3 mt-0.5 size-4 shrink-0" />
+              <dd className="text-ink-3">
+                <span className="mr-1">계획</span>
+                {timeLine(t)}
+              </dd>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-start gap-2">
+            <Clock className="text-ink-3 mt-0.5 size-4 shrink-0" />
+            <dd>{timeLine(t)}</dd>
+          </div>
+        )}
         {t.goalCategoryName && (
           <div className="flex items-start gap-2">
             <span className="mt-1 size-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />

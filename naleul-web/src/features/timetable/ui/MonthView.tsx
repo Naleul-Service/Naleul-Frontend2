@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { useMonthlyTimetable } from '../api'
-import { hexOf } from '../layout'
+import { hexOf, shownTime } from '../layout'
 import { WEEKDAY_LABEL, dDay, dayOfMonth, formatMonthDay, hm, monthOf, monthWeeks, weekdayIndex, yearOf } from '../time'
 import type { MonthlyDay, TimeBlockTask, TimetableDay } from '../types'
 
@@ -256,7 +256,7 @@ function DayPanel({
 }) {
   // 시간순 (시간 미정은 맨 뒤)
   const tasks = detail
-    ? [...detail.tasks].sort((a, b) => (a.plannedStartAt ?? '').localeCompare(b.plannedStartAt ?? ''))
+    ? [...detail.tasks].sort((a, b) => (shownTime(a)?.startAt ?? '').localeCompare(shownTime(b)?.startAt ?? ''))
     : []
   const unscheduled = detail?.unscheduledTasks ?? []
   const stats = detail?.stats
@@ -408,7 +408,7 @@ function TaskRow({
         className="flex min-w-0 flex-1 items-center gap-2 text-left"
       >
         <span className="text-ink-3 w-[52px] shrink-0 text-xs tabular-nums">
-          {t.plannedStartAt ? hm(t.plannedStartAt) : '시간 미정'}
+          {hm(shownTime(t)?.startAt) || '시간 미정'}
         </span>
         <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hexOf(t.goalColorCode) }} />
         <span className={cn('min-w-0 flex-1 truncate text-sm', done && 'text-ink-4 line-through')}>

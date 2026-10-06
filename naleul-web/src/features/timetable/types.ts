@@ -49,6 +49,9 @@ export interface TimeBlockTask {
   placementReasonCodes?: string[]
   carryOverCount: number
   completedAt?: string | null
+  /** 완료한 Task 의 실제 수행 시각 (완료 전이거나 실제 시각 기록이 없으면 null) */
+  actualStartAt?: string | null
+  actualEndAt?: string | null
   missed: boolean
 }
 
