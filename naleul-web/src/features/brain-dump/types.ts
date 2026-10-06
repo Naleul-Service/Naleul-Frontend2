@@ -24,6 +24,8 @@ export interface ParseItemRequest {
   dateType?: DateType | null
   startTime?: string | null
   endTime?: string | null
+  /** 사용자가 정한 걸리는 시간(분) — AI 추정보다 우선 */
+  estimatedMinutes?: number | null
 }
 
 export interface GoalLink {

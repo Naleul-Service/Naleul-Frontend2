@@ -78,6 +78,7 @@ export function TaskAddView() {
         dateType: l.date ? l.dateType : null,
         startTime: l.date || l.startTime ? l.startTime : null,
         endTime: l.date || l.startTime ? l.endTime : null,
+        estimatedMinutes: l.minutes,
       })),
       {
         onSuccess: (res) => {

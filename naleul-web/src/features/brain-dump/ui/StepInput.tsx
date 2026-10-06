@@ -1,14 +1,15 @@
 'use client'
 
 import { useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
-import { Clock, CornerDownLeft, Lock, X } from 'lucide-react'
+import { Clock, CornerDownLeft, Lock, Timer, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { toast } from '@/stores/toastStore'
-import { addDays, formatMonthDay } from '@/features/timetable/time'
+import { addDays, formatDuration, formatMonthDay, timeToMinutes } from '@/features/timetable/time'
+import { parseLine } from '../parseLine'
 import type { TaskQuota } from '../types'
 
 export const MAX_LINES = 20 // 백엔드 한 번에 최대 20개
@@ -22,17 +23,30 @@ export interface DumpLine {
   dateType: 'ON' | 'DUE'
   startTime: string | null
   endTime: string | null
+  /** 걸리는 시간(분). 시작 시각과 상관없이 "3시간 걸리는 일" — 비워 두면 AI 가 추정해요 */
+  minutes: number | null
 }
 
 let seq = 0
-export const newLine = (text: string): DumpLine => ({
-  clientKey: `c${Date.now().toString(36)}${(seq++).toString(36)}`,
-  text: text.slice(0, 200),
-  date: null,
-  dateType: 'ON',
-  startTime: null,
-  endTime: null,
-})
+/**
+ * 새 줄. today 를 주면 문장에서 시각·소요 시간·오늘/내일/모레를 바로 읽어 칩을 채워요.
+ * 예) "저녁 8시 정기 회의" → 시작 20:00 / "인강 듣기 3시간" → 소요 3시간
+ */
+export const newLine = (text: string, today?: string): DumpLine => {
+  const p = today ? parseLine(text, today) : null
+  return {
+    clientKey: `c${Date.now().toString(36)}${(seq++).toString(36)}`,
+    text: text.slice(0, 200),
+    date: p?.date ?? null,
+    dateType: 'ON',
+    startTime: p?.startTime ?? null,
+    endTime: p?.startTime ? p.endTime : null,
+    minutes: p?.minutes ?? null,
+  }
+}
+
+/** 소요 시간 고르기 (분) */
+const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480]
 
 interface Props {
   lines: DumpLine[]
@@ -63,7 +77,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
     if (!clean.length) return
     const room = Math.max(limit - lines.length, 0)
     const accepted = clean.slice(0, room)
-    if (accepted.length) onChange([...lines, ...accepted.map(newLine)])
+    if (accepted.length) onChange([...lines, ...accepted.map((t) => newLine(t, today))])
     if (clean.length > accepted.length) toast.show(`${clean.length - accepted.length}개는 한도를 넘어서 넣지 않았어요.`)
   }
 
@@ -99,8 +113,8 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
         <div>
           <h2 className="text-[17px] font-bold">머릿속에 있는 일을 한 줄씩 적어 주세요</h2>
           <p className="text-ink-3 mt-1 text-sm">
-            Enter를 누를 때마다 추가돼요. &quot;금요일까지&quot;, &quot;내일 오후 3시 미팅&quot;처럼 적어도 되고, 아래
-            칩으로 골라도 돼요.
+            Enter를 누를 때마다 추가돼요. &quot;저녁 8시 정기 회의&quot;, &quot;인강 듣기 3시간&quot;처럼 적으면 시각과
+            걸리는 시간을 바로 알아채요. 아래 칩으로 고쳐도 돼요.
           </p>
         </div>
         {quota && !quota.premium && quota.remaining != null && (
@@ -169,7 +183,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
               autoFocus
               aria-label="할 일 입력"
               placeholder={
-                lines.length ? '다음 할 일 (비워 두고 Enter = 다음 단계)' : '예) 금요일까지 토익 LC 모의고사 1회'
+                lines.length ? '다음 할 일 (비워 두고 Enter = 다음 단계)' : '예) 저녁 8시 정기 회의 · 인강 듣기 3시간'
               }
               className="placeholder:text-ink-4 h-11 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
             />
@@ -320,7 +334,60 @@ function LineRow({
             />
           </span>
         )}
+        <DurationChip line={line} index={index} disabled={disabled} onChange={(minutes) => onChange({ minutes })} />
       </div>
     </li>
+  )
+}
+
+/**
+ * 걸리는 시간 칩. 시작 시각을 몰라도 "3시간 걸리는 일"이면 자동 배치가 3시간짜리 빈칸을 찾아 넣어요.
+ * 시작·종료를 둘 다 고르면 그 차이가 소요 시간이라 여기서는 보여주기만 해요.
+ */
+function DurationChip({
+  line,
+  index,
+  disabled,
+  onChange,
+}: {
+  line: DumpLine
+  index: number
+  disabled: boolean
+  onChange: (minutes: number | null) => void
+}) {
+  const fixed =
+    line.dateType !== 'DUE' && line.startTime && line.endTime
+      ? (timeToMinutes(line.endTime) - timeToMinutes(line.startTime) + 1440) % 1440 || null
+      : null
+  const value = fixed ?? line.minutes
+  const options = [...new Set([...DURATIONS, ...(line.minutes ? [line.minutes] : [])])].sort((a, b) => a - b)
+
+  return (
+    <span
+      className={cn(
+        'relative inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium',
+        value ? 'border-brand bg-brand text-white' : 'border-line-strong text-ink-2 hover:border-ink-4',
+        fixed && 'opacity-80'
+      )}
+      title={fixed ? '시작·종료 시각으로 정해져요' : '걸리는 시간 (비워 두면 AI가 추정)'}
+    >
+      <Timer className="size-3" />
+      {value ? formatDuration(value) : '걸리는 시간'}
+      {/* 칩 위에 투명한 select 를 겹쳐서 누르면 목록이 열려요 */}
+      <select
+        value={line.minutes ?? ''}
+        onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+        disabled={disabled || !!fixed}
+        aria-label={`${index + 1}번 걸리는 시간`}
+        className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-default"
+      >
+        <option value="">AI가 추정</option>
+        {options.map((m) => (
+          <option key={m} value={m}>
+            {formatDuration(m)}
+          </option>
+        ))}
+      </select>
+    </span>
   )
 }

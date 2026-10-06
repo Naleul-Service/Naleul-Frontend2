@@ -10,7 +10,7 @@ import type { DateType, TempGoalInput } from '../types'
 import type { MapItem } from './StepGoals'
 
 const NEW_TEMP = '__new__'
-const MINUTES = [10, 15, 20, 30, 45, 60, 90, 120, 180, 240]
+const MINUTES = [10, 15, 20, 30, 45, 60, 90, 120, 150, 180, 240, 300, 360, 480]
 const PRIORITIES: TaskPriority[] = ['A', 'B', 'C', 'D', 'E']
 const PRIORITY_HINT: Record<TaskPriority, string> = {
   A: '가장 중요',
