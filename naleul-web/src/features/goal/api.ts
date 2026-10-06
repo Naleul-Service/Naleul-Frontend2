@@ -59,6 +59,8 @@ export interface GoalCategory {
   goalTopic?: string | null
   description?: string | null
   aiGenerated?: boolean
+  /** Brain dump 에서 자동으로 만든 임시 목표 (종료일·마일스톤 없음) → "AI로 구체화하기"를 권해요 */
+  temporary?: boolean
   planningStyle?: 'PLANNER' | 'SPONTANEOUS' | null
   aiNote?: string | null
   metricName?: string | null

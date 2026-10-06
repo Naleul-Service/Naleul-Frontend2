@@ -31,6 +31,53 @@ function useGoalMutation<V, R = unknown>(fn: (v: V) => Promise<R>, success?: str
 
 // ─── 전체 목표 ───────────────────────────────────────────────
 
+export interface GoalCreateInput {
+  goalCategoryName: string
+  goalCategoryStartDate: string
+  goalCategoryEndDate: string
+  colorId: number
+  motive?: string
+  emoji?: string
+  metricName?: string
+  metricUnit?: string
+  startValue?: number | null
+  targetValue?: number | null
+}
+
+/**
+ * 직접 목표 만들기 — 목표를 만든 뒤 적어 둔 세부 목표들을 같은 기간·색으로 이어서 만들어요.
+ * 세부 목표 하나가 실패해도 목표는 이미 만들어졌으니, 나머지는 상세 화면에서 추가하도록 안내해요.
+ */
+export function useCreateGoal() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ subGoals, ...goal }: GoalCreateInput & { subGoals: string[] }) => {
+      const created = await api.post<GoalCategory>('/v1/goal-categories', goal)
+      let failed = 0
+      for (const name of subGoals) {
+        try {
+          await api.post('/v1/general-categories', {
+            generalCategoryName: name,
+            goalCategoryId: created.goalCategoryId,
+            generalCategoryStartDate: goal.goalCategoryStartDate,
+            generalCategoryEndDate: goal.goalCategoryEndDate,
+            colorId: goal.colorId,
+          })
+        } catch {
+          failed++
+        }
+      }
+      return { goal: created, failed }
+    },
+    onSuccess: ({ failed }) =>
+      failed
+        ? toast.error(`목표는 만들었지만 세부 목표 ${failed}개를 만들지 못했어요. 상세 화면에서 다시 추가해 주세요.`)
+        : toast.success('목표를 만들었어요. 루틴·마일스톤·Task도 바로 추가해 보세요.'),
+    onError: (e) => toast.error(errorMessage(e)),
+    onSettled: () => qc.invalidateQueries({ queryKey: goalKeys.all }),
+  })
+}
+
 export interface GoalUpdateInput {
   goalCategoryName?: string
   motive?: string

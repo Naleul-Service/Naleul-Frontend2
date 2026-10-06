@@ -12,6 +12,7 @@ import { dDayLabel, periodProgress } from '../format'
 import { GoalHeader, GoalNotes } from './GoalHeader'
 import { GoalTaskList } from './GoalTaskList'
 import { MilestonesSection } from './MilestonesSection'
+import { RefineWithAiCard } from './RefineWithAiCard'
 import { RoutinesSection } from './RoutinesSection'
 import { Section } from './sections'
 import { SubGoalsSection } from './SubGoalsSection'
@@ -132,9 +133,14 @@ export function GoalDetailView({ goalId }: { goalId: number }) {
     <EditingContext.Provider value={editingCtx}>
       <GoalHeader goal={goal} />
 
-      <div className="mt-6">
-        <Hero goal={goal} />
-      </div>
+      {goal.temporary && <RefineWithAiCard goal={goal} className="mt-6" />}
+
+      {/* 임시 목표는 기간·수치가 없어 진행률이 의미 없어요 → 구체화 카드만 보여줘요 */}
+      {!goal.temporary && (
+        <div className="mt-6">
+          <Hero goal={goal} />
+        </div>
+      )}
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-5">

@@ -241,6 +241,7 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
             <Badge tone={goal.goalCategoryStatus === 'COMPLETED' ? 'success' : 'neutral'}>
               {statusLabel(goal.goalCategoryStatus)}
             </Badge>
+            {goal.temporary && <Badge tone="warning">임시 목표</Badge>}
             <button
               type="button"
               onClick={edit.open}
@@ -252,7 +253,8 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
           </div>
           {goal.goalCategoryStartDate && (
             <p className="text-ink-3 mt-1.5 text-sm">
-              {formatDot(goal.goalCategoryStartDate)} – {formatDot(goal.goalCategoryEndDate)}
+              {formatDot(goal.goalCategoryStartDate)} –{' '}
+              {goal.goalCategoryEndDate ? formatDot(goal.goalCategoryEndDate) : '종료일 미정'}
               {period && ` · ${period.weeks}주`}
             </p>
           )}

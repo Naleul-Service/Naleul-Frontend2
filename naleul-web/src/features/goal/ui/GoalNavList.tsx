@@ -26,12 +26,12 @@ export function GoalNavList({ onNavigate }: { onNavigate?: () => void }) {
   if (isError || goals.length === 0) {
     return (
       <Link
-        href="/goal/new"
+        href="/goal/add"
         onClick={onNavigate}
         className="text-brand hover:bg-brand-soft mt-2 flex h-9 items-center gap-2 rounded-xl px-3 text-[14px] font-semibold"
       >
         <Sparkles className="size-4" />
-        {isError ? '목표 불러오기 실패 · 새로 만들기' : 'AI로 첫 목표 만들기'}
+        {isError ? '목표 불러오기 실패 · 새로 만들기' : '첫 목표 만들기'}
       </Link>
     )
   }
@@ -58,7 +58,11 @@ export function GoalNavList({ onNavigate }: { onNavigate?: () => void }) {
                 {g.emoji ? `${g.emoji} ` : ''}
                 {g.goalCategoryName}
               </span>
-              {notStarted && <span className="text-ink-3 text-xs">시작 전</span>}
+              {g.temporary ? (
+                <span className="text-xs text-[#b45309]">임시</span>
+              ) : (
+                notStarted && <span className="text-ink-3 text-xs">시작 전</span>
+              )}
             </Link>
           </li>
         )

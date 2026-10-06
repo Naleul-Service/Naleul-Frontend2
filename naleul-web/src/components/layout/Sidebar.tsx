@@ -73,9 +73,9 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
             내 목표
           </h2>
           <Link
-            href="/goal/new"
+            href="/goal/add"
             onClick={onNavigate}
-            aria-label="새 목표 만들기"
+            aria-label="목표 추가"
             className="text-ink-3 hover:bg-subtle hover:text-ink rounded-md p-1"
           >
             <Plus className="size-4" />
