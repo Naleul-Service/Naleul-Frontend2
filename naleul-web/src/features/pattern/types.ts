@@ -43,6 +43,17 @@ export interface PatternStyle {
   insights: PatternInsight[]
   /** 스타일을 보여주려면 더 필요한 Task 수 (충분하면 null) */
   remainingForStyle?: number | null
+  /** 스타일을 열기까지의 진행 — "Task 15개 · 4일 더" */
+  progress?: StyleProgress | null
+}
+
+export interface StyleProgress {
+  evaluated: number
+  activeDays: number
+  requiredTasks: number
+  requiredDays: number
+  remainingTasks: number
+  remainingDays: number
 }
 
 export interface PatternSummary {

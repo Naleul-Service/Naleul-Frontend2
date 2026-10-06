@@ -107,17 +107,20 @@ export function PatternView() {
   }
 
   if (data.evaluatedCount === 0) {
+    // 기록이 하나도 없어도 빈 화면 대신 "얼마나 하면 열리는지"를 보여줘요
     return (
       <>
         {header}
-        <Card className="mt-6 grid min-h-[320px] place-items-center p-10 text-center">
-          <div>
-            <p className="text-[17px] font-bold">아직 분석할 기록이 없어요</p>
-            <p className="text-ink-3 mt-1.5 text-sm">Task를 완료하면 나의 실행 패턴이 쌓여요.</p>
-            <Link href="/calendar" className={cn(buttonClass('primary'), 'mt-5')}>
-              캘린더로 가기
-            </Link>
-          </div>
+        <div className="mt-6">
+          <StyleCard style={data.style} />
+        </div>
+        <Card className="mt-4 flex flex-wrap items-center gap-3 p-5">
+          <p className="text-ink-2 min-w-0 flex-1 text-sm">
+            Task를 완료하면 바로 패턴이 쌓이기 시작해요. 시간대별 실행률·요일별 패턴은 기록이 조금 더 모이면 열려요.
+          </p>
+          <Link href="/calendar" className={buttonClass('primary', 'sm')}>
+            캘린더로 가기
+          </Link>
         </Card>
       </>
     )
