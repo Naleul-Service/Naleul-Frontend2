@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { todayKst } from '@/features/timetable/time'
-import { isRecordGoal, type GoalCategory, type JavaDayOfWeek, type RoutineSummary } from '../api'
+import type { GoalCategory, JavaDayOfWeek, RoutineSummary } from '../api'
 import { useCreateRoutine, useDeleteRoutine, useUpdateRoutine } from '../edit/mutations'
 import {
   AddButton,
@@ -16,9 +16,9 @@ import {
   inlineInput,
   useEditing,
 } from '../edit/inline'
-import { JAVA_DAYS, JAVA_DAY_LABEL, hhmm } from '../format'
+import { JAVA_DAYS, JAVA_DAY_LABEL, formatDot, hhmm } from '../format'
 import { Section } from './sections'
-import { activeSubGoals, defaultPeriod } from './SubGoalsSection'
+import { activeSubGoals, areasOf, bucketOf, defaultPeriod } from './SubGoalsSection'
 
 function DayChips({ days }: { days: JavaDayOfWeek[] }) {
   return (
@@ -43,23 +43,27 @@ function RoutineForm({
   routine,
   subGoalId,
   onDone,
-  onNeedSubGoal,
 }: {
   goal: GoalCategory
   /** 없으면 새로 추가 */
   routine?: RoutineSummary
   subGoalId?: number
   onDone: () => void
-  onNeedSubGoal: () => void
 }) {
-  const subs = activeSubGoals(goal)
+  // 영역은 선택 — 안 고르면 서버가 목표의 "기타 할 일"에 넣어요 (트리 구조를 몰라도 바로 추가)
+  const areas = areasOf(goal)
+  const bucket = bucketOf(goal)
   const create = useCreateRoutine(goal.goalCategoryId)
   const update = useUpdateRoutine()
   const period = defaultPeriod(goal)
   const today = todayKst()
 
   const [name, setName] = useState(routine?.routineName ?? '')
-  const [sub, setSub] = useState<number | null>(subGoalId ?? subs[0]?.generalCategoryId ?? null)
+  const [sub, setSub] = useState<number | null>(
+    subGoalId != null && areas.some((a) => a.generalCategoryId === subGoalId) ? subGoalId : null
+  )
+  // 반복 기간은 보통 목표 기간 그대로라 접어 둬요
+  const [showPeriod, setShowPeriod] = useState(false)
   const [days, setDays] = useState<JavaDayOfWeek[]>(routine?.repeatDays?.length ? routine.repeatDays : JAVA_DAYS)
   const [startTime, setStartTime] = useState(hhmm(routine?.repeatStartTime ?? null) ?? '')
   const [endTime, setEndTime] = useState(hhmm(routine?.repeatEndTime ?? null) ?? '')
@@ -67,20 +71,6 @@ function RoutineForm({
   const [end, setEnd] = useState(routine?.repeatEndDate ?? (period.end < today ? today : period.end))
   const [notify, setNotify] = useState(routine?.notificationEnabled ?? true)
   const [howTo, setHowTo] = useState(routine?.description ?? '')
-
-  if (!subs.length) {
-    return (
-      <div className="bg-canvas flex flex-wrap items-center gap-2 rounded-2xl px-4 py-3 text-sm">
-        <span className="text-ink-2 flex-1">루틴은 세부 목표 아래에 만들어요. 세부 목표를 먼저 추가해 주세요.</span>
-        <button type="button" onClick={onNeedSubGoal} className="text-brand font-semibold">
-          세부 목표 추가
-        </button>
-        <button type="button" onClick={onDone} className="text-ink-3">
-          닫기
-        </button>
-      </div>
-    )
-  }
 
   const hadTime = !!routine?.repeatStartTime
   const oneTimeOnly = !!startTime !== !!endTime
@@ -97,11 +87,12 @@ function RoutineForm({
             : !start || !end || start > end
               ? '반복 기간을 확인해 주세요.'
               : null
-  const valid = !!name.trim() && !!sub && !error
+  const valid = !!name.trim() && !error
 
   const submit = () => {
     const body = {
-      generalCategoryId: sub!,
+      // 영역 없음 → 새로 만들 땐 null(서버가 "기타 할 일"로), 수정할 땐 "기타 할 일"로 옮기기 (그릇이 없으면 그대로)
+      generalCategoryId: sub ?? (routine ? (bucket?.generalCategoryId ?? null) : null),
       routineName: name.trim(),
       repeatStartDate: start,
       repeatEndDate: end,
@@ -138,7 +129,7 @@ function RoutineForm({
         </button>
       }
     >
-      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px]">
+      <div className={cn('grid gap-2', areas.length > 0 && 'sm:grid-cols-[minmax(0,1fr)_180px]')}>
         <Field label="루틴 이름">
           <input
             value={name}
@@ -148,16 +139,23 @@ function RoutineForm({
             className={inlineInput}
           />
         </Field>
-        {/* 기록형은 세부 목표를 안 보여줘요 (루틴은 서버가 미리 만든 "기타 할 일"에 들어가요) */}
-        <Field label="세부 목표" className={isRecordGoal(goal) && subs.length <= 1 ? 'hidden' : undefined}>
-          <select value={sub ?? ''} onChange={(e) => setSub(Number(e.target.value))} className={inlineInput}>
-            {subs.map((s) => (
-              <option key={s.generalCategoryId} value={s.generalCategoryId}>
-                {s.generalCategoryName}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {/* 영역이 있을 때만 (선택) — 없으면 아예 안 보여요 */}
+        {areas.length > 0 && (
+          <Field label="영역 (선택)">
+            <select
+              value={sub ?? ''}
+              onChange={(e) => setSub(e.target.value ? Number(e.target.value) : null)}
+              className={inlineInput}
+            >
+              <option value="">영역 없음</option>
+              {areas.map((s) => (
+                <option key={s.generalCategoryId} value={s.generalCategoryId}>
+                  {s.generalCategoryName}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
       </div>
       <Field label="반복 요일">
         <DaysPicker value={days} onChange={setDays} />
@@ -181,13 +179,25 @@ function RoutineForm({
             className={inlineInput}
           />
         </Field>
-        <Field label="반복 시작일">
-          <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={inlineInput} />
-        </Field>
-        <Field label="반복 종료일">
-          <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={inlineInput} />
-        </Field>
+        {showPeriod && (
+          <>
+            <Field label="반복 시작일">
+              <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className={inlineInput} />
+            </Field>
+            <Field label="반복 종료일">
+              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className={inlineInput} />
+            </Field>
+          </>
+        )}
       </div>
+      {!showPeriod && (
+        <p className="text-ink-3 text-xs">
+          {formatDot(start)} – {formatDot(end)} 동안 반복해요.{' '}
+          <button type="button" onClick={() => setShowPeriod(true)} className="text-ink-2 font-semibold underline">
+            기간 바꾸기
+          </button>
+        </p>
+      )}
       <Field label="하는 방법 (선택)">
         <textarea
           value={howTo}
@@ -220,7 +230,6 @@ function RoutineRow({
   const key = `routine:${routine.routineId}`
   const edit = useEditing(key)
   const del = useEditing(`del:${key}`)
-  const addSub = useEditing('sub:new')
   const remove = useDeleteRoutine()
   const start = hhmm(routine.repeatStartTime)
   const end = hhmm(routine.repeatEndTime)
@@ -228,13 +237,7 @@ function RoutineRow({
   if (edit.isOpen) {
     return (
       <li className="py-2">
-        <RoutineForm
-          goal={goal}
-          routine={routine}
-          subGoalId={subGoalId}
-          onDone={edit.close}
-          onNeedSubGoal={addSub.open}
-        />
+        <RoutineForm goal={goal} routine={routine} subGoalId={subGoalId} onDone={edit.close} />
       </li>
     )
   }
@@ -258,10 +261,15 @@ function RoutineRow({
           {routine.routineName}
           {routine.notificationEnabled && <Bell className="text-ink-3 size-3.5" aria-label="알림 켜짐" />}
         </p>
-        <p className="text-ink-3 mt-0.5 text-[13px]">
-          {subGoal}
-          {start ? ` · ${start}${end ? `~${end}` : ''}` : ' · 시간 자동'}
-          {!start && routine.durationMinutes ? ` · ${routine.durationMinutes}분` : ''}
+        <p className="text-ink-3 mt-0.5 flex flex-wrap items-center gap-1.5 text-[13px]">
+          {/* 영역은 부모가 아니라 라벨 — "기타 할 일"이면 안 보여줘요 */}
+          {subGoal && (
+            <span className="bg-subtle text-ink-2 rounded-full px-2 py-0.5 text-[12px] font-medium">{subGoal}</span>
+          )}
+          <span>
+            {start ? `${start}${end ? `~${end}` : ''}` : '시간 자동'}
+            {!start && routine.durationMinutes ? ` · ${routine.durationMinutes}분` : ''}
+          </span>
         </p>
         {routine.description && (
           <p className="bg-subtle text-ink-2 mt-2 rounded-lg px-2.5 py-1.5 text-[13px] leading-relaxed whitespace-pre-wrap">
@@ -281,9 +289,12 @@ function RoutineRow({
 /** 루틴 — 줄을 누르면 그 자리에서 수정, 아래 점선 버튼으로 추가 */
 export function RoutinesSection({ goal }: { goal: GoalCategory }) {
   const add = useEditing('routine:new')
-  const addSub = useEditing('sub:new')
   const rows = activeSubGoals(goal).flatMap((sg) =>
-    sg.routines.map((r) => ({ routine: r, subGoal: sg.generalCategoryName, subGoalId: sg.generalCategoryId }))
+    sg.routines.map((r) => ({
+      routine: r,
+      subGoal: sg.defaultBucket ? '' : sg.generalCategoryName,
+      subGoalId: sg.generalCategoryId,
+    }))
   )
 
   return (
@@ -297,7 +308,7 @@ export function RoutinesSection({ goal }: { goal: GoalCategory }) {
       )}
       <div className={rows.length ? 'mt-3' : ''}>
         {add.isOpen ? (
-          <RoutineForm goal={goal} onDone={add.close} onNeedSubGoal={addSub.open} />
+          <RoutineForm goal={goal} onDone={add.close} />
         ) : (
           <AddButton onClick={add.open}>루틴 추가</AddButton>
         )}

@@ -7,7 +7,7 @@ import type { TimeBlockTask } from '@/features/timetable/types'
 import type { GoalCategory } from '../api'
 import { useCreateGoalTask, useUpdateGoalTask } from '../edit/mutations'
 import { Field, InlineForm, inlineInput, toNum } from '../edit/inline'
-import { activeSubGoals } from './SubGoalsSection'
+import { areasOf } from './SubGoalsSection'
 
 /**
  * 목표 상세에서 Task 추가·수정.
@@ -18,18 +18,17 @@ export function GoalTaskForm({
   goal,
   task,
   onDone,
-  onNeedSubGoal,
   onCreated,
 }: {
   goal: GoalCategory
   /** 없으면 새로 추가 */
   task?: TimeBlockTask
   onDone: () => void
-  onNeedSubGoal: () => void
   /** 새로 만든 Task (추가일 때만) — 예: "이날 빈 시간에 배치하기" 안내 */
   onCreated?: (t: TimeBlockTask) => void
 }) {
-  const subs = activeSubGoals(goal)
+  // 영역은 선택 — 안 고르면 서버가 목표의 "기타 할 일"에 넣어요
+  const subs = areasOf(goal)
   const milestones = [...(goal.milestones ?? [])].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
   const create = useCreateGoalTask(goal.goalCategoryId)
   const update = useUpdateGoalTask(goal.goalCategoryId)
@@ -43,27 +42,13 @@ export function GoalTaskForm({
     sub:
       task?.generalCategoryId && subs.some((s) => s.generalCategoryId === task.generalCategoryId)
         ? task.generalCategoryId
-        : (subs[0]?.generalCategoryId ?? null),
+        : null,
     milestone: task?.milestoneId ?? null,
     duration: task?.plannedDurationMinutes && !task.plannedStartAt ? String(task.plannedDurationMinutes) : '',
     dueDate: task?.dueDate ?? '',
   }))
   const [more, setMore] = useState(!!(task?.milestoneId || task?.dueDate || (task && !task.plannedStartAt)))
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }))
-
-  if (!subs.length) {
-    return (
-      <div className="bg-canvas flex flex-wrap items-center gap-2 rounded-2xl px-4 py-3 text-sm">
-        <span className="text-ink-2 flex-1">Task는 세부 목표에 연결돼요. 세부 목표를 먼저 추가해 주세요.</span>
-        <button type="button" onClick={onNeedSubGoal} className="text-brand font-semibold">
-          세부 목표 추가
-        </button>
-        <button type="button" onClick={onDone} className="text-ink-3">
-          닫기
-        </button>
-      </div>
-    )
-  }
 
   const hasTime = !!f.startTime && !!f.endTime
   const duration = toNum(f.duration)
@@ -79,13 +64,13 @@ export function GoalTaskForm({
           : !hasTime && duration !== null && (Number.isNaN(duration) || duration < 5 || duration > 720)
             ? '소요 시간은 5~720분으로 입력해 주세요.'
             : null
-  const valid = !!f.name.trim() && !!f.sub && !error
+  const valid = !!f.name.trim() && !error
 
   const submit = () => {
     const body = {
       taskName: f.name.trim(),
       emoji: f.emoji.trim() || null,
-      generalCategoryId: f.sub!,
+      generalCategoryId: f.sub,
       milestoneId: f.milestone,
       date: f.date,
       startTime: hasTime ? f.startTime : null,
@@ -147,15 +132,24 @@ export function GoalTaskForm({
         <Field label="날짜">
           <input type="date" value={f.date} onChange={(e) => set('date', e.target.value)} className={inlineInput} />
         </Field>
-        <Field label="세부 목표">
-          <select value={f.sub ?? ''} onChange={(e) => set('sub', Number(e.target.value))} className={inlineInput}>
-            {subs.map((s) => (
-              <option key={s.generalCategoryId} value={s.generalCategoryId}>
-                {s.generalCategoryName}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {subs.length > 0 ? (
+          <Field label="영역 (선택)">
+            <select
+              value={f.sub ?? ''}
+              onChange={(e) => set('sub', e.target.value ? Number(e.target.value) : null)}
+              className={inlineInput}
+            >
+              <option value="">영역 없음</option>
+              {subs.map((s) => (
+                <option key={s.generalCategoryId} value={s.generalCategoryId}>
+                  {s.generalCategoryName}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <span />
+        )}
         <Field label="시작 (선택)">
           <input
             type="time"
@@ -196,7 +190,7 @@ export function GoalTaskForm({
               className={inlineInput}
             />
           </Field>
-          <Field label="마일스톤" className="col-span-2 sm:col-span-1">
+          <Field label="점검 시점" className="col-span-2 sm:col-span-1">
             <select
               value={f.milestone ?? ''}
               onChange={(e) => set('milestone', e.target.value ? Number(e.target.value) : null)}

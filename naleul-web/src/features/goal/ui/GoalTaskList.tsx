@@ -52,13 +52,12 @@ function TaskItem(props: {
   const key = `task:${t.taskId}`
   const edit = useEditing(key)
   const del = useEditing(`del:${key}`)
-  const addSub = useEditing('sub:new')
   const remove = useDeleteGoalTask()
 
   if (edit.isOpen) {
     return (
       <li className="py-2">
-        <GoalTaskForm goal={props.goal} task={t} onDone={edit.close} onNeedSubGoal={addSub.open} />
+        <GoalTaskForm goal={props.goal} task={t} onDone={edit.close} />
       </li>
     )
   }
@@ -190,7 +189,6 @@ export function GoalTaskList({ goal }: { goal: GoalCategory }) {
   const goalId = goal.goalCategoryId
   const { data, isPending, isError, refetch } = useGoalTasks(goalId)
   const add = useEditing('task:new')
-  const addSub = useEditing('sub:new')
   const toggle = useToggleGoalTask(goalId)
   const [status, setStatus] = useState<StatusFilter>('ALL')
   const [kind, setKind] = useState<KindFilter>('ALL')
@@ -232,7 +230,7 @@ export function GoalTaskList({ goal }: { goal: GoalCategory }) {
       {/* 추가: 이름·날짜만 넣고 Enter */}
       <div className="mb-4">
         {add.isOpen ? (
-          <GoalTaskForm goal={goal} onDone={add.close} onNeedSubGoal={addSub.open} />
+          <GoalTaskForm goal={goal} onDone={add.close} />
         ) : (
           <AddButton onClick={add.open}>Task 추가</AddButton>
         )}

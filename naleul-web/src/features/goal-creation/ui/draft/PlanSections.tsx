@@ -243,7 +243,7 @@ export function MilestoneTimeline({
   return (
     <div data-vkey="milestones" className="mt-7 scroll-mt-28">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-[17px] font-bold">점검 시점 (마일스톤)</h3>
+        <h3 className="text-[17px] font-bold">점검 시점</h3>
         <span className="text-ink-3 text-[13px]">
           {milestones.length}단계{goal.metric ? ' · 수치는 자동 계산' : ''}
         </span>
@@ -312,7 +312,7 @@ export function MilestoneTimeline({
       )}
       {editor({ kind: 'milestone', index: null }) ?? (
         <AddButton
-          label="마일스톤 추가"
+          label="점검 시점 추가"
           onClick={() => onEdit({ kind: 'milestone', index: null })}
           disabled={milestones.length >= LIMITS.milestones[1]}
         />
@@ -376,8 +376,8 @@ export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: 
   const remain = dDay(goal.endDate)
 
   const stats = [
-    ['세부 목표', `${plan.subGoals.length}개`],
-    ['마일스톤', `${plan.milestones.length}단계`],
+    ['영역', `${plan.subGoals.length}개`],
+    ['점검 시점', `${plan.milestones.length}단계`],
     ['일회성 Task', `${oneTimes}개`],
     ['루틴', `주 ${weeklyCount}회`],
   ] as const
@@ -464,7 +464,7 @@ export function SubGoalsCard({
   editor: EditorSlot
 }) {
   return (
-    <PanelCard title="세부 목표" aside={`${plan.subGoals.length}개`} vkey="subGoals" issues={issues}>
+    <PanelCard title="영역" aside={`${plan.subGoals.length}개`} vkey="subGoals" issues={issues}>
       <div className="space-y-2.5">
         {plan.subGoals.map((sg, i) => (
           <IssueFrame key={sg.tempId} vkey={`subGoals[${i}]`} issues={issues}>
@@ -489,7 +489,7 @@ export function SubGoalsCard({
       </div>
       {editor({ kind: 'subGoal', index: null }) ?? (
         <AddButton
-          label="세부 목표 추가"
+          label="영역 추가"
           onClick={() => onEdit({ kind: 'subGoal', index: null })}
           disabled={plan.subGoals.length >= LIMITS.subGoals[1]}
         />

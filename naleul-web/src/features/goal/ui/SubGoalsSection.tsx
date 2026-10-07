@@ -23,6 +23,12 @@ import { Section } from './sections'
 export const activeSubGoals = (goal: GoalCategory) =>
   goal.generalCategories.filter((sg) => sg.generalCategoryStatus !== 'DELETED')
 
+/** 사용자가 만든 영역만 ("기타 할 일" 그릇 제외) */
+export const areasOf = (goal: GoalCategory) => activeSubGoals(goal).filter((sg) => !sg.defaultBucket)
+
+/** 목표의 "기타 할 일" 그릇 (영역을 안 고른 루틴·Task 가 들어가요) */
+export const bucketOf = (goal: GoalCategory) => activeSubGoals(goal).find((sg) => sg.defaultBucket)
+
 /** 새로 만들 때 기본 기간: 목표 기간 (기록형은 종료일이 없어서 오늘부터 3개월) */
 export function defaultPeriod(goal: GoalCategory) {
   const today = todayKst()
@@ -85,7 +91,7 @@ function SubGoalForm({
       error={error}
       submitLabel={sub ? '저장' : '추가'}
     >
-      <Field label="세부 목표 이름">
+      <Field label="영역 이름">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -130,7 +136,7 @@ function SubGoalCard({ goal, sub }: { goal: GoalCategory; sub: SubGoalInfo }) {
           detail={
             sub.routines.length
               ? `루틴 ${sub.routines.length}개와 그 루틴의 Task도 함께 삭제돼요.`
-              : '이 세부 목표에 연결된 일회성 Task는 남아요.'
+              : '이 영역에 연결된 일회성 Task는 남아요.'
           }
           loading={remove.isPending}
           onCancel={del.close}
@@ -171,13 +177,19 @@ function SubGoalCard({ goal, sub }: { goal: GoalCategory; sub: SubGoalInfo }) {
   )
 }
 
-/** 세부 목표 — 카드를 누르면 그 자리에서 수정, 아래 점선 버튼으로 추가 */
+/**
+ * 영역 (예전 이름: 세부 목표) — 루틴·할 일을 묶어 보는 라벨.
+ * 없어도 돼요. 안 고른 루틴·할 일은 "기타 할 일" 그릇에 들어가고, 그 그릇은 여기 보여주지 않아요.
+ */
 export function SubGoalsSection({ goal }: { goal: GoalCategory }) {
-  const subs = activeSubGoals(goal)
+  const subs = areasOf(goal)
   const add = useEditing('sub:new')
 
   return (
-    <Section title="세부 목표" aside={`${subs.length}개`}>
+    <Section title="영역" aside={`${subs.length}개`}>
+      <p className="text-ink-3 -mt-2 mb-3 text-[13px]">
+        루틴·할 일을 묶어 보는 라벨이에요 (예: 운동 · 식단). 없어도 괜찮아요.
+      </p>
       {subs.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {subs.map((sg) => (
@@ -189,7 +201,7 @@ export function SubGoalsSection({ goal }: { goal: GoalCategory }) {
         {add.isOpen ? (
           <SubGoalForm goal={goal} onDone={add.close} />
         ) : (
-          <AddButton onClick={add.open}>세부 목표 추가</AddButton>
+          <AddButton onClick={add.open}>영역 추가</AddButton>
         )}
       </div>
     </Section>

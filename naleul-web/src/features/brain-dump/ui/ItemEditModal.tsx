@@ -185,12 +185,12 @@ export function ItemEditModal({ item, goals, tempGoals, today, onSave, onClose, 
           <div className="grid gap-3 sm:grid-cols-2">
             {subGoals.length > 0 && (
               <label className="block">
-                <span className={labelText}>세부 목표</span>
+                <span className={labelText}>영역</span>
                 <select
                   value={f.generalCategoryId ?? ''}
                   onChange={(e) => set({ generalCategoryId: e.target.value ? Number(e.target.value) : null })}
                   className={field}
-                  aria-label="세부 목표"
+                  aria-label="영역"
                 >
                   <option value="">선택 안 함 (기타 할 일)</option>
                   {subGoals.map((c) => (
@@ -203,12 +203,12 @@ export function ItemEditModal({ item, goals, tempGoals, today, onSave, onClose, 
             )}
             {milestones.length > 0 && (
               <label className="block">
-                <span className={labelText}>마일스톤</span>
+                <span className={labelText}>점검 시점</span>
                 <select
                   value={f.milestoneId ?? ''}
                   onChange={(e) => set({ milestoneId: e.target.value ? Number(e.target.value) : null })}
                   className={field}
-                  aria-label="마일스톤"
+                  aria-label="점검 시점"
                 >
                   <option value="">선택 안 함</option>
                   {milestones.map((m) => (

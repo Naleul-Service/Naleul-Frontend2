@@ -17,7 +17,7 @@ const field =
   'border-line-strong bg-surface focus:border-ink-3 h-10 w-full min-w-0 rounded-xl border px-3 text-[14px] outline-none'
 
 /**
- * Task 직접 추가 — 목표를 고르고, 이름·날짜·시간(선택)·세부 목표를 정해 Enter.
+ * Task 직접 추가 — 목표를 고르고, 이름·날짜·시간(선택)·영역(선택)을 정해 Enter.
  * 시간을 비워 두면 그날 "시간 미정"으로 들어가고, 바로 "AI로 빈 시간에 배치하기"를 누를 수 있어요.
  */
 export function ManualTaskAdd() {
@@ -91,7 +91,6 @@ export function ManualTaskAdd() {
             // 저장하면 폼을 비우고 다음 Task 를 바로 적을 수 있게
             onDone={() => setFormKey((k) => k + 1)}
             onCreated={(t) => setAdded((a) => [t, ...a])}
-            onNeedSubGoal={() => window.location.assign(`/goal/${selectedId}`)}
           />
         ) : (
           <div className="grid min-h-[160px] place-items-center">

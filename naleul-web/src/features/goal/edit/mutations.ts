@@ -96,6 +96,8 @@ export interface GoalUpdateInput {
   startValue?: number | null
   currentValue?: number | null
   targetValue?: number | null
+  /** true 면 수치 목표를 지워요 ("수치 없이 진행하기") — 점검 시점 수치도 함께 */
+  clearMetric?: boolean
   /** 목표 카테고리 — "기타"면 goalKindLabel 1~10자 */
   goalType?: GoalType
   goalSubType?: GoalSubType
@@ -112,7 +114,7 @@ export const useUpdateGoal = (goalId: number) =>
 export const useDeleteGoal = (goalId: number) =>
   useGoalMutation(() => api.delete(`/v1/goal-categories/${goalId}`), '목표를 삭제했어요.')
 
-// ─── 세부 목표 (general category) ─────────────────────────────
+// ─── 영역 (세부 목표 · general category) ─────────────────────
 
 export interface SubGoalInput {
   generalCategoryName: string
@@ -124,22 +126,23 @@ export interface SubGoalInput {
 export const useCreateSubGoal = (goalId: number) =>
   useGoalMutation(
     (v: SubGoalInput & { colorId: number }) => api.post('/v1/general-categories', { ...v, goalCategoryId: goalId }),
-    '세부 목표를 추가했어요.'
+    '영역을 추가했어요.'
   )
 
 export const useUpdateSubGoal = () =>
   useGoalMutation(
     ({ id, ...v }: SubGoalInput & { id: number }) => api.put(`/v1/general-categories/${id}`, v),
-    '세부 목표를 수정했어요.'
+    '영역을 수정했어요.'
   )
 
 export const useDeleteSubGoal = () =>
-  useGoalMutation((id: number) => api.delete(`/v1/general-categories/${id}`), '세부 목표를 삭제했어요.')
+  useGoalMutation((id: number) => api.delete(`/v1/general-categories/${id}`), '영역을 삭제했어요.')
 
 // ─── 루틴 ───────────────────────────────────────────────────
 
 export interface RoutineInput {
-  generalCategoryId: number
+  /** 영역 — null 이면 서버가 목표의 "기타 할 일"에 넣어요 */
+  generalCategoryId: number | null
   routineName: string
   repeatStartDate: string
   repeatEndDate: string
@@ -165,19 +168,20 @@ export const useUpdateRoutine = () =>
 export const useDeleteRoutine = () =>
   useGoalMutation((id: number) => api.delete(`/v1/routines/${id}`), '루틴을 삭제했어요.')
 
-// ─── 마일스톤 ────────────────────────────────────────────────
+// ─── 점검 시점 (마일스톤) ─────────────────────────────────────
 
 export interface MilestoneInput {
   title: string
   description: string
   dueDate: string
+  /** 보내면 "직접 정한 값", null/생략이면 시작값 → 목표값 직선에서 자동 계산 */
   targetValue: number | null
 }
 
 export const useCreateMilestone = (goalId: number) =>
   useGoalMutation(
     (v: MilestoneInput) => api.post<MilestoneInfo>(`/v1/goal-categories/${goalId}/milestones`, v),
-    '마일스톤을 추가했어요.'
+    '점검 시점을 추가했어요.'
   )
 
 export const useUpdateMilestone = () =>
@@ -185,25 +189,33 @@ export const useUpdateMilestone = () =>
     ({
       id,
       ...v
-    }: Partial<MilestoneInput> & { id: number; clearTargetValue?: boolean; status?: 'ACHIEVED' | 'PENDING' }) =>
-      api.patch<MilestoneInfo>(`/v1/milestones/${id}`, v),
+    }: Partial<MilestoneInput> & {
+      id: number
+      clearTargetValue?: boolean
+      /** true 면 직접 정한 값을 버리고 자동 계산으로 되돌려요 */
+      autoTargetValue?: boolean
+      status?: 'ACHIEVED' | 'PENDING'
+    }) => api.patch<MilestoneInfo>(`/v1/milestones/${id}`, v),
     (v) =>
       v.status === 'ACHIEVED'
-        ? '마일스톤을 달성했어요. 🎉'
+        ? '점검 시점을 달성했어요. 🎉'
         : v.status === 'PENDING'
           ? '달성을 취소했어요.'
-          : '마일스톤을 수정했어요.'
+          : v.autoTargetValue
+            ? '자동 계산으로 되돌렸어요.'
+            : '점검 시점을 수정했어요.'
   )
 
 export const useDeleteMilestone = () =>
-  useGoalMutation((id: number) => api.delete(`/v1/milestones/${id}`), '마일스톤을 삭제했어요.')
+  useGoalMutation((id: number) => api.delete(`/v1/milestones/${id}`), '점검 시점을 삭제했어요.')
 
 // ─── Task ───────────────────────────────────────────────────
 
 export interface GoalTaskInput {
   taskName: string
   emoji: string | null
-  generalCategoryId: number
+  /** 영역 — null 이면 서버가 목표의 "기타 할 일"에 넣어요 */
+  generalCategoryId: number | null
   milestoneId: number | null
   /** "YYYY-MM-DD" */
   date: string
@@ -229,3 +241,60 @@ export const useUpdateGoalTask = (goalId: number) =>
 
 export const useDeleteGoalTask = () =>
   useGoalMutation((taskId: number) => api.delete(`/v1/tasks/${taskId}`), 'Task를 삭제했어요.')
+
+// ─── 말로 고치기 (AI 변경안 미리보기 → 확인 → 적용) ─────────────
+
+export type GoalEditOpType =
+  | 'UPDATE_GOAL'
+  | 'ADD_ROUTINE'
+  | 'UPDATE_ROUTINE'
+  | 'DELETE_ROUTINE'
+  | 'ADD_MILESTONE'
+  | 'UPDATE_MILESTONE'
+  | 'DELETE_MILESTONE'
+  | 'ADD_TASK'
+
+/** 변경 하나 — 미리보기에서 받은 그대로 적용할 때 다시 보내요 */
+export interface GoalEditOp {
+  type: GoalEditOpType
+  targetId?: number | null
+  title?: string | null
+  durationMinutes?: number | null
+  days?: string[] | null
+  startTime?: string | null
+  description?: string | null
+  date?: string | null
+  startValue?: number | null
+  targetValue?: number | null
+  areaId?: number | null
+}
+
+export interface GoalEditChange {
+  op: GoalEditOp
+  /** "추가" · "변경" · "삭제" */
+  action: string
+  target: string
+  before: string | null
+  after: string | null
+}
+
+export interface GoalEditPreview {
+  summary: string
+  changes: GoalEditChange[]
+}
+
+/** 미리보기 — 아직 아무것도 바뀌지 않아요 */
+export function useGoalEditPreview(goalId: number) {
+  return useMutation({
+    mutationFn: (instruction: string) =>
+      api.post<GoalEditPreview>(`/v1/goal-categories/${goalId}/ai-edit/preview`, { instruction }),
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+}
+
+/** 고른 변경만 적용 */
+export const useGoalEditApply = (goalId: number) =>
+  useGoalMutation(
+    (ops: GoalEditOp[]) => api.post<{ applied: number }>(`/v1/goal-categories/${goalId}/ai-edit/apply`, { ops }),
+    (ops) => `${ops.length}개 변경을 적용했어요.`
+  )

@@ -13,15 +13,15 @@ import { useGoalActivities } from '@/features/record/api'
 import { isRecordGoal, useGoalCategory, type GoalCategory } from '../api'
 import { EditingContext } from '../edit/inline'
 import { dDayLabel, periodProgress } from '../format'
+import { GoalAiEditBar } from './GoalAiEditBar'
 import { GoalHeader, GoalNotes } from './GoalHeader'
 import { GoalTaskList } from './GoalTaskList'
-import { MilestonesSection } from './MilestonesSection'
 import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
 import { ProgressSection } from './progress/ProgressSection'
 import { RefineWithAiCard } from './RefineWithAiCard'
 import { RoutinesSection } from './RoutinesSection'
 import { Section } from './sections'
-import { SubGoalsSection } from './SubGoalsSection'
+import { StructurePanel } from './StructurePanel'
 
 // ─── 작은 조각들 ───────────────────────────────────────────────
 
@@ -179,7 +179,12 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
   )
 }
 
-/** 달성형 목표 (기존 화면) */
+/**
+ * 달성형 목표.
+ *  - 위: 진행 요약 + "말로 고치기" (트리를 몰라도 한 문장으로)
+ *  - 왼쪽: 매일 보는 "할 것" (루틴 · Task) — 영역은 부모가 아니라 각 줄의 라벨
+ *  - 오른쪽: 수치 기록 + 접어 둔 "세부 구조"(점검 시점 · 영역)
+ */
 function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
   return (
     <>
@@ -189,19 +194,23 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
           <Hero goal={goal} />
         </div>
       )}
+      {!goal.temporary && goal.goalCategoryStatus !== 'COMPLETED' && (
+        <div className="mt-4">
+          <GoalAiEditBar goal={goal} />
+        </div>
+      )}
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-5">
-          {/* 목표 지점까지 지금 어디쯤인지 (수치 기록 그래프 · Task 누적) */}
-          {!goal.temporary && <ProgressSection goal={goal} />}
-          <GoalNotes goal={goal} />
-          <SubGoalsSection goal={goal} />
           <RoutinesSection goal={goal} />
           <GoalTaskList goal={goal} />
+          <GoalNotes goal={goal} />
         </div>
 
         <div className="space-y-5">
-          <MilestonesSection goal={goal} />
+          {/* 목표 지점까지 지금 어디쯤인지 (수치 기록 그래프 · Task 누적) */}
+          {!goal.temporary && <ProgressSection goal={goal} />}
+          <StructurePanel goal={goal} />
           {goal.achievement && (
             <Section title="달성 기록">
               <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{goal.achievement}</p>

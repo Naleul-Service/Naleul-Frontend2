@@ -40,6 +40,8 @@ export interface SubGoalInfo {
   /** 세부 목표의 실천 원칙 (AI: "하루 1,600kcal, 단백질 90g…") */
   description?: string | null
   emoji?: string | null
+  /** 목표의 "기타 할 일" 그릇 — 영역을 안 고른 루틴·Task 가 들어가요. 화면에선 영역으로 보여주지 않아요 */
+  defaultBucket?: boolean
 }
 
 export interface MilestoneInfo {
@@ -48,6 +50,8 @@ export interface MilestoneInfo {
   description: string | null
   dueDate: string
   targetValue: number | null
+  /** 사용자가 이 시점 수치를 직접 정했는지 (false = 시작값 → 목표값 직선에서 자동 계산) */
+  targetValueManual?: boolean
   status: 'PENDING' | 'ACHIEVED' | 'MISSED'
 }
 

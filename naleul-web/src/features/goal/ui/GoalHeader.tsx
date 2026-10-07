@@ -20,12 +20,17 @@ import {
   useEditing,
 } from '../edit/inline'
 import { formatDot, goalColor, periodProgress, statusLabel } from '../format'
+import { metricSentence } from './metricSentence'
 import { isKindComplete, kindBody, type GoalKindValue } from '../kind'
 import { GoalKindPicker } from './GoalKindPicker'
 
 const numStr = (v: number | null | undefined) => (v == null ? '' : String(v))
 
-/** 전체 목표 수정 폼 — 이름·이모지·기간·색·시작한 이유·수치 목표 */
+/**
+ * 전체 목표 수정 폼 — 이름·이모지·기간·색·시작한 이유·수치 목표.
+ * 수치는 "시작값 · 목표값 · 종료일" 세 가지만 정해요. 점검 시점 수치는 이 값으로 자동 계산되고,
+ * "현재" 값은 "지금 어디쯤?"에서 남긴 기록으로만 바뀌어요 (숫자를 고치는 곳이 여러 군데라 헷갈리던 문제).
+ */
 function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: () => void; onDelete: () => void }) {
   const colors = useUserColors()
   const update = useUpdateGoal(goal.goalCategoryId)
@@ -39,7 +44,6 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
     metricName: goal.metricName ?? '',
     metricUnit: goal.metricUnit ?? '',
     startValue: numStr(goal.startValue),
-    currentValue: numStr(goal.currentValue),
     targetValue: numStr(goal.targetValue),
   })
   const [kind, setKind] = useState<GoalKindValue | null>(
@@ -51,7 +55,10 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }))
 
   const colorId = f.colorId ?? colorIdOf(colors.data, goal.colorCode)
-  const nums = [f.startValue, f.currentValue, f.targetValue].map(toNum)
+  const nums = [f.startValue, f.targetValue].map(toNum)
+  const hadMetric = goal.targetValue != null || !!goal.metricName
+  // 수치를 지우려고 칸을 비웠는지 ("수치 없이 진행하기")
+  const [clearMetric, setClearMetric] = useState(false)
   const error = !f.name.trim()
     ? '목표 이름을 입력해 주세요.'
     : f.start && f.end && f.start > f.end
@@ -73,15 +80,16 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
         ...(f.colorId !== null ? { colorId: f.colorId } : {}),
         // 카테고리는 2단계까지 고른 경우에만 (1단계만 고르다 만 건 기존 값 유지)
         ...(isKindComplete(kind) ? kindBody(kind) : {}),
-        ...(showMetric
-          ? {
-              metricName: f.metricName.trim(),
-              metricUnit: f.metricUnit.trim(),
-              startValue: nums[0],
-              currentValue: nums[1],
-              targetValue: nums[2],
-            }
-          : {}),
+        ...(clearMetric
+          ? { clearMetric: true }
+          : showMetric
+            ? {
+                metricName: f.metricName.trim(),
+                metricUnit: f.metricUnit.trim(),
+                startValue: nums[0],
+                targetValue: nums[1],
+              }
+            : {}),
       },
       { onSuccess: onDone }
     )
@@ -150,50 +158,76 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
         />
       </Field>
 
-      {showMetric ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-          <Field label="수치 이름" className="col-span-2 sm:col-span-1">
-            <input
-              value={f.metricName}
-              onChange={(e) => set('metricName', e.target.value)}
-              maxLength={30}
-              placeholder="체중"
-              className={inlineInput}
-            />
-          </Field>
-          <Field label="단위">
-            <input
-              value={f.metricUnit}
-              onChange={(e) => set('metricUnit', e.target.value)}
-              maxLength={10}
-              placeholder="kg"
-              className={inlineInput}
-            />
-          </Field>
-          <Field label="시작">
-            <input
-              inputMode="decimal"
-              value={f.startValue}
-              onChange={(e) => set('startValue', e.target.value)}
-              className={inlineInput}
-            />
-          </Field>
-          <Field label="현재">
-            <input
-              inputMode="decimal"
-              value={f.currentValue}
-              onChange={(e) => set('currentValue', e.target.value)}
-              className={inlineInput}
-            />
-          </Field>
-          <Field label="목표">
-            <input
-              inputMode="decimal"
-              value={f.targetValue}
-              onChange={(e) => set('targetValue', e.target.value)}
-              className={inlineInput}
-            />
-          </Field>
+      {showMetric && !clearMetric ? (
+        <div className="bg-subtle/60 space-y-2 rounded-xl p-3">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Field label="무엇을 재나요?">
+              <input
+                value={f.metricName}
+                onChange={(e) => set('metricName', e.target.value)}
+                maxLength={30}
+                placeholder="체중"
+                className={inlineInput}
+              />
+            </Field>
+            <Field label="단위">
+              <input
+                value={f.metricUnit}
+                onChange={(e) => set('metricUnit', e.target.value)}
+                maxLength={10}
+                placeholder="kg"
+                className={inlineInput}
+              />
+            </Field>
+            <Field label="처음 값">
+              <input
+                inputMode="decimal"
+                value={f.startValue}
+                onChange={(e) => set('startValue', e.target.value)}
+                placeholder="80"
+                className={inlineInput}
+              />
+            </Field>
+            <Field label="목표 값">
+              <input
+                inputMode="decimal"
+                value={f.targetValue}
+                onChange={(e) => set('targetValue', e.target.value)}
+                placeholder="72"
+                className={inlineInput}
+              />
+            </Field>
+          </div>
+          {/* 숫자의 의미를 문장으로 — "체중 80kg → 72kg, 1월 8일까지 · 주 평균 -0.6kg" */}
+          <p className="text-ink-2 text-[13px] font-medium">
+            {metricSentence({
+              name: f.metricName,
+              unit: f.metricUnit,
+              start: nums[0],
+              target: nums[1],
+              startDate: f.start,
+              endDate: f.end,
+            }) ?? '처음 값과 목표 값을 넣으면 어떤 계획인지 문장으로 보여드려요.'}
+          </p>
+          <p className="text-ink-3 text-xs leading-relaxed">
+            점검 시점 수치는 이 값과 기간으로 자동 계산돼요. 지금 값은 &lsquo;지금 어디쯤?&rsquo;에서 기록하면 바뀌어요.
+          </p>
+          {hadMetric && (
+            <button
+              type="button"
+              onClick={() => setClearMetric(true)}
+              className="text-ink-3 hover:text-danger text-[13px] font-semibold"
+            >
+              수치 없이 진행하기
+            </button>
+          )}
+        </div>
+      ) : clearMetric ? (
+        <div className="bg-warning-soft flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-[#92400e]">
+          <span className="flex-1">저장하면 수치 목표와 점검 시점의 수치가 지워져요. 기록한 값은 남아요.</span>
+          <button type="button" onClick={() => setClearMetric(false)} className="font-semibold underline">
+            되돌리기
+          </button>
         </div>
       ) : (
         <button type="button" onClick={() => setShowMetric(true)} className="text-brand text-[13px] font-semibold">

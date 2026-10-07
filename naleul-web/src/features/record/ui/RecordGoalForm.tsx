@@ -83,7 +83,7 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
         <ColorSwatches colors={colors.data} value={colorId} onChange={setColorId} />
       </Field>
       <p className="text-ink-3 text-xs">
-        기간·수치·마일스톤 없이 만들어요. 상세 화면에서 &ldquo;오늘 한 일&rdquo;을 한 줄씩 쌓고, 필요하면 반복 루틴도
+        기간·수치·점검 시점 없이 만들어요. 상세 화면에서 &ldquo;오늘 한 일&rdquo;을 한 줄씩 쌓고, 필요하면 반복 루틴도
         붙일 수 있어요.
       </p>
     </InlineForm>

@@ -153,7 +153,7 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
 
       {/* 세부 목표: Enter 로 하나씩 */}
       <div>
-        <span className="text-ink-3 mb-1 block text-[12px] font-medium">세부 목표 (선택 · Enter로 추가)</span>
+        <span className="text-ink-3 mb-1 block text-[12px] font-medium">영역 (선택 · Enter로 추가)</span>
         <div className="border-line-strong bg-surface focus-within:border-ink-3 flex flex-wrap items-center gap-1.5 rounded-xl border px-2 py-1.5">
           {subs.map((s) => (
             <span
@@ -177,7 +177,7 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
             onKeyDown={onSubKey}
             maxLength={30}
             placeholder={subs.length ? '' : '예: LC 연습, 단어 외우기'}
-            aria-label="세부 목표 추가"
+            aria-label="영역 추가"
             className="placeholder:text-ink-4 h-7 min-w-[140px] flex-1 bg-transparent text-[14px] outline-none"
           />
         </div>
@@ -231,7 +231,7 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
           + 수치 목표 추가 (예: 체중 80 → 72kg)
         </button>
       )}
-      <p className="text-ink-3 text-xs">만든 뒤 목표 상세에서 루틴·마일스톤·Task를 바로 추가할 수 있어요.</p>
+      <p className="text-ink-3 text-xs">만든 뒤 목표 상세에서 루틴·점검 시점·Task를 바로 추가할 수 있어요.</p>
     </InlineForm>
   )
 }
@@ -306,7 +306,7 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
           </span>
           <p className="mt-4 text-[17px] font-bold">직접 만들기</p>
           <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
-            이미 계획이 있다면 이름·기간·세부 목표를 직접 정해요. 나중에 AI로 구체화할 수도 있어요.
+            이미 계획이 있다면 이름·기간·영역을 직접 정해요. 나중에 AI로 구체화할 수도 있어요.
           </p>
           <span className="text-ink-2 mt-auto flex items-center gap-1 pt-4 text-sm font-semibold">
             {open === 'manual' ? '아래에서 입력해 주세요' : '바로 입력하기'}

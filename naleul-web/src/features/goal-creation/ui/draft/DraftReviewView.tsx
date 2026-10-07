@@ -136,9 +136,9 @@ export function DraftReviewView({ session, draft }: Props) {
   const deleteBlockReason = (t: EditTarget | null): string | null => {
     if (!t || t.kind === 'goal') return null
     if (t.kind === 'subGoal' && plan.subGoals.length <= LIMITS.subGoals[0])
-      return `세부 목표는 최소 ${LIMITS.subGoals[0]}개가 필요해요.`
+      return `영역은 최소 ${LIMITS.subGoals[0]}개가 필요해요.`
     if (t.kind === 'milestone' && plan.milestones.length <= LIMITS.milestones[0])
-      return `마일스톤은 최소 ${LIMITS.milestones[0]}개가 필요해요.`
+      return `점검 시점은 최소 ${LIMITS.milestones[0]}개가 필요해요.`
     if (t.kind === 'task' && routines.length + oneTimes <= 1) return '할 일은 최소 1개가 필요해요.'
     if (t.kind === 'task' && t.taskType === 'ROUTINE' && routines.length <= LIMITS.routines[0])
       return `루틴은 최소 ${LIMITS.routines[0]}개가 필요해요.`
@@ -453,7 +453,7 @@ export function DraftReviewView({ session, draft }: Props) {
               <span className="min-w-0 flex-1">
                 <span className="block text-[15px] font-bold">세부 구조</span>
                 <span className="text-ink-3 block text-[13px]">
-                  세부 목표 {plan.subGoals.length}개 · 점검 시점 {plan.milestones.length}단계 — 날짜
+                  영역 {plan.subGoals.length}개 · 점검 시점 {plan.milestones.length}단계 — 날짜
                   {plan.goal.metric ? '·수치' : ''}는 자동으로 맞춰져요. 꼭 바꿀 때만 열어 보세요.
                 </span>
               </span>
