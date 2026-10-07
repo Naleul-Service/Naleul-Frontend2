@@ -8,7 +8,7 @@ import { Badge, Chip } from '@/components/ui/Chip'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { hexOf, shownTime } from '@/features/timetable/layout'
-import { WEEKDAY_LABEL, addDays, hm, todayKst, weekdayIndex } from '@/features/timetable/time'
+import { WEEKDAY_LABEL, addDays, hm, startOfWeek, todayKst, weekdayIndex } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
 import { useGoalTasks, useToggleGoalTask, type GoalCategory } from '../api'
 import { useDeleteGoalTask } from '../edit/mutations'
@@ -17,10 +17,12 @@ import { GoalTaskForm } from './GoalTaskForm'
 
 type StatusFilter = 'ALL' | 'TODO' | 'DONE'
 type KindFilter = 'ALL' | 'ONE_TIME' | 'ROUTINE'
+/** 언제 할 Task 를 볼지 — 기본은 이번 주 (전체는 몇 달치가 쌓여 지금 할 일이 묻혀요) */
+type PeriodFilter = 'TODAY' | 'WEEK' | 'ALL'
 
 const PAGE = 20
 
-const isDone = (t: TimeBlockTask) => t.taskStatus === 'COMPLETED'
+export const isDone = (t: TimeBlockTask) => t.taskStatus === 'COMPLETED'
 
 const matchKind = (t: TimeBlockTask, k: KindFilter) =>
   k === 'ALL' || (k === 'ROUTINE' ? t.sourceType === 'ROUTINE' : t.sourceType !== 'ROUTINE')
@@ -28,7 +30,8 @@ const matchKind = (t: TimeBlockTask, k: KindFilter) =>
 const matchStatus = (t: TimeBlockTask, s: StatusFilter) => s === 'ALL' || (s === 'DONE' ? isDone(t) : !isDone(t))
 
 /** 이 Task 가 화면에 놓이는 날짜 (완료 후 실제 → 계획 → 시간 미정 날짜 → 권장일 → 마감일) */
-const dayOf = (t: TimeBlockTask) => shownTime(t)?.startAt.slice(0, 10) ?? t.date ?? t.scheduledDate ?? t.dueDate ?? null
+export const dayOf = (t: TimeBlockTask) =>
+  shownTime(t)?.startAt.slice(0, 10) ?? t.date ?? t.scheduledDate ?? t.dueDate ?? null
 
 /** "오늘" · "내일" · "어제" · "10.08 (목)" (해가 다르면 "2027.01.03 (일)") */
 function dayLabel(ymd: string, today: string) {
@@ -190,13 +193,27 @@ export function GoalTaskList({ goal }: { goal: GoalCategory }) {
   const { data, isPending, isError, refetch } = useGoalTasks(goalId)
   const add = useEditing('task:new')
   const toggle = useToggleGoalTask(goalId)
+  const [period, setPeriod] = useState<PeriodFilter>('WEEK')
   const [status, setStatus] = useState<StatusFilter>('ALL')
   const [kind, setKind] = useState<KindFilter>('ALL')
   const [limit, setLimit] = useState(PAGE)
   const today = todayKst()
 
   const all = data?.tasks ?? []
-  const byKind = all.filter((t) => matchKind(t, kind))
+  const weekStart = startOfWeek(today)
+  const weekEnd = addDays(weekStart, 6)
+  const inPeriod = (t: TimeBlockTask, p: PeriodFilter) => {
+    if (p === 'ALL') return true
+    const day = dayOf(t)
+    if (!day) return false
+    return p === 'TODAY' ? day === today : day >= weekStart && day <= weekEnd
+  }
+  const periodCounts = {
+    TODAY: all.filter((t) => inPeriod(t, 'TODAY')).length,
+    WEEK: all.filter((t) => inPeriod(t, 'WEEK')).length,
+    ALL: all.length,
+  }
+  const byKind = all.filter((t) => inPeriod(t, period) && matchKind(t, kind))
   const shown = byKind.filter((t) => matchStatus(t, status))
   const visible = shown.slice(0, limit)
   const counts = {
@@ -209,6 +226,10 @@ export function GoalTaskList({ goal }: { goal: GoalCategory }) {
 
   const pickStatus = (s: StatusFilter) => {
     setStatus(s)
+    setLimit(PAGE)
+  }
+  const pickPeriod = (p: PeriodFilter) => {
+    setPeriod(p)
     setLimit(PAGE)
   }
   const pickKind = (k: KindFilter) => {
@@ -253,6 +274,31 @@ export function GoalTaskList({ goal }: { goal: GoalCategory }) {
         </p>
       ) : (
         <>
+          {/* 기간: 오늘 · 이번 주(기본) · 전체 */}
+          <div className="bg-subtle mb-2.5 inline-flex rounded-xl p-1" role="tablist" aria-label="기간">
+            {(
+              [
+                ['TODAY', '오늘'],
+                ['WEEK', '이번 주'],
+                ['ALL', '전체 기간'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={period === key}
+                onClick={() => pickPeriod(key)}
+                className={cn(
+                  'h-8 rounded-lg px-3 text-[13px] font-semibold transition-colors',
+                  period === key ? 'bg-surface text-ink shadow-sm' : 'text-ink-3 hover:text-ink-2'
+                )}
+              >
+                {label} <span className="tabular-nums">{periodCounts[key]}</span>
+              </button>
+            ))}
+          </div>
+
           {/* 필터 */}
           <div className="flex flex-wrap items-center gap-1.5">
             {(
@@ -286,7 +332,15 @@ export function GoalTaskList({ goal }: { goal: GoalCategory }) {
 
           {shown.length === 0 ? (
             <p className="text-ink-3 py-8 text-center text-sm">
-              {status === 'DONE' ? '아직 완료한 Task가 없어요.' : '남은 Task가 없어요. 모두 끝냈어요! 🎉'}
+              {byKind.length === 0
+                ? period === 'TODAY'
+                  ? '오늘 할 Task가 없어요.'
+                  : period === 'WEEK'
+                    ? '이번 주 Task가 없어요.'
+                    : '조건에 맞는 Task가 없어요.'
+                : status === 'DONE'
+                  ? '아직 완료한 Task가 없어요.'
+                  : '남은 Task가 없어요. 모두 끝냈어요! 🎉'}
             </p>
           ) : (
             <ul className="divide-line mt-3 divide-y">

@@ -133,13 +133,13 @@ export function GoalTaskForm({
           <input type="date" value={f.date} onChange={(e) => set('date', e.target.value)} className={inlineInput} />
         </Field>
         {subs.length > 0 ? (
-          <Field label="영역 (선택)">
+          <Field label="세부 목표 (선택)">
             <select
               value={f.sub ?? ''}
               onChange={(e) => set('sub', e.target.value ? Number(e.target.value) : null)}
               className={inlineInput}
             >
-              <option value="">영역 없음</option>
+              <option value="">세부 목표 없음</option>
               {subs.map((s) => (
                 <option key={s.generalCategoryId} value={s.generalCategoryId}>
                   {s.generalCategoryName}
@@ -190,7 +190,7 @@ export function GoalTaskForm({
               className={inlineInput}
             />
           </Field>
-          <Field label="점검 시점" className="col-span-2 sm:col-span-1">
+          <Field label="마일스톤" className="col-span-2 sm:col-span-1">
             <select
               value={f.milestone ?? ''}
               onChange={(e) => set('milestone', e.target.value ? Number(e.target.value) : null)}

@@ -19,9 +19,11 @@ import { GoalTaskList } from './GoalTaskList'
 import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
 import { ProgressSection } from './progress/ProgressSection'
 import { RefineWithAiCard } from './RefineWithAiCard'
+import { RoutineHeatmapSection } from './RoutineHeatmapSection'
 import { RoutinesSection } from './RoutinesSection'
 import { Section } from './sections'
 import { StructurePanel } from './StructurePanel'
+import { TaskRateSection } from './TaskRateSection'
 
 // ─── 작은 조각들 ───────────────────────────────────────────────
 
@@ -123,6 +125,7 @@ function RecordGoalBody({ goal }: { goal: GoalCategory }) {
         <div className="space-y-5">
           <GoalNotes goal={goal} />
           <RoutinesSection goal={goal} />
+          <RoutineHeatmapSection goal={goal} />
           <GoalTaskList goal={goal} />
         </div>
       </div>
@@ -181,9 +184,9 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
 
 /**
  * 달성형 목표.
- *  - 위: 진행 요약 + "말로 고치기" (트리를 몰라도 한 문장으로)
- *  - 왼쪽: 매일 보는 "할 것" (루틴 · Task) — 영역은 부모가 아니라 각 줄의 라벨
- *  - 오른쪽: 수치 기록 + 접어 둔 "세부 구조"(점검 시점 · 영역)
+ *  - 위: 진행 요약 → "말로 고치기" → 이 목표를 시작한 이유 (가장 먼저 다시 보게)
+ *  - 왼쪽: 매일 보는 "할 것" — 루틴 · 루틴 실천 히트맵 · Task (세부 목표는 각 줄의 라벨)
+ *  - 오른쪽: 수치 기록 · Task 실천률 · 접어 둔 "세부 구조"(마일스톤 · 세부 목표)
  */
 function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
   return (
@@ -199,17 +202,23 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
           <GoalAiEditBar goal={goal} />
         </div>
       )}
+      {(goal.motive || goal.aiNote) && (
+        <div className="mt-4">
+          <GoalNotes goal={goal} />
+        </div>
+      )}
 
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-5">
           <RoutinesSection goal={goal} />
+          <RoutineHeatmapSection goal={goal} />
           <GoalTaskList goal={goal} />
-          <GoalNotes goal={goal} />
         </div>
 
         <div className="space-y-5">
           {/* 목표 지점까지 지금 어디쯤인지 (수치 기록 그래프 · Task 누적) */}
           {!goal.temporary && <ProgressSection goal={goal} />}
+          <TaskRateSection goal={goal} />
           <StructurePanel goal={goal} />
           {goal.achievement && (
             <Section title="달성 기록">

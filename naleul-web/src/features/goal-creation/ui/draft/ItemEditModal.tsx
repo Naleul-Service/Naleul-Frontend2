@@ -146,7 +146,7 @@ function GoalForm({ plan, formId, onDone, onError }: FormProps<{ kind: 'goal' }>
         )}
       </div>
       <p className="text-ink-3 text-xs">
-        점검 시점 날짜{metric ? '와 단계별 수치' : ''}는 이 값에 맞춰 자동으로 다시 계산돼요.
+        마일스톤 날짜{metric ? '와 단계별 수치' : ''}는 이 값에 맞춰 자동으로 다시 계산돼요.
       </p>
     </form>
   )
@@ -350,7 +350,7 @@ function TaskForm({
     if (dueDate > maxDue)
       return onError(
         milestone
-          ? `마감일은 연결된 점검 시점(${formatMd(milestone.dueDate, false)})보다 늦을 수 없어요.`
+          ? `마감일은 연결된 마일스톤(${formatMd(milestone.dueDate, false)})보다 늦을 수 없어요.`
           : '마감일은 목표 종료일보다 늦을 수 없어요.'
       )
     onDone({
@@ -390,7 +390,7 @@ function TaskForm({
             onChange={(e) => setMinutes(e.target.value)}
           />
         </Field>
-        <Field label="영역">
+        <Field label="세부 목표">
           <select className={inputClass} value={subGoalId} onChange={(e) => setSubGoalId(e.target.value)}>
             {plan.subGoals.map((sg) => (
               <option key={sg.tempId} value={sg.tempId}>
@@ -434,7 +434,7 @@ function TaskForm({
         </>
       ) : (
         <>
-          <Field label="점검 시점 (선택)">
+          <Field label="마일스톤 (선택)">
             <select className={inputClass} value={milestoneId} onChange={(e) => setMilestoneId(e.target.value)}>
               <option value="">연결 안 함</option>
               {plan.milestones.map((ms) => (
@@ -480,9 +480,9 @@ function titleOf(target: EditTarget): string {
     target.kind === 'goal'
       ? '목표'
       : target.kind === 'subGoal'
-        ? '영역'
+        ? '세부 목표'
         : target.kind === 'milestone'
-          ? '점검 시점'
+          ? '마일스톤'
           : target.taskType === 'ROUTINE'
             ? '루틴'
             : '할 일'

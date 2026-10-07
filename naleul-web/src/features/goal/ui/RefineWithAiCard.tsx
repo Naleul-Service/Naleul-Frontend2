@@ -31,8 +31,8 @@ export function RefineWithAiCard({ goal, className }: { goal: GoalCategory; clas
       <div className="min-w-0 flex-1">
         <p className="text-[17px] leading-snug font-bold">AI로 &lsquo;{name}&rsquo; 목표를 구체화해 볼까요?</p>
         <p className="text-ink-3 mt-1 text-sm leading-relaxed">
-          아직 임시 목표예요. 몇 가지 질문에 답하면 기간·점검 시점·루틴까지 설계해 드려요. 지금 있는 Task와 기록은
-          그대로 옮겨져요. 업무처럼 기록만 쌓을 일이라면 기록형으로 두면 돼요.
+          아직 임시 목표예요. 몇 가지 질문에 답하면 기간·마일스톤·루틴까지 설계해 드려요. 지금 있는 Task와 기록은 그대로
+          옮겨져요. 업무처럼 기록만 쌓을 일이라면 기록형으로 두면 돼요.
         </p>
       </div>
       <div className="flex shrink-0 flex-wrap gap-2">

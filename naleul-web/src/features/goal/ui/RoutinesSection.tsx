@@ -141,13 +141,13 @@ function RoutineForm({
         </Field>
         {/* 영역이 있을 때만 (선택) — 없으면 아예 안 보여요 */}
         {areas.length > 0 && (
-          <Field label="영역 (선택)">
+          <Field label="세부 목표 (선택)">
             <select
               value={sub ?? ''}
               onChange={(e) => setSub(e.target.value ? Number(e.target.value) : null)}
               className={inlineInput}
             >
-              <option value="">영역 없음</option>
+              <option value="">세부 목표 없음</option>
               {areas.map((s) => (
                 <option key={s.generalCategoryId} value={s.generalCategoryId}>
                   {s.generalCategoryName}

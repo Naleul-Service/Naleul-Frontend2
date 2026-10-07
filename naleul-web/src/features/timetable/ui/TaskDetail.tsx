@@ -405,7 +405,7 @@ export function TaskDetail({
               onBlur={stop}
               onKeyDown={editKeys(stop, stop)}
               className={field}
-              aria-label="영역"
+              aria-label="세부 목표"
             >
               {goal.isPending && <option>불러오는 중…</option>}
               {subs.map((s) => (
@@ -417,7 +417,7 @@ export function TaskDetail({
           ) : (
             <Prop
               icon={<span className="mt-0.5 block size-3 rounded-full" style={{ backgroundColor: color }} />}
-              label="영역"
+              label="세부 목표"
               editable={perm.editContent}
               onEdit={() => setEditing('sub')}
             >
@@ -439,7 +439,7 @@ export function TaskDetail({
               onBlur={stop}
               onKeyDown={editKeys(stop, stop)}
               className={field}
-              aria-label="점검 시점"
+              aria-label="마일스톤"
             >
               <option value="">없음</option>
               {milestones.map((m) => (
@@ -451,11 +451,11 @@ export function TaskDetail({
           ) : (
             <Prop
               icon={<Flag className="text-ink-3 size-4" />}
-              label="점검 시점"
+              label="마일스톤"
               editable={perm.editContent}
               onEdit={() => setEditing('milestone')}
             >
-              {t.milestoneTitle ?? empty('점검 시점 없음')}
+              {t.milestoneTitle ?? empty('마일스톤 없음')}
             </Prop>
           ))}
 

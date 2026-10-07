@@ -307,7 +307,7 @@ function DayPanel({
       {/* 그날 마일스톤 */}
       {summary && summary.milestones.length > 0 && (
         <section>
-          <h4 className="text-ink-3 mb-2 text-xs font-semibold">점검 시점</h4>
+          <h4 className="text-ink-3 mb-2 text-xs font-semibold">마일스톤</h4>
           <ul className="space-y-1.5">
             {summary.milestones.map((m) => (
               <li key={m.milestoneId} className="flex items-center gap-2 text-sm">

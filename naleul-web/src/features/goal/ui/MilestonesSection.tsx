@@ -110,7 +110,7 @@ function MilestoneForm({
         <div className="bg-subtle/60 rounded-xl px-3 py-2.5 text-[13px]">
           {lockedLast ? (
             <p className="text-ink-2">
-              마지막 점검 시점은 항상{' '}
+              마지막 마일스톤은 항상{' '}
               <b>
                 목표 값 {goal.targetValue}
                 {unit}
@@ -204,7 +204,7 @@ function MilestoneItem({
         ) : (
           <InlineConfirm
             message={`'${m.title}'을 삭제할까요?`}
-            detail="이 점검 시점에 연결된 Task는 남고 연결만 풀려요."
+            detail="이 마일스톤에 연결된 Task는 남고 연결만 풀려요."
             loading={remove.isPending}
             onCancel={del.close}
             onConfirm={() => remove.mutate(m.milestoneId, { onSuccess: del.close })}
@@ -268,9 +268,9 @@ export function MilestonesSection({ goal }: { goal: GoalCategory }) {
   const currentId = milestones.find((m) => m.status !== 'ACHIEVED' && m.dueDate >= today)?.milestoneId
 
   return (
-    <Section title="점검 시점" aside={milestones.length ? `${achieved} / ${milestones.length} 달성` : undefined}>
+    <Section title="마일스톤" aside={milestones.length ? `${achieved} / ${milestones.length} 달성` : undefined}>
       <p className="text-ink-3 -mt-2 mb-4 text-[13px] leading-relaxed">
-        중간에 잘 가고 있는지 확인하는 날이에요. 동그라미를 눌러 달성을 체크해요.
+        목표까지 가는 길의 중간 점검 지점이에요. 그날까지 잘 가고 있는지 확인하고, 동그라미를 눌러 달성을 체크해요.
         {hasMetric(goal) && ' 수치는 처음 값 → 목표 값 사이에서 날짜에 맞춰 자동으로 정해져요.'}
       </p>
       {milestones.length > 0 && (
@@ -290,7 +290,7 @@ export function MilestonesSection({ goal }: { goal: GoalCategory }) {
       {add.isOpen ? (
         <MilestoneForm goal={goal} onDone={add.close} />
       ) : (
-        <AddButton onClick={add.open}>점검 시점 추가</AddButton>
+        <AddButton onClick={add.open}>마일스톤 추가</AddButton>
       )}
     </Section>
   )

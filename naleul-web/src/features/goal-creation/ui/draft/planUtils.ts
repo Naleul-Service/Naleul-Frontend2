@@ -159,24 +159,24 @@ export function validatePlan(plan: GoalPlan): PlanIssue[] {
 
   const [sgMin, sgMax] = LIMITS.subGoals
   if (plan.subGoals.length < sgMin || plan.subGoals.length > sgMax)
-    add('subGoals', `영역은 ${sgMin}~${sgMax}개여야 해요.`)
+    add('subGoals', `세부 목표는 ${sgMin}~${sgMax}개여야 해요.`)
   plan.subGoals.forEach((sg, i) => {
     if (!titleOk(sg.title)) add(`subGoals[${i}].title`, `제목은 1~${LIMITS.title}자로 적어 주세요.`)
   })
 
   const [msMin, msMax] = LIMITS.milestones
   if (plan.milestones.length < msMin || plan.milestones.length > msMax)
-    add('milestones', `점검 시점은 ${msMin}~${msMax}개여야 해요.`)
+    add('milestones', `마일스톤은 ${msMin}~${msMax}개여야 해요.`)
   plan.milestones.forEach((ms, i) => {
     if (!titleOk(ms.title)) add(`milestones[${i}].title`, `제목은 1~${LIMITS.title}자로 적어 주세요.`)
     const prev = plan.milestones[i - 1]
-    if (prev && ms.dueDate <= prev.dueDate) add(`milestones[${i}].dueDate`, '점검 시점 날짜는 앞 단계보다 뒤여야 해요.')
+    if (prev && ms.dueDate <= prev.dueDate) add(`milestones[${i}].dueDate`, '마일스톤 날짜는 앞 단계보다 뒤여야 해요.')
   })
   const lastMs = plan.milestones[plan.milestones.length - 1]
   if (lastMs && lastMs.dueDate !== plan.goal.endDate)
     add(
       `milestones[${plan.milestones.length - 1}].dueDate`,
-      `마지막 점검 시점은 목표 종료일(${formatYmdDot(plan.goal.endDate)})이어야 해요.`
+      `마지막 마일스톤은 목표 종료일(${formatYmdDot(plan.goal.endDate)})이어야 해요.`
     )
 
   const routines = plan.tasks.filter(isRoutine)
@@ -202,7 +202,7 @@ export function validatePlan(plan: GoalPlan): PlanIssue[] {
         add(`${p}.scheduledDate`, '실행일은 마감일보다 늦을 수 없어요.')
       const ms = plan.milestones.find((m) => m.tempId === t.milestoneTempId)
       if (ms && t.dueDate && t.dueDate > ms.dueDate)
-        add(`${p}.dueDate`, `마감일은 연결된 점검 시점(${formatMd(ms.dueDate, false)})보다 늦을 수 없어요.`)
+        add(`${p}.dueDate`, `마감일은 연결된 마일스톤(${formatMd(ms.dueDate, false)})보다 늦을 수 없어요.`)
     }
   })
 

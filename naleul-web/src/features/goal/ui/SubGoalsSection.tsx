@@ -91,7 +91,7 @@ function SubGoalForm({
       error={error}
       submitLabel={sub ? '저장' : '추가'}
     >
-      <Field label="영역 이름">
+      <Field label="세부 목표 이름">
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -123,20 +123,20 @@ function SubGoalCard({ goal, sub }: { goal: GoalCategory; sub: SubGoalInfo }) {
 
   if (edit.isOpen) {
     return (
-      <div className="sm:col-span-2 xl:col-span-3">
+      <div>
         <SubGoalForm goal={goal} sub={sub} onDone={edit.close} />
       </div>
     )
   }
   if (del.isOpen) {
     return (
-      <div className="sm:col-span-2 xl:col-span-3">
+      <div>
         <InlineConfirm
           message={`'${sub.generalCategoryName}'을 삭제할까요?`}
           detail={
             sub.routines.length
               ? `루틴 ${sub.routines.length}개와 그 루틴의 Task도 함께 삭제돼요.`
-              : '이 영역에 연결된 일회성 Task는 남아요.'
+              : '이 세부 목표에 연결된 일회성 Task는 남아요.'
           }
           loading={remove.isPending}
           onCancel={del.close}
@@ -186,12 +186,13 @@ export function SubGoalsSection({ goal }: { goal: GoalCategory }) {
   const add = useEditing('sub:new')
 
   return (
-    <Section title="영역" aside={`${subs.length}개`}>
-      <p className="text-ink-3 -mt-2 mb-3 text-[13px]">
-        루틴·할 일을 묶어 보는 라벨이에요 (예: 운동 · 식단). 없어도 괜찮아요.
+    <Section title="세부 목표" aside={`${subs.length}개`}>
+      <p className="text-ink-3 -mt-2 mb-3 text-[13px] leading-relaxed">
+        목표를 이루려고 나눈 갈래예요 (예: 필기 대비 · 실기 대비). 루틴·Task에 붙는 이름표 역할이라, 없어도 괜찮아요.
       </p>
+      {/* 세로로 쌓아요 — 좁은 오른쪽 칸에서 가로로 나누면 글자가 한두 글자씩 끊겨 읽기 어려워요 */}
       {subs.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="space-y-2.5">
           {subs.map((sg) => (
             <SubGoalCard key={sg.generalCategoryId} goal={goal} sub={sg} />
           ))}
@@ -201,7 +202,7 @@ export function SubGoalsSection({ goal }: { goal: GoalCategory }) {
         {add.isOpen ? (
           <SubGoalForm goal={goal} onDone={add.close} />
         ) : (
-          <AddButton onClick={add.open}>영역 추가</AddButton>
+          <AddButton onClick={add.open}>세부 목표 추가</AddButton>
         )}
       </div>
     </Section>

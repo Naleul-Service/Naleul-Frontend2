@@ -210,7 +210,7 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
             }) ?? '처음 값과 목표 값을 넣으면 어떤 계획인지 문장으로 보여드려요.'}
           </p>
           <p className="text-ink-3 text-xs leading-relaxed">
-            점검 시점 수치는 이 값과 기간으로 자동 계산돼요. 지금 값은 &lsquo;지금 어디쯤?&rsquo;에서 기록하면 바뀌어요.
+            마일스톤 수치는 이 값과 기간으로 자동 계산돼요. 지금 값은 &lsquo;지금 어디쯤?&rsquo;에서 기록하면 바뀌어요.
           </p>
           {hadMetric && (
             <button
@@ -224,7 +224,7 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
         </div>
       ) : clearMetric ? (
         <div className="bg-warning-soft flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-[#92400e]">
-          <span className="flex-1">저장하면 수치 목표와 점검 시점의 수치가 지워져요. 기록한 값은 남아요.</span>
+          <span className="flex-1">저장하면 수치 목표와 마일스톤의 수치가 지워져요. 기록한 값은 남아요.</span>
           <button type="button" onClick={() => setClearMetric(false)} className="font-semibold underline">
             되돌리기
           </button>

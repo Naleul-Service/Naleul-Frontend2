@@ -126,17 +126,17 @@ export interface SubGoalInput {
 export const useCreateSubGoal = (goalId: number) =>
   useGoalMutation(
     (v: SubGoalInput & { colorId: number }) => api.post('/v1/general-categories', { ...v, goalCategoryId: goalId }),
-    '영역을 추가했어요.'
+    '세부 목표를 추가했어요.'
   )
 
 export const useUpdateSubGoal = () =>
   useGoalMutation(
     ({ id, ...v }: SubGoalInput & { id: number }) => api.put(`/v1/general-categories/${id}`, v),
-    '영역을 수정했어요.'
+    '세부 목표를 수정했어요.'
   )
 
 export const useDeleteSubGoal = () =>
-  useGoalMutation((id: number) => api.delete(`/v1/general-categories/${id}`), '영역을 삭제했어요.')
+  useGoalMutation((id: number) => api.delete(`/v1/general-categories/${id}`), '세부 목표를 삭제했어요.')
 
 // ─── 루틴 ───────────────────────────────────────────────────
 
@@ -181,7 +181,7 @@ export interface MilestoneInput {
 export const useCreateMilestone = (goalId: number) =>
   useGoalMutation(
     (v: MilestoneInput) => api.post<MilestoneInfo>(`/v1/goal-categories/${goalId}/milestones`, v),
-    '점검 시점을 추가했어요.'
+    '마일스톤을 추가했어요.'
   )
 
 export const useUpdateMilestone = () =>
@@ -198,16 +198,16 @@ export const useUpdateMilestone = () =>
     }) => api.patch<MilestoneInfo>(`/v1/milestones/${id}`, v),
     (v) =>
       v.status === 'ACHIEVED'
-        ? '점검 시점을 달성했어요. 🎉'
+        ? '마일스톤을 달성했어요. 🎉'
         : v.status === 'PENDING'
           ? '달성을 취소했어요.'
           : v.autoTargetValue
             ? '자동 계산으로 되돌렸어요.'
-            : '점검 시점을 수정했어요.'
+            : '마일스톤을 수정했어요.'
   )
 
 export const useDeleteMilestone = () =>
-  useGoalMutation((id: number) => api.delete(`/v1/milestones/${id}`), '점검 시점을 삭제했어요.')
+  useGoalMutation((id: number) => api.delete(`/v1/milestones/${id}`), '마일스톤을 삭제했어요.')
 
 // ─── Task ───────────────────────────────────────────────────
 

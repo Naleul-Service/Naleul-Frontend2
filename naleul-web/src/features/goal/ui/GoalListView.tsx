@@ -30,7 +30,7 @@ function TempGoalCard({ goal }: { goal: GoalCategory }) {
         {goal.goalCategoryName}
       </Link>
       <p className="text-ink-3 mt-1 text-[13px]">
-        Task를 적다가 만들어진 목표예요{subCount ? ` · 영역 ${subCount}개` : ''}
+        Task를 적다가 만들어진 목표예요{subCount ? ` · 세부 목표 ${subCount}개` : ''}
       </p>
       <Link href={refineHref(goal)} className={buttonClass('brand', 'sm') + ' mt-auto self-start'}>
         <Sparkles className="size-3.5" />
@@ -99,7 +99,7 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
       <p className="text-ink-3 mt-3 text-xs">
         {goal.goalMode === 'RECORD'
           ? `기록형 · 한 일을 쌓는 목표${routineCount ? ` · 루틴 ${routineCount}개` : ''}`
-          : `영역 ${goal.generalCategories.length}개 · 루틴 ${routineCount}개`}
+          : `세부 목표 ${goal.generalCategories.length}개 · 루틴 ${routineCount}개`}
       </p>
     </Link>
   )
@@ -169,7 +169,7 @@ export function GoalListView() {
         <section className="mt-8">
           <h2 className="mb-1 text-[15px] font-bold">임시 목표 {temps.length}</h2>
           <p className="text-ink-3 mb-3 text-[13px]">
-            AI로 구체화하면 기간·점검 시점·루틴이 생기고, 지금 있는 Task는 그대로 옮겨져요.
+            AI로 구체화하면 기간·마일스톤·루틴이 생기고, 지금 있는 Task는 그대로 옮겨져요.
           </p>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {temps.map((g) => (

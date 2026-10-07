@@ -99,6 +99,7 @@ export const goalKeys = {
   detail: (id: number) => [...goalKeys.all, 'detail', id] as const,
   tasks: (id: number) => [...goalKeys.all, 'tasks', id] as const,
   progress: (id: number) => [...goalKeys.all, 'progress', id] as const,
+  heatmap: (id: number) => [...goalKeys.all, 'heatmap', id] as const,
 }
 
 export function useGoalCategories() {
@@ -147,8 +148,32 @@ export function useToggleGoalTask(goalId: number) {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: goalKeys.tasks(goalId) })
       qc.invalidateQueries({ queryKey: goalKeys.progress(goalId) })
+      qc.invalidateQueries({ queryKey: goalKeys.heatmap(goalId) })
       qc.invalidateQueries({ queryKey: timetableKeys.all })
     },
+  })
+}
+
+// ─── 루틴 실천 히트맵 ──────────────────────────────────────────
+
+/** GET /routines/{goalId}/heatmap — 루틴마다 반복 요일 · 기간 · 완료한 날짜 */
+export interface RoutineHeatmap {
+  routineId: number
+  routineName: string
+  repeatStartDate: string
+  repeatEndDate: string | null
+  /** "MONDAY" … */
+  repeatDays: JavaDayOfWeek[]
+  /** 루틴 Task 를 완료한 날짜 "YYYY-MM-DD" */
+  completedDates: string[]
+  currentStreak: number
+  longestStreak: number
+}
+
+export function useRoutineHeatmap(goalId: number) {
+  return useQuery({
+    queryKey: goalKeys.heatmap(goalId),
+    queryFn: async () => (await api.get<RoutineHeatmap[]>(`/v1/routines/${goalId}/heatmap`)) ?? [],
   })
 }
 
