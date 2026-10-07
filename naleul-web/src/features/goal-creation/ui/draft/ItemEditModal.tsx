@@ -18,7 +18,14 @@ export type EditTarget =
   | { kind: 'task'; index: number | null; taskType: PlanTask['type'] }
 
 export type EditResult =
-  | { kind: 'goal'; title: string; emoji: string | null }
+  | {
+      kind: 'goal'
+      title: string
+      emoji: string | null
+      endDate: string
+      /** 수치 목표일 때만 (시작값·목표값) */
+      metricValues: { startValue: number; targetValue: number } | null
+    }
   | { kind: 'subGoal'; index: number | null; item: PlanSubGoal }
   | { kind: 'milestone'; index: number | null; item: PlanMilestone }
   | { kind: 'task'; index: number | null; item: PlanTask }
@@ -75,18 +82,72 @@ function EmojiTitle({
 }
 
 // ─── 목표 ───────────────────────────────────────────────────────
+/**
+ * 목표 이름 + "그래프를 정하는 값" (종료일 · 시작값 · 목표값).
+ * 마일스톤 날짜·수치는 이 값에서 자동으로 계산돼서, 그래프를 고치려고 마일스톤을 하나하나 맞출 필요가 없어요.
+ */
 function GoalForm({ plan, formId, onDone, onError }: FormProps<{ kind: 'goal' }>) {
-  const [title, setTitle] = useState(plan.goal.title)
-  const [emoji, setEmoji] = useState(plan.goal.emoji ?? '')
+  const { goal } = plan
+  const [title, setTitle] = useState(goal.title)
+  const [emoji, setEmoji] = useState(goal.emoji ?? '')
+  const [endDate, setEndDate] = useState(goal.endDate)
+  const [startValue, setStartValue] = useState(goal.metric?.startValue.toString() ?? '')
+  const [targetValue, setTargetValue] = useState(goal.metric?.targetValue.toString() ?? '')
+  const metric = goal.metric
   return (
     <form
       id={formId}
+      className="space-y-4"
       onSubmit={submitter(() => {
         if (!title.trim()) return onError('목표 이름을 입력해 주세요.')
-        onDone({ kind: 'goal', title: title.trim(), emoji: emoji.trim() || null })
+        if (!endDate || endDate <= goal.startDate) return onError('종료일은 시작일보다 뒤여야 해요.')
+        let metricValues: { startValue: number; targetValue: number } | null = null
+        if (metric) {
+          const sv = toNumber(startValue)
+          const tv = toNumber(targetValue)
+          if (sv === null || tv === null || Number.isNaN(sv) || Number.isNaN(tv))
+            return onError('시작값과 목표값을 숫자로 입력해 주세요.')
+          if (sv === tv) return onError('목표값이 시작값과 같아요.')
+          metricValues = { startValue: sv, targetValue: tv }
+        }
+        onDone({ kind: 'goal', title: title.trim(), emoji: emoji.trim() || null, endDate, metricValues })
       })}
     >
       <EmojiTitle emoji={emoji} title={title} onEmoji={setEmoji} onTitle={setTitle} />
+      <div className={cn('grid gap-3', metric ? 'grid-cols-3' : 'grid-cols-1 sm:max-w-[200px]')}>
+        <Field label="종료일">
+          <input
+            type="date"
+            className={inputClass}
+            value={endDate}
+            min={goal.startDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </Field>
+        {metric && (
+          <>
+            <Field label={`지금 ${metric.name} (${metric.unit})`}>
+              <input
+                className={inputClass}
+                inputMode="decimal"
+                value={startValue}
+                onChange={(e) => setStartValue(e.target.value)}
+              />
+            </Field>
+            <Field label={`목표 ${metric.name} (${metric.unit})`}>
+              <input
+                className={inputClass}
+                inputMode="decimal"
+                value={targetValue}
+                onChange={(e) => setTargetValue(e.target.value)}
+              />
+            </Field>
+          </>
+        )}
+      </div>
+      <p className="text-ink-3 text-xs">
+        마일스톤 날짜{metric ? '와 단계별 수치' : ''}는 이 값에 맞춰 자동으로 다시 계산돼요.
+      </p>
     </form>
   )
 }
@@ -143,8 +204,9 @@ function MilestoneForm({
   const [title, setTitle] = useState(current?.title ?? '')
   const [description, setDescription] = useState(current?.description ?? '')
   const [dueDate, setDueDate] = useState(current?.dueDate ?? '')
-  const [targetValue, setTargetValue] = useState(current?.targetValue?.toString() ?? '')
   const metric = plan.goal.metric
+  // 마지막 단계는 항상 목표 종료일 (자동) — 날짜를 바꾸려면 목표의 종료일을 고쳐요
+  const isLast = target.index !== null && target.index === plan.milestones.length - 1
 
   return (
     <form
@@ -155,8 +217,6 @@ function MilestoneForm({
         if (!dueDate) return onError('날짜를 정해 주세요.')
         if (dueDate < plan.goal.startDate || dueDate > plan.goal.endDate)
           return onError('목표 기간 안의 날짜를 골라 주세요.')
-        const tv = toNumber(targetValue)
-        if (Number.isNaN(tv)) return onError('목표 수치는 숫자로 입력해 주세요.')
         onDone({
           kind: 'milestone',
           index: target.index,
@@ -165,7 +225,8 @@ function MilestoneForm({
             title: title.trim(),
             description: description.trim() || null,
             dueDate,
-            targetValue: tv,
+            // 수치는 저장할 때 시작값→목표값 직선에서 자동 계산돼요 (normalizePlan)
+            targetValue: current?.targetValue ?? null,
           },
         })
       })}
@@ -181,25 +242,23 @@ function MilestoneForm({
         />
       </Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="날짜">
+        <Field label={isLast ? '날짜 (목표 종료일)' : '날짜'}>
           <input
             type="date"
             className={inputClass}
             value={dueDate}
             min={plan.goal.startDate}
             max={plan.goal.endDate}
+            disabled={isLast}
             onChange={(e) => setDueDate(e.target.value)}
           />
         </Field>
         {metric && (
-          <Field label={`목표 ${metric.name} (${metric.unit})`}>
-            <input
-              className={inputClass}
-              inputMode="decimal"
-              value={targetValue}
-              onChange={(e) => setTargetValue(e.target.value)}
-            />
-          </Field>
+          <div className="text-ink-3 self-end pb-2 text-xs leading-relaxed">
+            이 시점 {metric.name}은(는) 날짜에 맞춰
+            <br />
+            자동으로 계산돼요
+          </div>
         )}
       </div>
       <Field label="설명 (선택)">

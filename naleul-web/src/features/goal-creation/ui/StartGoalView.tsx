@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
-import { MessageCircle, Sparkles } from 'lucide-react'
+import { ArrowRight, MessageCircle, NotebookPen, Sparkles } from 'lucide-react'
 import { Badge, Chip } from '@/components/ui/Chip'
 import { isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
@@ -63,6 +64,25 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
         <p className="text-ink-3 mt-2 text-[15px] leading-relaxed">
           카테고리를 고르면 AI가 그 분야에 맞는 루틴 위주로, 꼭 필요한 것만 담아 계획을 설계해 드려요.
         </p>
+
+        {/* 회사 업무처럼 수치·마감이 없는 일은 AI 설계가 오히려 뜬구름이 돼요 → 기록형으로 안내 */}
+        {!sourceGoalId && (
+          <Link
+            href="/goal/add?mode=record"
+            className="border-line bg-surface hover:border-line-strong group mt-6 flex items-center gap-3 rounded-2xl border px-4 py-3"
+          >
+            <span className="bg-ink grid size-9 shrink-0 place-items-center rounded-xl text-white">
+              <NotebookPen className="size-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14px] font-semibold">회사 업무처럼 수치·마감이 없는 일인가요?</span>
+              <span className="text-ink-3 block text-[13px]">
+                AI 설계 없이 이름만 정하고, 오늘 한 일을 쌓는 기록형 목표가 더 잘 맞아요.
+              </span>
+            </span>
+            <ArrowRight className="text-ink-3 size-4 shrink-0 transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        )}
 
         {sourceGoalId && (
           <div className="bg-warning-soft mt-6 rounded-2xl px-4 py-3.5 text-sm text-[#92400e]">

@@ -55,6 +55,81 @@ export const isRoutine = (t: PlanTask) => t.type === 'ROUTINE'
 export const weeklyRoutineMinutes = (tasks: PlanTask[]) =>
   tasks.filter(isRoutine).reduce((sum, t) => sum + t.durationMinutes * (t.routineDays?.length ?? 0), 0)
 
+// ─── 자동 보정 ───────────────────────────────────────────────────
+
+const addDaysYmd = (ymd: string, n: number) => {
+  const d = parseYmd(ymd)
+  d.setDate(d.getDate() + n)
+  return toYmd(d)
+}
+
+/** 시작값·목표값 자리수에 맞춰 반올림 (80 → 72 면 정수, 80.5 → 72 면 소수 첫째 자리) */
+function roundLike(value: number, ...refs: number[]) {
+  const decimals = Math.max(...refs.map((r) => (String(r).split('.')[1] ?? '').length), 0)
+  const f = 10 ** Math.min(Math.max(decimals, 0), 2)
+  return Math.round(value * f) / f
+}
+
+/**
+ * 사용자가 무엇을 고치든 계획이 "깨지지 않게" 자동으로 맞춰요.
+ * 예전에는 마일스톤 날짜·수치를 사람이 직접 맞춰야 해서(마지막 = 종료일, 우상향/우하향 유지, 할 일 마감 ≤ 마일스톤)
+ * 하나를 고치면 다른 곳에 빨간 오류가 생겼어요. 이제 사용자는 "시작값·목표값·종료일"만 고치면 돼요.
+ *  - 마일스톤: 날짜순 정렬 · 목표 기간 안으로 · 겹치는 날짜는 하루씩 밀기 · 마지막은 종료일
+ *  - 마일스톤 수치: 시작값 → 목표값 직선 위의 값 (날짜 비율대로) — 그래프가 항상 한 방향
+ *  - 일회성 할 일: 마감이 연결된 마일스톤보다 늦으면 마일스톤 날짜로, 실행일이 마감보다 늦으면 마감으로
+ */
+export function normalizePlan(plan: GoalPlan): GoalPlan {
+  const { goal } = plan
+  const start = goal.startDate
+  const end = goal.endDate
+  if (!start || !end || end <= start) return plan
+
+  // 1) 날짜
+  const sorted = [...plan.milestones].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+  const milestones = sorted.map((m) => ({ ...m }))
+  milestones.forEach((m, i) => {
+    let due = m.dueDate < start ? addDaysYmd(start, 1) : m.dueDate > end ? end : m.dueDate
+    const prev = milestones[i - 1]
+    if (prev && due <= prev.dueDate) due = addDaysYmd(prev.dueDate, 1)
+    m.dueDate = due > end ? end : due
+  })
+  const last = milestones[milestones.length - 1]
+  if (last) last.dueDate = end
+
+  // 2) 수치 — 직선 보간
+  const metric = goal.metric
+  const total = Math.max(daysBetween(start, end), 1)
+  milestones.forEach((m) => {
+    if (!metric) {
+      m.targetValue = null
+      return
+    }
+    const ratio = Math.min(Math.max(daysBetween(start, m.dueDate) / total, 0), 1)
+    const raw = metric.startValue + (metric.targetValue - metric.startValue) * ratio
+    m.targetValue = roundLike(raw, metric.startValue, metric.targetValue)
+  })
+  if (last && metric) last.targetValue = metric.targetValue
+
+  // 3) 일회성 할 일 날짜
+  const dueOf = new Map(milestones.map((m) => [m.tempId, m.dueDate]))
+  const tasks = plan.tasks.map((t) => {
+    if (isRoutine(t)) return t
+    const msDue = t.milestoneTempId ? dueOf.get(t.milestoneTempId) : undefined
+    let due = t.dueDate
+    if (due && msDue && due > msDue) due = msDue
+    if (due && due > end) due = end
+    const scheduled = t.scheduledDate && due && t.scheduledDate > due ? due : t.scheduledDate
+    return due === t.dueDate && scheduled === t.scheduledDate ? t : { ...t, dueDate: due, scheduledDate: scheduled }
+  })
+
+  const same =
+    milestones.every((m, i) => {
+      const o = plan.milestones[i]
+      return o && o.tempId === m.tempId && o.dueDate === m.dueDate && o.targetValue === m.targetValue
+    }) && tasks.every((t, i) => t === plan.tasks[i])
+  return same ? plan : { ...plan, milestones, tasks }
+}
+
 // ─── 검증 ───────────────────────────────────────────────────────
 // 서버 HARD 규칙 중 프론트에서 바로 확인 가능한 것들 (인수인계 3-4).
 // path 형식을 서버 violations 와 같게 맞춰서, 화면 표시 로직을 하나로 써요.
@@ -68,7 +143,7 @@ export const LIMITS = {
   title: 40,
   subGoals: [1, 5],
   milestones: [1, 8],
-  routines: [1, 10],
+  routines: [0, 10],
   oneTimes: [0, 30],
   routineMinutes: [1, 240],
   oneTimeMinutes: [1, 480],
@@ -106,7 +181,8 @@ export function validatePlan(plan: GoalPlan): PlanIssue[] {
 
   const routines = plan.tasks.filter(isRoutine)
   const [rMin, rMax] = LIMITS.routines
-  if (routines.length < rMin || routines.length > rMax) add('tasks', `루틴은 ${rMin}~${rMax}개여야 해요.`)
+  if (plan.tasks.length === 0) add('tasks', '할 일을 하나 이상 남겨 주세요.')
+  if (routines.length < rMin || routines.length > rMax) add('tasks', `루틴은 ${rMax}개까지 만들 수 있어요.`)
   // 일회성 Task 개수는 검사하지 않아요 — AI 목표는 루틴 중심이라 0개가 기본이에요 (추가 버튼만 30개에서 막혀요)
 
   plan.tasks.forEach((t, i) => {

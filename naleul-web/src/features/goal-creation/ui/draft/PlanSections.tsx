@@ -125,6 +125,7 @@ export function GoalHeroCard({
   colorId,
   onColor,
   editor,
+  showMilestones = true,
 }: {
   plan: GoalPlan
   issues: Issues
@@ -134,6 +135,8 @@ export function GoalHeroCard({
   colors: UserColor[] | undefined
   colorId: number | null
   onColor: (id: number | null) => void
+  /** false 면 마일스톤은 화면 아래 "자세히" 안에서 따로 보여줘요 */
+  showMilestones?: boolean
 }) {
   const { goal } = plan
   const days = daysBetween(goal.startDate, goal.endDate)
@@ -215,12 +218,12 @@ export function GoalHeroCard({
         </div>
       </div>
 
-      <MilestoneTimeline plan={plan} issues={issues} onEdit={onEdit} editor={editor} />
+      {showMilestones && <MilestoneTimeline plan={plan} issues={issues} onEdit={onEdit} editor={editor} />}
     </section>
   )
 }
 
-function MilestoneTimeline({
+export function MilestoneTimeline({
   plan,
   issues,
   onEdit,
@@ -240,8 +243,10 @@ function MilestoneTimeline({
   return (
     <div data-vkey="milestones" className="mt-7 scroll-mt-28">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-[17px] font-bold">마일스톤</h3>
-        <span className="text-ink-3 text-[13px]">{milestones.length}단계</span>
+        <h3 className="text-[17px] font-bold">점검 시점 (마일스톤)</h3>
+        <span className="text-ink-3 text-[13px]">
+          {milestones.length}단계{goal.metric ? ' · 수치는 자동 계산' : ''}
+        </span>
       </div>
       {messages && (
         <ul className="text-danger mb-3 text-[13px] font-medium">
@@ -363,7 +368,7 @@ function PlanCurve({ plan }: { plan: GoalPlan }) {
   )
 }
 
-export function MetricCard({ plan }: { plan: GoalPlan }) {
+export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: () => void }) {
   const { goal } = plan
   const routines = plan.tasks.filter(isRoutine)
   const oneTimes = plan.tasks.length - routines.length
@@ -419,6 +424,16 @@ export function MetricCard({ plan }: { plan: GoalPlan }) {
           <p className="mt-5 text-[13px] text-white/80">계획 {goal.metric.name} 곡선</p>
           <PlanCurve plan={plan} />
         </>
+      )}
+      {onEditGoal && (
+        <button
+          type="button"
+          onClick={onEditGoal}
+          className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-semibold hover:bg-white/25"
+        >
+          <Pencil className="size-3.5" />
+          {goal.metric ? '시작값·목표값·종료일 고치기' : '종료일 고치기'}
+        </button>
       )}
 
       <dl className="mt-5 grid grid-cols-2 gap-2.5">

@@ -4,6 +4,7 @@ import type {
   ConfirmRequest,
   DraftRequested,
   DraftResponse,
+  GoalPlan,
   PlanningStyle,
   SessionDetail,
   SlotsPatch,
@@ -52,8 +53,18 @@ export const goalCreationApi = {
   cancel: (sessionId: number) => api.delete<null>(`${BASE}/${sessionId}`),
 
   /** 초안 생성 / 다시 생성 (202, 비동기) */
-  requestDraft: (sessionId: number, body: { feedback?: string; planningStyle?: PlanningStyle } = {}) =>
-    api.post<DraftRequested>(`${BASE}/${sessionId}/drafts`, body),
+  /**
+   * 초안 생성 / 다시 생성.
+   * basePlan 을 같이 보내면 "말로 고치기": 화면에서 직접 고친 지금 초안을 기준으로 feedback 부분만 바꿔요.
+   */
+  requestDraft: (
+    sessionId: number,
+    body: {
+      feedback?: string
+      planningStyle?: PlanningStyle
+      basePlan?: GoalPlan
+    } = {}
+  ) => api.post<DraftRequested>(`${BASE}/${sessionId}/drafts`, body),
 
   /** 초안 폴링 */
   getDraft: (sessionId: number, draftId: number) => api.get<DraftResponse>(`${BASE}/${sessionId}/drafts/${draftId}`),

@@ -6,7 +6,11 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { isApiError } from '@/lib/client/api'
-import { useGoalCategory, type GoalCategory } from '../api'
+import { RecordHero } from '@/features/record/ui/RecordHero'
+import { RecordQuickLog } from '@/features/record/ui/RecordQuickLog'
+import { RecordTimeline } from '@/features/record/ui/RecordTimeline'
+import { useGoalActivities } from '@/features/record/api'
+import { isRecordGoal, useGoalCategory, type GoalCategory } from '../api'
 import { EditingContext } from '../edit/inline'
 import { dDayLabel, periodProgress } from '../format'
 import { GoalHeader, GoalNotes } from './GoalHeader'
@@ -95,6 +99,37 @@ function Hero({ goal }: { goal: GoalCategory }) {
   )
 }
 
+// ─── 기록형 목표 ───────────────────────────────────────────────
+
+/**
+ * 기록형 목표 (회사 업무 등) — 진행률·마일스톤 대신 "한 일"을 쌓아 보여줘요.
+ *  - 상단: 이번 주 쌓인 시간
+ *  - 왼쪽: 오늘 한 일 한 줄 기록 + 날짜별 타임라인
+ *  - 오른쪽: (선택) 반복 루틴 · Task — 주간 회의처럼 반복되는 일만 필요할 때 붙여요
+ */
+function RecordGoalBody({ goal }: { goal: GoalCategory }) {
+  const activities = useGoalActivities(goal.goalCategoryId)
+  const list = activities.data ?? []
+  return (
+    <>
+      <div className="mt-6">
+        <RecordHero activities={list} />
+      </div>
+      <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="space-y-5">
+          <RecordQuickLog goal={goal} />
+          <RecordTimeline activities={list} loading={activities.isPending} />
+        </div>
+        <div className="space-y-5">
+          <GoalNotes goal={goal} />
+          <RoutinesSection goal={goal} />
+          <GoalTaskList goal={goal} />
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ─── 화면 ──────────────────────────────────────────────────────
 
 /** /goal/[goalId] — 목표 상세. 각 영역을 그 자리에서 바로 추가·수정·삭제할 수 있어요 */
@@ -135,9 +170,19 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
     <EditingContext.Provider value={editingCtx}>
       <GoalHeader goal={goal} />
 
-      {justCreated && <PlaceAfterCreateCard goal={goal} className="mt-6" />}
+      {/* 기록형은 만들 때 루틴·Task 가 없어서 "TimeTable 에 배치할까요?"를 묻지 않아요 */}
+      {justCreated && !isRecordGoal(goal) && <PlaceAfterCreateCard goal={goal} className="mt-6" />}
       {goal.temporary && <RefineWithAiCard goal={goal} className="mt-6" />}
 
+      {isRecordGoal(goal) ? <RecordGoalBody goal={goal} /> : <AchievementGoalBody goal={goal} />}
+    </EditingContext.Provider>
+  )
+}
+
+/** 달성형 목표 (기존 화면) */
+function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
+  return (
+    <>
       {/* 임시 목표는 기간·수치가 없어 진행률이 의미 없어요 → 구체화 카드만 보여줘요 */}
       {!goal.temporary && (
         <div className="mt-6">
@@ -164,6 +209,6 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
           )}
         </div>
       </div>
-    </EditingContext.Provider>
+    </>
   )
 }

@@ -65,6 +65,11 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
         >
           {statusLabel(goal.goalCategoryStatus)}
         </Badge>
+        {goal.goalMode === 'RECORD' && (
+          <Badge tone="neutral" className="h-5 px-2 text-[11px]">
+            기록형
+          </Badge>
+        )}
         {period && isOngoing(goal.goalCategoryStatus) && (
           <span className="text-ink-3 ml-auto text-xs font-semibold">{dDayLabel(period.remain)}</span>
         )}
@@ -75,7 +80,8 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
       </p>
       {goal.goalCategoryStartDate && (
         <p className="text-ink-3 mt-1 text-[13px]">
-          {formatDot(goal.goalCategoryStartDate)} – {formatDot(goal.goalCategoryEndDate)}
+          {formatDot(goal.goalCategoryStartDate)} –{' '}
+          {goal.goalCategoryEndDate ? formatDot(goal.goalCategoryEndDate) : '계속'}
         </p>
       )}
 
@@ -91,7 +97,9 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
         </div>
       )}
       <p className="text-ink-3 mt-3 text-xs">
-        세부 목표 {goal.generalCategories.length}개 · 루틴 {routineCount}개
+        {goal.goalMode === 'RECORD'
+          ? `기록형 · 한 일을 쌓는 목표${routineCount ? ` · 루틴 ${routineCount}개` : ''}`
+          : `세부 목표 ${goal.generalCategories.length}개 · 루틴 ${routineCount}개`}
       </p>
     </Link>
   )

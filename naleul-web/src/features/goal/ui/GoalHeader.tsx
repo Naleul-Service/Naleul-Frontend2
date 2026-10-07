@@ -257,6 +257,7 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
               {statusLabel(goal.goalCategoryStatus)}
             </Badge>
             {goal.temporary && <Badge tone="warning">임시 목표</Badge>}
+            {goal.goalMode === 'RECORD' && <Badge tone="neutral">기록형</Badge>}
             {goal.goalKindName && <Badge tone="brand">{goal.goalKindName}</Badge>}
             <button
               type="button"

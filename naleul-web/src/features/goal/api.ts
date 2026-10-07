@@ -68,6 +68,8 @@ export interface GoalCategory {
   aiGenerated?: boolean
   /** Brain dump 에서 자동으로 만든 임시 목표 (종료일·마일스톤 없음) → "AI로 구체화하기"를 권해요 */
   temporary?: boolean
+  /** 목표 형태: ACHIEVEMENT 달성형(기본) / RECORD 기록형 — 회사 업무처럼 종료일·수치 없이 "한 일"을 쌓는 목표 */
+  goalMode?: 'ACHIEVEMENT' | 'RECORD'
   /** 목표 카테고리 2단계 (명세 6.A.1.2). 예전 목표는 null */
   goalType?: GoalType | null
   goalSubType?: GoalSubType | null
@@ -83,6 +85,9 @@ export interface GoalCategory {
   targetValue?: number | null
   milestones?: MilestoneInfo[] | null
 }
+
+/** 기록형 목표인지 (예전 응답엔 goalMode 가 없어서 undefined = 달성형) */
+export const isRecordGoal = (g: Pick<GoalCategory, 'goalMode'> | null | undefined) => g?.goalMode === 'RECORD'
 
 export const goalKeys = {
   all: ['goals'] as const,

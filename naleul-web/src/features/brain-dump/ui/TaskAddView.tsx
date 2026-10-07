@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check, PenLine, Sparkles } from 'lucide-react'
+import { Check, NotebookPen, PenLine, Sparkles } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { cn } from '@/lib/cn'
 import { isApiError } from '@/lib/client/api'
@@ -9,6 +9,7 @@ import { toast } from '@/stores/toastStore'
 import { useGoalCategories } from '@/features/goal/api'
 import { isOngoing } from '@/features/goal/format'
 import { hm, todayKst } from '@/features/timetable/time'
+import { LogDoneView } from '@/features/record/ui/LogDoneView'
 import { useConfirmBrainDump, useParseBrainDump, useTaskQuota } from '../api'
 import type { ConfirmResponse, ParseResponse, TempGoalInput } from '../types'
 import { ManualTaskAdd } from './ManualTaskAdd'
@@ -52,10 +53,11 @@ function toMapItems(res: ParseResponse): { items: MapItem[]; tempGoals: TempGoal
  *   2. 목표 연결 → POST /brain-dump/confirm
  *   3. TimeBlock 확인
  */
-export function TaskAddView({ initialMode = 'ai' }: { initialMode?: 'ai' | 'manual' }) {
+export function TaskAddView({ initialMode = 'ai' }: { initialMode?: 'ai' | 'manual' | 'log' }) {
   const today = todayKst()
   // 목표 만들기처럼 "AI로 정리하기 / 직접 추가하기" 중에서 골라요
-  const [mode, setMode] = useState<'ai' | 'manual'>(initialMode)
+  // 할 일을 적거나(ai·manual), 이미 한 일을 기록하거나(log)
+  const [mode, setMode] = useState<'ai' | 'manual' | 'log'>(initialMode)
   const [step, setStep] = useState<0 | 1 | 2>(0)
   const [lines, setLines] = useState<DumpLine[]>([])
   const [items, setItems] = useState<MapItem[]>([])
@@ -154,14 +156,18 @@ export function TaskAddView({ initialMode = 'ai' }: { initialMode?: 'ai' | 'manu
 
   return (
     <>
-      <PageHeader title="Task 추가" description="AI로 한 번에 정리하거나, 직접 하나씩 추가할 수 있어요." />
+      <PageHeader
+        title="Task 추가"
+        description="할 일을 AI로 정리하거나 직접 추가하고, 이미 한 일은 기록으로 남길 수 있어요."
+      />
 
       {/* 추가 방식 고르기 */}
-      <div className="mt-5 grid max-w-5xl gap-3 sm:grid-cols-2" role="tablist" aria-label="추가 방식">
+      <div className="mt-5 grid max-w-5xl gap-3 sm:grid-cols-3" role="tablist" aria-label="추가 방식">
         {(
           [
             ['ai', Sparkles, 'AI로 정리하기', '생각나는 일을 쏟아내면 목표에 연결하고 빈 시간에 배치해요.'],
             ['manual', PenLine, '직접 추가하기', '목표·날짜·시간을 정해서 하나씩 바로 추가해요.'],
+            ['log', NotebookPen, '한 일 기록', '이미 한 일을 한 줄씩 적으면 목표에 연결해 기록으로 쌓아요.'],
           ] as const
         ).map(([key, Icon, title, desc]) => (
           <button
@@ -170,9 +176,9 @@ export function TaskAddView({ initialMode = 'ai' }: { initialMode?: 'ai' | 'manu
             role="tab"
             aria-selected={mode === key}
             onClick={() => setMode(key)}
-            disabled={mode === 'ai' && key === 'manual' && step > 0 && !result}
+            disabled={mode === 'ai' && key !== 'ai' && step > 0 && !result}
             title={
-              mode === 'ai' && key === 'manual' && step > 0 && !result
+              mode === 'ai' && key !== 'ai' && step > 0 && !result
                 ? 'AI 정리를 마치거나 처음으로 돌아가면 바꿀 수 있어요'
                 : undefined
             }
@@ -197,7 +203,11 @@ export function TaskAddView({ initialMode = 'ai' }: { initialMode?: 'ai' | 'manu
         ))}
       </div>
 
-      {mode === 'manual' ? (
+      {mode === 'log' ? (
+        <div className="mt-4 max-w-5xl">
+          <LogDoneView goals={ongoingGoals} />
+        </div>
+      ) : mode === 'manual' ? (
         <div className="mt-4 max-w-5xl">
           <ManualTaskAdd />
         </div>

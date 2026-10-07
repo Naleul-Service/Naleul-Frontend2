@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ChevronDown, RefreshCw, Sparkles } from 'lucide-react'
+import { AlertTriangle, ChevronDown, CornerDownLeft, MessageSquareText, RefreshCw, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
@@ -21,10 +21,20 @@ import type { DraftResponse, GoalPlan, PlanIssue, PlanningStyle, SessionDetail }
 import { FlowShell } from '../SessionGate'
 import { textareaClass } from '../formParts'
 import { InlineItemEditor, sameTarget, type EditResult, type EditTarget } from './ItemEditModal'
-import { GoalHeroCard, MetricCard, OneTimeTasksCard, RoutinesCard, SubGoalsCard } from './PlanSections'
-import { LIMITS, groupIssues, isRoutine, itemKeyOf, validatePlan } from './planUtils'
+import {
+  GoalHeroCard,
+  MetricCard,
+  MilestoneTimeline,
+  OneTimeTasksCard,
+  RoutinesCard,
+  SubGoalsCard,
+} from './PlanSections'
+import { LIMITS, groupIssues, isRoutine, itemKeyOf, normalizePlan, validatePlan } from './planUtils'
 
 const FEEDBACK_MAX = 200
+
+/** 말로 고치기 예시 */
+const QUICK_FIX_EXAMPLES = ['운동은 주 2회로 줄여줘', '루틴을 저녁 시간으로 옮겨줘', '하나만 남기고 더 가볍게']
 
 /** 첫 번째 문제 항목으로 스크롤 */
 function scrollToIssue(issues: PlanIssue[]) {
@@ -65,6 +75,9 @@ export function DraftReviewView({ session, draft }: Props) {
   const [pendingStyle, setPendingStyle] = useState<PlanningStyle | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
+  const [quickFix, setQuickFix] = useState('')
+  // 세부 목표·마일스톤은 기본으로 접어 둬요 (트리 구조를 몰라도 루틴만 보고 고칠 수 있게)
+  const [structureOpen, setStructureOpen] = useState(false)
 
   const dirty = plan !== draft.plan
   const clientIssues = useMemo(() => validatePlan(plan), [plan])
@@ -73,6 +86,11 @@ export function DraftReviewView({ session, draft }: Props) {
     [serverIssues, showClientIssues, clientIssues]
   )
   const issueMap = useMemo(() => groupIssues(shownIssues), [shownIssues])
+  // 세부 구조 안에 고칠 곳이 있거나 그 안의 항목을 편집 중이면 접혀 있지 않게
+  const structureHasIssue =
+    [...issueMap.keys()].some((k) => k.startsWith('subGoals') || k.startsWith('milestones')) ||
+    editTarget?.kind === 'subGoal' ||
+    editTarget?.kind === 'milestone'
 
   const routines = plan.tasks.filter(isRoutine)
   const oneTimes = plan.tasks.length - routines.length
@@ -80,14 +98,25 @@ export function DraftReviewView({ session, draft }: Props) {
 
   // ── 편집 ────────────────────────────────────────────────────
   const update = (next: GoalPlan) => {
-    setPlan(next)
+    // 마일스톤 날짜·수치, 할 일 마감을 자동으로 맞춰요 → 하나 고쳤다고 다른 곳에 오류가 생기지 않게
+    setPlan(normalizePlan(next))
     setServerIssues(null) // 서버 결과는 이전 내용 기준이라 지워요 (index 가 바뀌었을 수 있음)
   }
 
   const applyEdit = (r: EditResult) => {
     const p = plan
     if (r.kind === 'goal') {
-      update({ ...p, goal: { ...p.goal, title: r.title, emoji: r.emoji } })
+      const metric = p.goal.metric && r.metricValues ? { ...p.goal.metric, ...r.metricValues } : p.goal.metric
+      update({
+        ...p,
+        goal: {
+          ...p.goal,
+          title: r.title,
+          emoji: r.emoji,
+          endDate: r.endDate,
+          metric,
+        },
+      })
     } else if (r.kind === 'subGoal') {
       const list = r.index === null ? [...p.subGoals, r.item] : p.subGoals.map((x, i) => (i === r.index ? r.item : x))
       update({ ...p, subGoals: list })
@@ -110,6 +139,7 @@ export function DraftReviewView({ session, draft }: Props) {
       return `세부 목표는 최소 ${LIMITS.subGoals[0]}개가 필요해요.`
     if (t.kind === 'milestone' && plan.milestones.length <= LIMITS.milestones[0])
       return `마일스톤은 최소 ${LIMITS.milestones[0]}개가 필요해요.`
+    if (t.kind === 'task' && routines.length + oneTimes <= 1) return '할 일은 최소 1개가 필요해요.'
     if (t.kind === 'task' && t.taskType === 'ROUTINE' && routines.length <= LIMITS.routines[0])
       return `루틴은 최소 ${LIMITS.routines[0]}개가 필요해요.`
     if (t.kind === 'task' && t.taskType === 'ONE_TIME' && oneTimes <= LIMITS.oneTimes[0])
@@ -157,7 +187,7 @@ export function DraftReviewView({ session, draft }: Props) {
   }
 
   // ── 다시 생성 / 성향 변경 ──────────────────────────────────
-  const regenerate = async (body: { feedback?: string; planningStyle?: PlanningStyle }) => {
+  const regenerate = async (body: { feedback?: string; planningStyle?: PlanningStyle; basePlan?: GoalPlan }) => {
     setRegenerating(true)
     try {
       const res = await goalCreationApi.requestDraft(sessionId, body)
@@ -177,6 +207,21 @@ export function DraftReviewView({ session, draft }: Props) {
     const text = feedback.trim()
     const style = wasStyleSelectedByUser(sessionId) ? plan.goal.planningStyle : undefined
     regenerate({ ...(text ? { feedback: text } : {}), ...(style ? { planningStyle: style } : {}) })
+  }
+
+  /**
+   * 말로 고치기 — 화면에서 고친 지금 초안(basePlan)을 기준으로 이 문장에 해당하는 부분만 AI 가 바꿔요.
+   * "다시 생성"과 달리 직접 고친 내용이 사라지지 않아요.
+   */
+  const submitQuickFix = () => {
+    const text = quickFix.trim()
+    if (!text || busy) return
+    const style = wasStyleSelectedByUser(sessionId) ? plan.goal.planningStyle : undefined
+    regenerate({
+      feedback: text,
+      basePlan: plan,
+      ...(style ? { planningStyle: style } : {}),
+    })
   }
 
   const changeStyle = () => {
@@ -330,6 +375,51 @@ export function DraftReviewView({ session, draft }: Props) {
             </div>
           )}
 
+          {/* 말로 고치기: 트리를 몰라도 한 문장으로 */}
+          <div className="border-line bg-surface mt-4 rounded-[20px] border px-4 py-3 sm:px-5">
+            <div className="flex items-center gap-2">
+              <MessageSquareText className="text-brand size-5 shrink-0" />
+              <input
+                value={quickFix}
+                onChange={(e) => setQuickFix(e.target.value.slice(0, FEEDBACK_MAX))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                    e.preventDefault()
+                    submitQuickFix()
+                  }
+                }}
+                disabled={busy}
+                placeholder="바꾸고 싶은 걸 말로 적어 보세요. 예) 운동은 주 2회로 줄여줘"
+                aria-label="말로 고치기"
+                className="placeholder:text-ink-4 h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+              />
+              <Button
+                size="sm"
+                variant="brand"
+                onClick={submitQuickFix}
+                loading={regenerating}
+                disabled={!quickFix.trim() || busy}
+              >
+                <CornerDownLeft className="size-3.5" />
+                고치기
+              </Button>
+            </div>
+            {!quickFix && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5 pl-7">
+                {QUICK_FIX_EXAMPLES.map((ex) => (
+                  <button
+                    key={ex}
+                    type="button"
+                    onClick={() => setQuickFix(ex)}
+                    className="border-line text-ink-3 hover:border-line-strong hover:text-ink-2 h-6 rounded-full border px-2 text-[12px]"
+                  >
+                    {ex}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* 상단: 목표 + 수치 */}
           <div className="mt-5 grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
             <GoalHeroCard
@@ -341,17 +431,48 @@ export function DraftReviewView({ session, draft }: Props) {
               colors={colors.data}
               colorId={colorId}
               onColor={setColorId}
+              showMilestones={false}
             />
-            <MetricCard plan={plan} />
+            <MetricCard plan={plan} onEditGoal={() => setEditTarget({ kind: 'goal' })} />
           </div>
 
-          {/* 하단: 세부 목표 · Task · 루틴 */}
-          <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-3">
-            <SubGoalsCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
-            {/* 루틴이 계획의 중심이라 먼저, 일회성 Task 는 꼭 필요한 것만 */}
+          {/* 가운데: 실제로 할 일 — 루틴이 계획의 중심, 일회성 Task 는 꼭 필요한 것만 */}
+          <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <RoutinesCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
             <OneTimeTasksCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
           </div>
+
+          {/* 아래: 세부 구조 (접힘) — 세부 목표 · 마일스톤. 날짜·수치는 자동으로 맞춰져요 */}
+          <section className="border-line bg-surface mt-5 rounded-[20px] border">
+            <button
+              type="button"
+              onClick={() => setStructureOpen((v) => !v)}
+              aria-expanded={structureOpen || structureHasIssue}
+              className="flex w-full items-center gap-3 px-5 py-4 text-left sm:px-7"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-bold">세부 구조</span>
+                <span className="text-ink-3 block text-[13px]">
+                  세부 목표 {plan.subGoals.length}개 · 점검 시점 {plan.milestones.length}단계 — 날짜
+                  {plan.goal.metric ? '·수치' : ''}는 자동으로 맞춰져요. 꼭 바꿀 때만 열어 보세요.
+                </span>
+              </span>
+              <ChevronDown
+                className={cn(
+                  'text-ink-3 size-5 transition-transform',
+                  (structureOpen || structureHasIssue) && 'rotate-180'
+                )}
+              />
+            </button>
+            {(structureOpen || structureHasIssue) && (
+              <div className="border-line grid grid-cols-[minmax(0,1fr)] gap-5 border-t px-5 pt-2 pb-6 sm:px-7 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                <MilestoneTimeline plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
+                <div className="pt-5">
+                  <SubGoalsCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
+                </div>
+              </div>
+            )}
+          </section>
         </main>
       </div>
 

@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { useUserColors } from '@/features/color/api'
-import { todayKst } from '@/features/timetable/time'
-import type { GoalCategory, SubGoalInfo } from '../api'
+import { addDays, todayKst } from '@/features/timetable/time'
+import { isRecordGoal, type GoalCategory, type SubGoalInfo } from '../api'
 import { useCreateSubGoal, useDeleteSubGoal, useUpdateSubGoal } from '../edit/mutations'
 import {
   AddButton,
@@ -23,11 +23,11 @@ import { Section } from './sections'
 export const activeSubGoals = (goal: GoalCategory) =>
   goal.generalCategories.filter((sg) => sg.generalCategoryStatus !== 'DELETED')
 
-/** 새로 만들 때 기본 기간: 목표 기간 (없으면 오늘부터 4주) */
+/** 새로 만들 때 기본 기간: 목표 기간 (기록형은 종료일이 없어서 오늘부터 3개월) */
 export function defaultPeriod(goal: GoalCategory) {
   const today = todayKst()
   const start = goal.goalCategoryStartDate ?? today
-  const end = goal.goalCategoryEndDate ?? start
+  const end = goal.goalCategoryEndDate ?? (isRecordGoal(goal) ? addDays(today, 90) : start)
   return { start, end: end < start ? start : end }
 }
 

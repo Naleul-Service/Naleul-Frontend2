@@ -3,7 +3,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, MessageCircle, PenLine, Sparkles, X } from 'lucide-react'
+import { ArrowRight, MessageCircle, NotebookPen, PenLine, Sparkles, X } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
@@ -12,6 +12,7 @@ import { addDays, todayKst } from '@/features/timetable/time'
 import { useCreateGoal } from '../edit/mutations'
 import { ColorSwatches, Field, InlineForm, colorIdOf, inlineInput, toNum } from '../edit/inline'
 import { isKindComplete, kindBody, type GoalKindValue } from '../kind'
+import { RecordGoalForm } from '@/features/record/ui/RecordGoalForm'
 import { GoalKindPicker } from './GoalKindPicker'
 
 /** 직접 목표 만들기 폼 — Enter 로 만들기, Esc 로 닫기 */
@@ -237,30 +238,31 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
 
 /**
  * /goal/add — 목표 추가 방법 고르기
- *  - AI로 설계: 대화로 기간·마일스톤·루틴까지 (기존 /goal/new)
- *  - 직접 만들기: 이 화면에서 바로 입력
+ *  - AI로 설계: 대화로 기간·마일스톤·루틴까지 (기존 /goal/new) — 다이어트·자격증처럼 "이룰 것"이 분명할 때
+ *  - 기록하며 쌓기: 회사 업무처럼 수치·마감 없이 "한 일"을 모으는 기록형 목표 — 이름만 적으면 끝
+ *  - 직접 만들기: 이미 계획이 있을 때 이 화면에서 바로 입력
  */
-export function GoalAddView({ initialManual = false }: { initialManual?: boolean }) {
-  const [manual, setManual] = useState(initialManual)
+export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | 'record' | null }) {
+  const [open, setOpen] = useState<'manual' | 'record' | null>(initialMode)
   const card =
     'border-line bg-surface hover:border-line-strong group flex flex-col rounded-[20px] border p-5 text-left transition-colors sm:p-6'
 
   return (
     <>
-      <PageHeader breadcrumb={<Link href="/goal">목표</Link>} title="목표 추가" description="어떻게 만들어 볼까요?" />
+      <PageHeader breadcrumb={<Link href="/goal">목표</Link>} title="목표 추가" description="어떤 목표인가요?" />
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
         <Link href="/goal/new" className={card}>
           <span className="bg-brand-soft text-brand grid size-11 place-items-center rounded-2xl">
             <Sparkles className="size-5" />
           </span>
           <p className="mt-4 flex items-center gap-2 text-[17px] font-bold">
-            AI로 설계하기 <Badge tone="brand">추천</Badge>
+            AI로 설계하기 <Badge tone="brand">이룰 목표</Badge>
           </p>
           <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
-            카테고리와 한 문장만 고르면 몇 가지 질문을 하고, 그 분야에 맞는 루틴 위주로 꼭 필요한 것만 계획해 드려요.
+            다이어트·자격증·독서처럼 이루고 싶은 게 분명할 때. 몇 가지 질문 후 꼭 필요한 루틴만 계획해 드려요.
           </p>
-          <span className="text-brand mt-4 flex items-center gap-1 text-sm font-semibold">
+          <span className="text-brand mt-auto flex items-center gap-1 pt-4 text-sm font-semibold">
             <MessageCircle className="size-4" />
             대화 시작하기
             <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
@@ -269,9 +271,35 @@ export function GoalAddView({ initialManual = false }: { initialManual?: boolean
 
         <button
           type="button"
-          onClick={() => setManual(true)}
-          aria-expanded={manual}
-          className={cn(card, manual && 'border-ink ring-ink ring-1')}
+          onClick={() => setOpen('record')}
+          aria-expanded={open === 'record'}
+          className={cn(card, open === 'record' && 'border-ink ring-ink ring-1')}
+        >
+          <span className="bg-ink grid size-11 place-items-center rounded-2xl text-white">
+            <NotebookPen className="size-5" />
+          </span>
+          <p className="mt-4 flex items-center gap-2 text-[17px] font-bold">
+            기록하며 쌓기 <Badge tone="neutral">업무·프로젝트</Badge>
+          </p>
+          <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
+            회사 업무처럼 수치나 마감이 없는 일. 이름만 정하면 끝이고, &ldquo;오늘 한 일&rdquo;을 한 줄씩 쌓아요.
+          </p>
+          <span className="text-ink-2 mt-auto flex items-center gap-1 pt-4 text-sm font-semibold">
+            {open === 'record' ? '아래에서 이름을 정해 주세요' : '10초 만에 만들기'}
+            <ArrowRight
+              className={cn(
+                'size-4 transition-transform',
+                open === 'record' ? 'rotate-90' : 'group-hover:translate-x-0.5'
+              )}
+            />
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setOpen('manual')}
+          aria-expanded={open === 'manual'}
+          className={cn(card, open === 'manual' && 'border-ink ring-ink ring-1')}
         >
           <span className="bg-subtle text-ink-2 grid size-11 place-items-center rounded-2xl">
             <PenLine className="size-5" />
@@ -280,16 +308,20 @@ export function GoalAddView({ initialManual = false }: { initialManual?: boolean
           <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
             이미 계획이 있다면 이름·기간·세부 목표를 직접 정해요. 나중에 AI로 구체화할 수도 있어요.
           </p>
-          <span className="text-ink-2 mt-4 flex items-center gap-1 text-sm font-semibold">
-            {manual ? '아래에서 입력해 주세요' : '바로 입력하기'}
+          <span className="text-ink-2 mt-auto flex items-center gap-1 pt-4 text-sm font-semibold">
+            {open === 'manual' ? '아래에서 입력해 주세요' : '바로 입력하기'}
             <ArrowRight
-              className={cn('size-4 transition-transform', manual ? 'rotate-90' : 'group-hover:translate-x-0.5')}
+              className={cn(
+                'size-4 transition-transform',
+                open === 'manual' ? 'rotate-90' : 'group-hover:translate-x-0.5'
+              )}
             />
           </span>
         </button>
       </div>
 
-      {manual && <ManualGoalForm onCancel={() => setManual(false)} />}
+      {open === 'record' && <RecordGoalForm onCancel={() => setOpen(null)} className="mt-4 max-w-2xl" />}
+      {open === 'manual' && <ManualGoalForm onCancel={() => setOpen(null)} />}
     </>
   )
 }

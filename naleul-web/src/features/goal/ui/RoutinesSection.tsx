@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { todayKst } from '@/features/timetable/time'
-import type { GoalCategory, JavaDayOfWeek, RoutineSummary } from '../api'
+import { isRecordGoal, type GoalCategory, type JavaDayOfWeek, type RoutineSummary } from '../api'
 import { useCreateRoutine, useDeleteRoutine, useUpdateRoutine } from '../edit/mutations'
 import {
   AddButton,
@@ -148,7 +148,8 @@ function RoutineForm({
             className={inlineInput}
           />
         </Field>
-        <Field label="세부 목표">
+        {/* 기록형은 세부 목표를 안 보여줘요 (루틴은 서버가 미리 만든 "기타 할 일"에 들어가요) */}
+        <Field label="세부 목표" className={isRecordGoal(goal) && subs.length <= 1 ? 'hidden' : undefined}>
           <select value={sub ?? ''} onChange={(e) => setSub(Number(e.target.value))} className={inlineInput}>
             {subs.map((s) => (
               <option key={s.generalCategoryId} value={s.generalCategoryId}>
