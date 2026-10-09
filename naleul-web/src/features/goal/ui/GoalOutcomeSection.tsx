@@ -158,15 +158,22 @@ function OutcomeStats({ outcome }: { outcome: GoalOutcome }) {
     outcome.routineRate != null && `루틴 실천 ${outcome.routineRate}%`,
     outcome.taskRate != null && `할 일 완료 ${outcome.taskRate}%`,
   ].filter(Boolean) as string[]
-  if (!stats.length) return null
+  if (!stats.length && !outcome.metricUnrecorded) return null
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {stats.map((s) => (
-        <span key={s} className="bg-subtle text-ink-2 rounded-full px-3 py-1 text-[13px] font-medium tabular-nums">
-          {s}
-        </span>
-      ))}
-    </div>
+    <>
+      {stats.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {stats.map((s) => (
+            <span key={s} className="bg-subtle text-ink-2 rounded-full px-3 py-1 text-[13px] font-medium tabular-nums">
+              {s}
+            </span>
+          ))}
+        </div>
+      )}
+      {outcome.metricUnrecorded && (
+        <p className="text-ink-3 mt-2 text-[13px]">수치 기록이 없어서 실천률로 판정했어요.</p>
+      )}
+    </>
   )
 }
 

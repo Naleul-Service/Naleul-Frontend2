@@ -97,6 +97,10 @@ export interface GoalCategory {
   currentValue?: number | null
   targetValue?: number | null
   milestones?: MilestoneInfo[] | null
+  /** 목록 조회에서만 — 마지막 활동일 (Task 완료 · 수치 기록) */
+  lastActivityDate?: string | null
+  /** 목록 조회에서만 — 진행 중인데 오래 활동이 없으면 멈춘 지 며칠째 (생활형 14일 · 업무형 28일부터), 아니면 null */
+  pausedDays?: number | null
 }
 
 /** 기록형 목표인지 (예전 응답엔 goalMode 가 없어서 undefined = 달성형) */
@@ -269,6 +273,8 @@ export interface GoalOutcome {
   metricPercent: number | null
   routineRate: number | null
   taskRate: number | null
+  /** 수치 목표인데 수치 기록이 없어 실천률로 판정했어요 (이때 metricPercent 는 null) */
+  metricUnrecorded?: boolean
 }
 
 export interface GoalAdjustment {

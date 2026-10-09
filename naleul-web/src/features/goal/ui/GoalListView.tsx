@@ -174,6 +174,11 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
             업무형
           </Badge>
         )}
+        {goal.pausedDays != null && (
+          <Badge tone="warning" className="h-5 px-2 text-[11px]">
+            멈춤 {goal.pausedDays}일째
+          </Badge>
+        )}
         {period && isOngoing(goal.goalCategoryStatus) && (
           <span className="text-ink-3 ml-auto text-xs font-semibold">{dDayLabel(period.remain)}</span>
         )}
