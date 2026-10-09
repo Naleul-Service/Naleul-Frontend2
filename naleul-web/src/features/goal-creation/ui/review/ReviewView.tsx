@@ -15,7 +15,7 @@ import { PLANNING_STYLE_LABEL } from '../../constants'
 import { markStyleSelectedByUser, wasStyleSelectedByUser } from '../../planningStyleMemory'
 import { goalFlowPath } from '../../routes'
 import type { PlanningStyle, SessionDetail, SlotKey, SlotsPatch } from '../../types'
-import { MustDoPicker } from '../MustDoPicker'
+import { MustDoPicker, withDraft } from '../MustDoPicker'
 import { FlowShell } from '../SessionGate'
 import { SlotEditModal } from './SlotEditModal'
 
@@ -63,6 +63,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
   // 꼭 할 일 수정 (슬롯이 아니라 따로 저장돼요)
   const [mustDoOpen, setMustDoOpen] = useState(false)
   const [mustDoDraft, setMustDoDraft] = useState<string[]>(session.mustDoItems ?? [])
+  const [mustDoText, setMustDoText] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -163,6 +164,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
                 onClick={() => {
                   setSaveError(null)
                   setMustDoDraft(session.mustDoItems ?? [])
+                  setMustDoText('')
                   setMustDoOpen(true)
                 }}
               />
@@ -220,13 +222,19 @@ export function ReviewView({ session }: { session: SessionDetail }) {
             <Button variant="secondary" onClick={() => setMustDoOpen(false)} disabled={saving}>
               취소
             </Button>
-            <Button onClick={() => save({ mustDoItems: mustDoDraft })} loading={saving}>
+            <Button onClick={() => save({ mustDoItems: withDraft(mustDoDraft, mustDoText) })} loading={saving}>
               저장
             </Button>
           </>
         }
       >
-        <MustDoPicker value={mustDoDraft} onChange={setMustDoDraft} disabled={saving} />
+        <MustDoPicker
+          value={mustDoDraft}
+          onChange={setMustDoDraft}
+          draft={mustDoText}
+          onDraftChange={setMustDoText}
+          disabled={saving}
+        />
         {saveError && <p className="text-danger mt-2 text-[13px]">{saveError}</p>}
       </Modal>
       <SlotEditModal

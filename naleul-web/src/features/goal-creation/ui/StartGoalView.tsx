@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
 import { ArrowRight, MessageCircle, NotebookPen, Sparkles } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import { Badge, Chip } from '@/components/ui/Chip'
 import { isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
@@ -13,8 +14,7 @@ import { MUST_DO_SUGGESTIONS, isKindComplete, subOption, type GoalKindValue } fr
 import { GoalKindPicker } from '@/features/goal/ui/GoalKindPicker'
 import { goalCreationApi } from '../api'
 import { EXAMPLE_GOALS } from '../constants'
-import { ChatComposer } from './ChatComposer'
-import { MustDoPicker } from './MustDoPicker'
+import { MustDoPicker, withDraft } from './MustDoPicker'
 import { FlowHeader } from './FlowHeader'
 import { ResumeCard } from './ResumeCard'
 
@@ -25,19 +25,23 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
   const [kind, setKind] = useState<GoalKindValue | null>(null)
   // 이 목표를 위해 꼭 하고 싶은 일 (예: 다이어트 → 헬스 · 식단 기록) — 계획에 반드시 루틴으로 들어가요
   const [mustDo, setMustDo] = useState<string[]>([])
+  // 입력창에 적어 두기만 한 일도 함께 보내요 (하나만 할 거면 "+ 추가"를 안 눌러도 돼요)
+  const [mustDoDraft, setMustDoDraft] = useState('')
+  const mustDoInput = useRef<HTMLInputElement>(null)
   const kindReady = isKindComplete(kind)
   const goals = useGoalCategories()
   const source = sourceGoalId ? goals.data?.find((g) => g.goalCategoryId === sourceGoalId) : undefined
 
   const start = useMutation({
-    mutationFn: (initialMessage?: string) => goalCreationApi.start(initialMessage, sourceGoalId, kind, mustDo),
+    mutationFn: (initialMessage?: string) =>
+      goalCreationApi.start(initialMessage, sourceGoalId, kind, withDraft(mustDo, mustDoDraft)),
     onSuccess: (turn) => router.push(`/goal/new/${turn.sessionId}`),
     onError: (error) => toast.error(isApiError(error) ? error.message : '시작하지 못했어요. 다시 시도해 주세요.'),
   })
 
+  const goalText = text.trim()
   const submit = () => {
-    const value = text.trim()
-    if (value && kindReady && !start.isPending) start.mutate(value)
+    if (goalText && kindReady && !start.isPending) start.mutate(goalText)
   }
 
   // 이동 중에도 버튼이 다시 눌리지 않게 성공 후에도 막아둬요
@@ -116,34 +120,26 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
         </section>
 
         <section className={kindReady ? 'mt-8' : 'pointer-events-none mt-8 opacity-40'}>
-          <p className="text-[14px] font-semibold">
-            <span className="text-brand mr-1.5">2</span>이 목표를 위해 꼭 하고 싶은 일이 있나요?{' '}
-            <span className="text-ink-3 font-normal">(선택)</span>
-          </p>
-          <p className="text-ink-3 mt-1 mb-3 text-[13px]">
-            고른 일은 계획에 꼭 넣어 드려요. 없으면 AI가 알맞게 골라요.
-          </p>
-          <MustDoPicker
-            value={mustDo}
-            onChange={setMustDo}
-            suggestions={kind ? (MUST_DO_SUGGESTIONS[kind.goalSubType] ?? []) : []}
-            disabled={busy || !kindReady}
-          />
-        </section>
-
-        <section className={kindReady ? 'mt-8' : 'pointer-events-none mt-8 opacity-40'}>
           <p className="mb-3 text-[14px] font-semibold">
-            <span className="text-brand mr-1.5">3</span>목표를 한 문장으로
+            <span className="text-brand mr-1.5">2</span>이루고 싶은 목표를 작성해 주세요
           </p>
-          <ChatComposer
+          {/* Enter 는 바로 시작하지 않고 다음 질문(꼭 해야 할 일)으로 넘어가요 */}
+          <input
             value={text}
-            onChange={setText}
-            onSubmit={submit}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                mustDoInput.current?.focus()
+              }
+            }}
+            maxLength={100}
             disabled={busy || !kindReady}
             placeholder={placeholder}
+            aria-label="이루고 싶은 목표"
+            className="border-line-strong bg-surface placeholder:text-ink-4 focus:border-ink-3 disabled:bg-subtle h-12 w-full rounded-2xl border px-4 text-[15px] outline-none"
           />
-
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             {examples.map((goal) => (
               <Chip key={goal} size="sm" onClick={() => setText(goal)} disabled={busy || !kindReady}>
                 {goal}
@@ -151,6 +147,47 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             ))}
           </div>
         </section>
+
+        <section className={kindReady ? 'mt-8' : 'pointer-events-none mt-8 opacity-40'}>
+          <p className="text-[14px] font-semibold">
+            <span className="text-brand mr-1.5">3</span>
+            {goalText ? (
+              <>
+                <span className="text-brand">
+                  &ldquo;{goalText.length > 24 ? `${goalText.slice(0, 24)}…` : goalText}&rdquo;
+                </span>{' '}
+                목표를 이루기 위해 꼭 해야 할 일들이 있나요?
+              </>
+            ) : (
+              '이 목표를 이루기 위해 꼭 해야 할 일들이 있나요?'
+            )}{' '}
+            <span className="text-ink-3 font-normal">(선택)</span>
+          </p>
+          <p className="text-ink-3 mt-1 mb-3 text-[13px]">
+            하나면 적기만 하면 되고, 여러 개면 &lsquo;+ 추가&rsquo;로 더 적어 주세요. 고른 일은 계획에 꼭 넣어 드려요.
+          </p>
+          <MustDoPicker
+            value={mustDo}
+            onChange={setMustDo}
+            draft={mustDoDraft}
+            onDraftChange={setMustDoDraft}
+            inputRef={mustDoInput}
+            suggestions={kind ? (MUST_DO_SUGGESTIONS[kind.goalSubType] ?? []) : []}
+            disabled={busy || !kindReady}
+          />
+        </section>
+
+        <Button
+          size="lg"
+          variant="brand"
+          className="mt-8 w-full"
+          onClick={submit}
+          loading={start.isPending}
+          disabled={busy || !kindReady || !goalText}
+        >
+          <Sparkles className="size-4" />
+          AI와 목표 설계 시작하기
+        </Button>
 
         <button
           type="button"
