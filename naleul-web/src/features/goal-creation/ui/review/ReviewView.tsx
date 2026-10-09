@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
 import { isApiError } from '@/lib/client/api'
@@ -14,6 +15,7 @@ import { PLANNING_STYLE_LABEL } from '../../constants'
 import { markStyleSelectedByUser, wasStyleSelectedByUser } from '../../planningStyleMemory'
 import { goalFlowPath } from '../../routes'
 import type { PlanningStyle, SessionDetail, SlotKey, SlotsPatch } from '../../types'
+import { MustDoPicker } from '../MustDoPicker'
 import { FlowShell } from '../SessionGate'
 import { SlotEditModal } from './SlotEditModal'
 
@@ -58,6 +60,9 @@ export function ReviewView({ session }: { session: SessionDetail }) {
   const summary = session.summary
 
   const [editing, setEditing] = useState<SlotKey | null>(null)
+  // 꼭 할 일 수정 (슬롯이 아니라 따로 저장돼요)
+  const [mustDoOpen, setMustDoOpen] = useState(false)
+  const [mustDoDraft, setMustDoDraft] = useState<string[]>(session.mustDoItems ?? [])
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
@@ -78,9 +83,12 @@ export function ReviewView({ session }: { session: SessionDetail }) {
       const turn = await goalCreationApi.updateSlots(sessionId, patch)
       // 화면 데이터(캐시)를 응답으로 바로 갱신 → 다시 불러오지 않아도 요약이 바뀌어요
       queryClient.setQueryData<SessionDetail>(goalCreationKeys.session(sessionId), (prev) =>
-        prev ? { ...prev, status: turn.status, slots: turn.slots, summary: turn.summary } : prev
+        prev
+          ? { ...prev, status: turn.status, slots: turn.slots, summary: turn.summary, mustDoItems: turn.mustDoItems }
+          : prev
       )
       setEditing(null)
+      setMustDoOpen(false)
       toast.success('수정했어요.')
     } catch (error) {
       if (isApiError(error) && error.httpStatus === 409) {
@@ -149,6 +157,15 @@ export function ReviewView({ session }: { session: SessionDetail }) {
                 value={summary?.preferenceText ?? null}
                 onClick={() => openEdit('practicePreference')}
               />
+              <SummaryRow
+                label="꼭 할 일"
+                value={session.mustDoItems?.length ? session.mustDoItems.join(' · ') : null}
+                onClick={() => {
+                  setSaveError(null)
+                  setMustDoDraft(session.mustDoItems ?? [])
+                  setMustDoOpen(true)
+                }}
+              />
             </div>
           </Section>
 
@@ -192,6 +209,26 @@ export function ReviewView({ session }: { session: SessionDetail }) {
         </div>
       </div>
 
+      <Modal
+        open={mustDoOpen}
+        onClose={() => !saving && setMustDoOpen(false)}
+        title="꼭 하고 싶은 일"
+        description="고른 일은 계획에 꼭 루틴으로 넣어 드려요."
+        dismissible={!saving}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setMustDoOpen(false)} disabled={saving}>
+              취소
+            </Button>
+            <Button onClick={() => save({ mustDoItems: mustDoDraft })} loading={saving}>
+              저장
+            </Button>
+          </>
+        }
+      >
+        <MustDoPicker value={mustDoDraft} onChange={setMustDoDraft} disabled={saving} />
+        {saveError && <p className="text-danger mt-2 text-[13px]">{saveError}</p>}
+      </Modal>
       <SlotEditModal
         slot={editing}
         slots={session.slots}

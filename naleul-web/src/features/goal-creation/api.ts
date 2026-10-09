@@ -26,12 +26,14 @@ export const goalCreationApi = {
    * sourceGoalId: 임시 목표를 구체화할 때 (BE-8). 확정하면 그 임시 목표의 Task·기록이 새 목표로 옮겨져요.
    * 첫 문장을 비우면 서버가 임시 목표 이름으로 시작해요.
    */
-  start: (initialMessage?: string, sourceGoalId?: number, kind?: GoalKindValue | null) =>
+  start: (initialMessage?: string, sourceGoalId?: number, kind?: GoalKindValue | null, mustDoItems?: string[]) =>
     api.post<TurnResponse>(BASE, {
       ...(initialMessage ? { initialMessage } : {}),
       ...(sourceGoalId ? { sourceGoalId } : {}),
       // 고른 카테고리 → AI 가 카테고리에 맞는 질문 · 계획 가이드를 써요
       ...kindBody(kind ?? null),
+      // 꼭 하고 싶은 일 → 인터뷰가 다시 묻지 않고, 계획에 반드시 루틴으로 넣어요
+      ...(mustDoItems?.length ? { mustDoItems } : {}),
     }),
 
   /** 진행 중인 최신 세션. 없으면 204 → null */

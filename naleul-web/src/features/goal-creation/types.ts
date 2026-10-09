@@ -72,6 +72,8 @@ export interface TurnResponse {
   message: GoalMessage | null
   slots: GoalSlots
   summary: GoalSummary | null
+  /** 이 목표를 위해 꼭 하고 싶은 일 (예: 헬스, 식단 기록) — 계획에 반드시 들어가요 */
+  mustDoItems?: string[]
 }
 
 export interface DraftRef {
@@ -91,6 +93,7 @@ export interface SessionDetail {
   slots: GoalSlots
   summary: GoalSummary | null
   latestDraft: DraftRef | null
+  mustDoItems?: string[]
 }
 
 // ─── 슬롯 수정 (PATCH /slots) — 바꾼 것만 보냄 ───────────────────
@@ -100,6 +103,8 @@ export interface SlotsPatch {
   motivation?: string
   deadline?: DeadlineValue
   practicePreference?: PracticePreferenceValue
+  /** 빈 목록이면 지워요 */
+  mustDoItems?: string[]
 }
 
 // ─── 초안 (GoalPlan) — 초안 응답 = 확정 요청 공통 구조 ─────────────

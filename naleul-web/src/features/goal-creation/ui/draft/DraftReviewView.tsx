@@ -292,7 +292,12 @@ export function DraftReviewView({ session, draft }: Props) {
   }
 
   const summary = session.summary
-  const summaryChips = [summary?.deadlineText, summary?.metricText, summary?.preferenceText].filter(Boolean)
+  const summaryChips = [
+    summary?.deadlineText,
+    summary?.metricText,
+    summary?.preferenceText,
+    session.mustDoItems?.length ? `꼭 할 일: ${session.mustDoItems.join(' · ')}` : null,
+  ].filter(Boolean)
 
   const styleChip = (
     <button

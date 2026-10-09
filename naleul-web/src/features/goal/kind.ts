@@ -115,6 +115,27 @@ export const GOAL_TYPES: { value: GoalType; label: string; emoji: string; hint: 
   },
 ]
 
+/**
+ * "이 목표를 위해 꼭 하고 싶은 일" 추천 칩 (AI 목표 시작 화면).
+ * 고른 일은 계획 AI 가 반드시 루틴으로 넣어요. 기타는 추천 없이 직접 적어요.
+ */
+export const MUST_DO_SUGGESTIONS: Partial<Record<GoalSubType, string[]>> = {
+  EXERCISE: ['헬스', '러닝', '홈트레이닝', '스트레칭', '수영'],
+  DIET: ['헬스', '식단 기록', '유산소', '체중 기록', '간헐적 단식'],
+  WATER: ['물 마시기 체크', '텀블러 들고 다니기'],
+  NO_ALCOHOL: ['음주 기록', '술자리 대신 운동'],
+  NO_SMOKING: ['흡연 욕구 기록', '금연 클리닉'],
+  LANGUAGE: ['단어 암기', '듣기 연습', '회화 연습', '모의고사'],
+  CERTIFICATE: ['이론 공부', '기출 풀이', '오답 정리', '모의고사'],
+  READING: ['매일 읽기', '독서 기록'],
+  CODING: ['알고리즘 문제 풀이', '강의 듣기', '프로젝트 개발'],
+  WAKE_UP: ['기상 인증', '아침 스트레칭'],
+  SLEEP: ['취침 준비 루틴', '자기 전 휴대폰 끄기'],
+  MEDITATION: ['아침 명상', '호흡 연습'],
+  CLEANING: ['정리 정돈', '설거지 바로 하기'],
+  JOURNAL: ['일기 쓰기', '감사 일기'],
+}
+
 export const typeOption = (t: GoalType) => GOAL_TYPES.find((o) => o.value === t)!
 export const subOption = (s: GoalSubType) => GOAL_TYPES.flatMap((t) => t.subs).find((o) => o.value === s)!
 

@@ -9,11 +9,12 @@ import { Badge, Chip } from '@/components/ui/Chip'
 import { isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
 import { useGoalCategories } from '@/features/goal/api'
-import { isKindComplete, subOption, type GoalKindValue } from '@/features/goal/kind'
+import { MUST_DO_SUGGESTIONS, isKindComplete, subOption, type GoalKindValue } from '@/features/goal/kind'
 import { GoalKindPicker } from '@/features/goal/ui/GoalKindPicker'
 import { goalCreationApi } from '../api'
 import { EXAMPLE_GOALS } from '../constants'
 import { ChatComposer } from './ChatComposer'
+import { MustDoPicker } from './MustDoPicker'
 import { FlowHeader } from './FlowHeader'
 import { ResumeCard } from './ResumeCard'
 
@@ -22,12 +23,14 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
   const router = useRouter()
   const [text, setText] = useState('')
   const [kind, setKind] = useState<GoalKindValue | null>(null)
+  // 이 목표를 위해 꼭 하고 싶은 일 (예: 다이어트 → 헬스 · 식단 기록) — 계획에 반드시 루틴으로 들어가요
+  const [mustDo, setMustDo] = useState<string[]>([])
   const kindReady = isKindComplete(kind)
   const goals = useGoalCategories()
   const source = sourceGoalId ? goals.data?.find((g) => g.goalCategoryId === sourceGoalId) : undefined
 
   const start = useMutation({
-    mutationFn: (initialMessage?: string) => goalCreationApi.start(initialMessage, sourceGoalId, kind),
+    mutationFn: (initialMessage?: string) => goalCreationApi.start(initialMessage, sourceGoalId, kind, mustDo),
     onSuccess: (turn) => router.push(`/goal/new/${turn.sessionId}`),
     onError: (error) => toast.error(isApiError(error) ? error.message : '시작하지 못했어요. 다시 시도해 주세요.'),
   })
@@ -113,8 +116,24 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
         </section>
 
         <section className={kindReady ? 'mt-8' : 'pointer-events-none mt-8 opacity-40'}>
+          <p className="text-[14px] font-semibold">
+            <span className="text-brand mr-1.5">2</span>이 목표를 위해 꼭 하고 싶은 일이 있나요?{' '}
+            <span className="text-ink-3 font-normal">(선택)</span>
+          </p>
+          <p className="text-ink-3 mt-1 mb-3 text-[13px]">
+            고른 일은 계획에 꼭 넣어 드려요. 없으면 AI가 알맞게 골라요.
+          </p>
+          <MustDoPicker
+            value={mustDo}
+            onChange={setMustDo}
+            suggestions={kind ? (MUST_DO_SUGGESTIONS[kind.goalSubType] ?? []) : []}
+            disabled={busy || !kindReady}
+          />
+        </section>
+
+        <section className={kindReady ? 'mt-8' : 'pointer-events-none mt-8 opacity-40'}>
           <p className="mb-3 text-[14px] font-semibold">
-            <span className="text-brand mr-1.5">2</span>목표를 한 문장으로
+            <span className="text-brand mr-1.5">3</span>목표를 한 문장으로
           </p>
           <ChatComposer
             value={text}
