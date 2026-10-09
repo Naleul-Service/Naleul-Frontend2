@@ -265,7 +265,7 @@ export function GoalAdjustmentBanner({ goal }: { goal: GoalCategory }) {
       >
         <X className="size-4" />
       </button>
-      <p className={cn('flex items-center gap-1.5 pr-6 text-sm font-bold', down ? 'text-[#b45309]' : 'text-brand')}>
+      <p className={cn('flex items-center gap-1.5 pr-6 text-sm font-bold', down ? 'text-warning-ink' : 'text-brand')}>
         <Icon className="size-4" />
         주간 점검 · {adj.routineName}
       </p>

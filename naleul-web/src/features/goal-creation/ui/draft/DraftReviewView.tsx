@@ -423,11 +423,11 @@ export function DraftReviewView({ session, draft }: Props) {
           {/* SOFT 경고 */}
           {plan.warnings.length > 0 && (
             <div className="border-warning/40 bg-warning-soft mt-4 rounded-2xl border px-5 py-4">
-              <p className="flex items-center gap-1.5 text-sm font-bold text-[#b45309]">
+              <p className="flex items-center gap-1.5 text-sm font-bold text-warning-ink">
                 <AlertTriangle className="size-4" />
                 확인해 보면 좋은 점
               </p>
-              <ul className="mt-1.5 space-y-0.5 text-[13px] text-[#92400e]">
+              <ul className="mt-1.5 space-y-0.5 text-[13px] text-warning-ink-strong">
                 {plan.warnings.map((w, i) => (
                   <li key={`${w.ruleId}-${i}`}>· {w.message}</li>
                 ))}
@@ -552,7 +552,7 @@ export function DraftReviewView({ session, draft }: Props) {
 
       {/* 하단 고정 바 */}
       <div className="bg-canvas px-4 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
-        <div className="bg-ink mx-auto flex max-w-[1280px] flex-col gap-3 rounded-[20px] px-5 py-4 text-white sm:flex-row sm:items-center sm:px-6">
+        <div className="bg-inverse mx-auto flex max-w-[1280px] flex-col gap-3 rounded-[20px] px-5 py-4 text-white sm:flex-row sm:items-center sm:px-6">
           <div className="flex-1">
             <p className="text-[14px] text-white/85">
               이 목표로 시작하면 <b className="text-[#8EA2FF]">Task {oneTimes}개</b>와{' '}
@@ -573,7 +573,7 @@ export function DraftReviewView({ session, draft }: Props) {
               {regenRemaining != null && <span className="text-white/60">({regenRemaining}회 남음)</span>}
             </Button>
             <Button
-              className="text-ink flex-1 bg-white hover:bg-white/90 sm:flex-none"
+              className="flex-1 bg-white text-[#111111] hover:bg-white/90 sm:flex-none"
               onClick={confirm}
               loading={confirming}
               disabled={busy && !confirming}
@@ -743,11 +743,11 @@ function PlanFitCard({
       </div>
       <p className="text-ink-2 mt-1.5 text-[13px]">
         루틴은 일주일에{' '}
-        <b className={cn('tabular-nums', over ? 'text-[#b45309]' : 'text-ink')}>{hoursText(weeklyMinutes)}</b>
+        <b className={cn('tabular-nums', over ? 'text-warning-ink' : 'text-ink')}>{hoursText(weeklyMinutes)}</b>
         <span className="text-ink-3"> · 내 기준 {hoursText(fit.weeklyCapMinutes)} 이내 추천</span>
       </p>
       {over && (
-        <p className="mt-1 text-[13px] text-[#b45309]">
+        <p className="mt-1 text-[13px] text-warning-ink">
           지금 실천량보다 많아요. 처음엔 조금 줄여서 시작하면 끝까지 가기 쉬워요.
         </p>
       )}

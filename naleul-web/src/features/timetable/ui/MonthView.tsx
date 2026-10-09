@@ -397,7 +397,7 @@ function TaskRow({
         onClick={() => onToggle(t)}
         className={cn(
           'grid size-5 shrink-0 place-items-center rounded-md border-2 transition-colors disabled:opacity-50',
-          done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-ink-4 bg-white'
+          done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-ink-4 bg-surface'
         )}
       >
         {done && <Check className="size-3" strokeWidth={3.5} />}

@@ -33,7 +33,7 @@ type BadgeTone = 'brand' | 'success' | 'warning' | 'danger' | 'neutral'
 const BADGE_TONE: Record<BadgeTone, string> = {
   brand: 'bg-brand-soft text-brand',
   success: 'bg-success-soft text-success',
-  warning: 'bg-warning-soft text-[#b45309]',
+  warning: 'bg-warning-soft text-warning-ink',
   danger: 'bg-danger-soft text-danger',
   neutral: 'bg-subtle text-ink-2',
 }

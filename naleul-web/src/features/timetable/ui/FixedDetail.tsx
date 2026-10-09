@@ -43,7 +43,7 @@ export function FixedDetail({ block: b, busy, actions }: { block: FixedBlock; bu
         </p>
       )}
       {covered.length > 0 && (
-        <p className="bg-warning-soft mt-3 rounded-xl px-3.5 py-2.5 text-xs leading-relaxed text-[#b45309]">
+        <p className="bg-warning-soft mt-3 rounded-xl px-3.5 py-2.5 text-xs leading-relaxed text-warning-ink">
           직접 정한 Task가 이 시간의 일부를 덮고 있어요.
         </p>
       )}

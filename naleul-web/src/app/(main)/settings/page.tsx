@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { LogoutButton } from '@/features/account/ui/LogoutButton'
 import { ProfileSummaryCard } from '@/features/account/ui/ProfileSummaryCard'
+import { ThemePicker } from '@/features/theme/ThemePicker'
 import { UsageCard } from '@/features/usage/ui/UsageCard'
 import { COOKIE, type UserRole } from '@/lib/server/session'
 
@@ -64,10 +65,14 @@ export default async function SettingsPage() {
           ))}
         </Card>
 
+        <Card>
+          <ThemePicker />
+        </Card>
+
         {/* ⚠️ DEV 전용 — 운영 대시보드 버튼. main 에 머지할 때 이 블록을 주석 처리해요 (시작) */}
         <Card>
           <Link href="/settings/dashboard" className={rowClass}>
-            <span className="bg-warning-soft grid size-10 shrink-0 place-items-center rounded-xl text-[#b45309]">
+            <span className="bg-warning-soft grid size-10 shrink-0 place-items-center rounded-xl text-warning-ink">
               <BarChart3 className="size-5" />
             </span>
             <div className="min-w-0 flex-1">

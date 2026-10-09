@@ -195,7 +195,7 @@ export function GoalHeroCard({
             onClick={() => onColor(null)}
             className={cn(
               'h-8 rounded-full border px-3 text-xs font-semibold',
-              colorId === null ? 'border-ink bg-ink text-white' : 'border-line-strong text-ink-2'
+              colorId === null ? 'border-ink bg-ink text-on-ink' : 'border-line-strong text-ink-2'
             )}
           >
             자동
@@ -450,7 +450,7 @@ export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: 
 
 // ─── 세부 목표 ──────────────────────────────────────────────────
 
-const SUBGOAL_TONES = ['bg-[#FFF1E6]', 'bg-[#EEF1FF]', 'bg-[#E8F8F0]', 'bg-[#FDECEC]']
+const SUBGOAL_TONES = ['bg-warning-soft', 'bg-brand-soft', 'bg-success-soft', 'bg-danger-soft']
 
 export function SubGoalsCard({
   plan,

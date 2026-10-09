@@ -5,7 +5,7 @@ export function Logo({ className, size = 'md' }: { className?: string; size?: 'm
     <span className={cn('inline-flex items-center gap-2', className)}>
       <span
         className={cn(
-          'bg-ink grid place-items-center rounded-[10px] font-bold text-white',
+          'bg-ink grid place-items-center rounded-[10px] font-bold text-on-ink',
           size === 'lg' ? 'size-11 text-lg' : 'size-8 text-[15px]'
         )}
       >

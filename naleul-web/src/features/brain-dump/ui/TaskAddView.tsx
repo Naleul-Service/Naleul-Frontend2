@@ -243,7 +243,7 @@ export function TaskAddView({
               className={cn(
                 'grid shrink-0 place-items-center rounded-xl',
                 panel ? 'size-7 rounded-lg' : 'size-9',
-                mode === key ? 'bg-ink text-white' : 'bg-subtle text-ink-3'
+                mode === key ? 'bg-ink text-on-ink' : 'bg-subtle text-ink-3'
               )}
             >
               <Icon className="size-4" />
@@ -280,7 +280,7 @@ export function TaskAddView({
                 <span
                   className={cn(
                     'grid size-6 place-items-center rounded-full text-xs font-bold',
-                    i < step ? 'bg-success text-white' : i === step ? 'bg-ink text-white' : 'bg-subtle text-ink-3'
+                    i < step ? 'bg-success text-on-ink' : i === step ? 'bg-ink text-on-ink' : 'bg-subtle text-ink-3'
                   )}
                 >
                   {i < step ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}

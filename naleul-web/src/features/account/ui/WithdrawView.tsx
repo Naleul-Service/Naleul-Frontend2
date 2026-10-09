@@ -12,7 +12,7 @@ import { cn } from '@/lib/cn'
 import { toast } from '@/stores/toastStore'
 import { WITHDRAWAL_REASONS, useWithdraw, type WithdrawalReason } from '../api'
 
-const field = 'border-line-strong focus:border-brand w-full rounded-xl border bg-white px-3 text-[15px] outline-none'
+const field = 'border-line-strong focus:border-brand w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
 
 /** /settings/withdraw — iOS WithdrawView(회원 탈퇴)를 옮긴 것 */
 export function WithdrawView() {
@@ -100,7 +100,7 @@ export function WithdrawView() {
             className={cn(
               'grid size-5 shrink-0 place-items-center rounded-md border transition-colors',
               'peer-focus-visible:outline-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
-              agreed ? 'border-brand bg-brand text-white' : 'border-line-strong bg-white'
+              agreed ? 'border-brand bg-brand text-white' : 'border-line-strong bg-surface'
             )}
             aria-hidden
           >

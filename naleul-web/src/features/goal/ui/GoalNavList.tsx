@@ -59,7 +59,7 @@ export function GoalNavList({ onNavigate }: { onNavigate?: () => void }) {
                 {g.goalCategoryName}
               </span>
               {g.temporary ? (
-                <span className="text-xs text-[#b45309]">임시</span>
+                <span className="text-xs text-warning-ink">임시</span>
               ) : g.goalMode === 'RECORD' ? (
                 <span className="text-ink-3 text-xs">기록</span>
               ) : (

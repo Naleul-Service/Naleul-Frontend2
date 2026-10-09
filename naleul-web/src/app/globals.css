@@ -4,7 +4,7 @@
  * 디자인 토큰 — Tailwind 클래스로 바로 쓸 수 있어요.
  * 예) bg-brand, text-ink-3, border-line, rounded-card, shadow-card
  */
-@theme {
+@theme static {
   --font-sans:
     'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR',
     'Malgun Gothic', sans-serif;
@@ -35,10 +35,89 @@
   --color-danger: #ef4444;
   --color-danger-soft: #fdecec;
 
+  /* bg-ink 위 글자 (라이트: 흰색 · 다크: ink 가 밝아지니 검정) */
+  --color-on-ink: #ffffff;
+  /* 늘 어두운 면 (실행 스타일 카드 · 하단 확정 바 · 토스트) — 다크 모드에서도 어둡게 남아요 */
+  --color-inverse: #111111;
+  /* 연한 노랑 바탕 위 경고 글자 */
+  --color-warning-ink: #b45309;
+  --color-warning-ink-strong: #92400e;
+
+  /* 타임테이블 빗금 (고정 시간 · 수면) */
+  --color-hatch: #f6f7f9;
+  --color-hatch-line: #e6e8ec;
+  --color-sleep: #eef1fb;
+  --color-sleep-line: #dfe4f6;
+  --color-sleep-ink: #4b5bb8;
+
+  /* 히트맵 단계 (1 연함 ~ 5 진함) */
+  --color-heat-1: #e3e7fe;
+  --color-heat-2: #c3cbfb;
+  --color-heat-3: #8e9cf6;
+  --color-heat-4: #5a6ff0;
+  --color-heat-5: #3346d8;
+
   --radius-card: 18px;
   --shadow-card: 0 1px 2px rgb(17 17 17 / 0.04);
   --shadow-pop: 0 12px 40px rgb(17 17 17 / 0.14);
 }
+
+/*
+ * 다크 모드 — <html data-theme="dark"> 일 때 토큰 값만 바꿔요.
+ * 화면 코드는 bg-surface · text-ink 같은 토큰 클래스를 쓰니 그대로 따라 바뀌어요.
+ * data-theme 은 layout.tsx 의 THEME_SCRIPT 가 첫 화면을 그리기 전에 정해요 (설정: 시스템 / 라이트 / 다크).
+ */
+:root {
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark; /* 날짜 선택기 · 스크롤바 같은 기본 UI 도 어둡게 */
+
+  --color-ink: #f2f3f5;
+  --color-ink-2: #c5c9d0;
+  --color-ink-3: #8d929b;
+  --color-ink-4: #5d626c;
+
+  --color-canvas: #0e0f11;
+  --color-surface: #18191c;
+  --color-subtle: #222429;
+  --color-line: #2a2d32;
+  --color-line-strong: #3a3d44;
+
+  --color-brand: #6b82ff;
+  --color-brand-strong: #8597ff;
+  --color-brand-soft: #1d2340;
+
+  --color-success: #34d399;
+  --color-success-soft: #0f2a1f;
+  --color-warning: #fbbf24;
+  --color-warning-soft: #2d2410;
+  --color-danger: #f87171;
+  --color-danger-soft: #331b1b;
+
+  --color-on-ink: #111111;
+  --color-inverse: #26282e;
+  --color-warning-ink: #fbbf24;
+  --color-warning-ink-strong: #fcd34d;
+
+  --color-hatch: #1b1c20;
+  --color-hatch-line: #26282d;
+  --color-sleep: #191d30;
+  --color-sleep-line: #232945;
+  --color-sleep-ink: #a9b5fa;
+
+  --color-heat-1: #1f2547;
+  --color-heat-2: #2c3880;
+  --color-heat-3: #3f52c2;
+  --color-heat-4: #5a6ff0;
+  --color-heat-5: #8b9cff;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.55);
+}
+
+/* Tailwind dark: 변형 (dark:bg-…) 도 같은 기준으로 */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 @layer base {
   html {

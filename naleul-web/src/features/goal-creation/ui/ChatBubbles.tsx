@@ -42,7 +42,7 @@ export function UserBubble({
       ) : (
         <p
           className={cn(
-            'bg-ink max-w-[85%] rounded-2xl rounded-tr-md px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap text-white sm:max-w-[75%]',
+            'bg-ink max-w-[85%] rounded-2xl rounded-tr-md px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap text-on-ink sm:max-w-[75%]',
             item.sendState === 'sending' && 'opacity-70',
             failed && 'opacity-50'
           )}

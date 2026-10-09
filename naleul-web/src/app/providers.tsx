@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { useState, type ReactNode } from 'react'
 import { isApiError } from '@/lib/client/api'
 import { Toaster } from '@/components/ui/Toaster'
+import { ThemeSync } from '@/features/theme/theme'
 
 function makeQueryClient() {
   return new QueryClient({
@@ -31,6 +32,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={client}>
       {children}
       <Toaster />
+      <ThemeSync />
       <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
     </QueryClientProvider>
   )

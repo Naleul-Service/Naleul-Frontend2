@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import { THEME_SCRIPT } from '@/features/theme/theme'
 import { Providers } from './providers'
 import './globals.css'
 
@@ -8,13 +9,20 @@ export const metadata: Metadata = {
 }
 
 export const viewport: Viewport = {
-  themeColor: '#ffffff',
+  // 브라우저 주소창 색 — 라이트/다크 (globals.css 의 canvas 와 같은 색)
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f5f6f8' },
+    { media: '(prefers-color-scheme: dark)', color: '#0e0f11' },
+  ],
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ko">
+    // data-theme 은 THEME_SCRIPT 가 React 보다 먼저 붙여서 서버 HTML 과 달라요 → 경고만 끕니다
+    <html lang="ko" suppressHydrationWarning>
       <head>
+        {/* 다크 모드 깜빡임 방지: 첫 화면을 그리기 전에 data-theme 을 정해요 */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         {/* Pretendard (iOS 앱과 같은 폰트). 사용하는 글자만 내려받는 dynamic-subset 버전 */}
         <link
           rel="stylesheet"

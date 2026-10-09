@@ -90,7 +90,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             href="/goal/add?mode=record"
             className="border-line bg-surface hover:border-line-strong group mt-6 flex items-center gap-3 rounded-2xl border px-4 py-3"
           >
-            <span className="bg-ink grid size-9 shrink-0 place-items-center rounded-xl text-white">
+            <span className="bg-ink grid size-9 shrink-0 place-items-center rounded-xl text-on-ink">
               <NotebookPen className="size-4" />
             </span>
             <span className="min-w-0 flex-1">
@@ -104,7 +104,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
         )}
 
         {sourceGoalId && (
-          <div className="bg-warning-soft mt-6 rounded-2xl px-4 py-3.5 text-sm text-[#92400e]">
+          <div className="bg-warning-soft mt-6 rounded-2xl px-4 py-3.5 text-sm text-warning-ink-strong">
             <p>
               임시 목표{' '}
               <b>

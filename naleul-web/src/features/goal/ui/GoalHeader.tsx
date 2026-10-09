@@ -242,7 +242,7 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
           )}
         </div>
       ) : clearMetric ? (
-        <div className="bg-warning-soft flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-[#92400e]">
+        <div className="bg-warning-soft flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-warning-ink-strong">
           <span className="flex-1">저장하면 수치 목표와 마일스톤의 수치가 지워져요. 기록한 값은 남아요.</span>
           <button type="button" onClick={() => setClearMetric(false)} className="font-semibold underline">
             되돌리기

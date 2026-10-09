@@ -21,7 +21,7 @@ const PRIORITY_HINT: Record<TaskPriority, string> = {
 }
 
 const field =
-  'border-line-strong focus:border-brand h-11 w-full rounded-xl border bg-white px-3 text-[15px] outline-none'
+  'border-line-strong focus:border-brand h-11 w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
 const labelText = 'text-ink-3 mb-1 block text-xs font-medium'
 
 /** goal 선택 값: "g12" (기존 목표) / "t:t1" (이번에 만드는 임시 목표) / "__new__" */

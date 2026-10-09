@@ -52,9 +52,15 @@ export const INSIGHT_ICON: Record<string, string> = {
 }
 
 /** 히트맵 단계 색 (1 낮음 ~ 5 높음) */
-export const HEAT_BG: Record<number, string> = { 1: '#e3e7fe', 2: '#c3cbfb', 3: '#8e9cf6', 4: '#5a6ff0', 5: '#3346d8' }
+export const HEAT_BG: Record<number, string> = {
+  1: 'var(--color-heat-1)',
+  2: 'var(--color-heat-2)',
+  3: 'var(--color-heat-3)',
+  4: 'var(--color-heat-4)',
+  5: 'var(--color-heat-5)',
+}
 
 export const heatText = (level: number) => (level >= 3 ? 'text-white' : 'text-ink-2')
 
 /** 빗금 배경 (고정 시간) */
-export const HATCH = 'repeating-linear-gradient(135deg, #eceef1 0 3px, #f7f8fa 3px 7px)'
+export const HATCH = 'repeating-linear-gradient(135deg, var(--color-line) 0 3px, var(--color-subtle) 3px 7px)'

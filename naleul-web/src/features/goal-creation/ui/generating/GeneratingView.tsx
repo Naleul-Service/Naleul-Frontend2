@@ -154,7 +154,7 @@ export function GeneratingView({ sessionId, draftId }: { sessionId: number; draf
                   <span
                     className={cn(
                       'grid size-6 shrink-0 place-items-center rounded-full',
-                      state === 'done' && 'bg-ink text-white',
+                      state === 'done' && 'bg-ink text-on-ink',
                       state === 'current' && 'bg-brand-soft text-brand',
                       state === 'todo' && 'bg-subtle'
                     )}

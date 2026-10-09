@@ -116,7 +116,7 @@ export function StepGoals({
       </p>
 
       {aiFailed && (
-        <p className="bg-warning-soft mt-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm text-[#b45309]">
+        <p className="bg-warning-soft mt-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm text-warning-ink">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
           AI 정리가 잠시 안 돼서, 적은 내용만 나눠 두었어요. 목표는 &quot;변경&quot;에서 직접 골라 주세요.
         </p>

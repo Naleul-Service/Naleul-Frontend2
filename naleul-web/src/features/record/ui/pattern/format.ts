@@ -38,4 +38,10 @@ export function levelOf(minutes: number, max: number) {
 }
 
 /** 단계별 색 (나의 패턴 히트맵과 같은 파란 계열) */
-export const LEVEL_BG = ['', '#dfe4fe', '#a9b5fa', '#6f80f3', '#3346d8']
+export const LEVEL_BG = [
+  '',
+  'var(--color-heat-1)',
+  'var(--color-heat-2)',
+  'var(--color-heat-4)',
+  'var(--color-heat-5)',
+]

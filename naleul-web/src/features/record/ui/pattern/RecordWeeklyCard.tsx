@@ -44,8 +44,8 @@ export function RecordWeeklyCard({ weeks }: { weeks: RecordPattern['rhythm']['we
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="주차별 완료한 Task와 누적 그래프">
         {[0, 0.5, 1].map((t) => (
           <g key={t}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={yBar(maxWeek * t)} y2={yBar(maxWeek * t)} stroke="#eceef1" />
-            <text x={PAD.left - 8} y={yBar(maxWeek * t) + 4} textAnchor="end" fontSize="11" fill="#8b9099">
+            <line x1={PAD.left} x2={W - PAD.right} y1={yBar(maxWeek * t)} y2={yBar(maxWeek * t)} stroke="var(--color-line)" />
+            <text x={PAD.left - 8} y={yBar(maxWeek * t) + 4} textAnchor="end" fontSize="11" fill="var(--color-ink-3)">
               {Math.round(maxWeek * t)}
             </text>
           </g>
@@ -61,7 +61,7 @@ export function RecordWeeklyCard({ weeks }: { weeks: RecordPattern['rhythm']['we
               width={barW}
               height={h}
               rx="5"
-              fill={i === lastIdx ? '#3d5afe' : '#c3cbfb'}
+              fill={i === lastIdx ? 'var(--color-brand)' : 'var(--color-heat-2)'}
             >
               <title>{`${monthOf(w.weekStart)}/${dayOfMonth(w.weekStart)} 주 · ${w.count}개${w.minutes ? ` (${formatDuration(w.minutes)})` : ''}`}</title>
             </rect>
@@ -69,19 +69,19 @@ export function RecordWeeklyCard({ weeks }: { weeks: RecordPattern['rhythm']['we
         })}
 
         {/* 누적 선 */}
-        <path d={line} fill="none" stroke="#111" strokeWidth="2" strokeLinejoin="round" strokeDasharray="0" />
+        <path d={line} fill="none" stroke="var(--color-ink)" strokeWidth="2" strokeLinejoin="round" strokeDasharray="0" />
         {weeks.map((w, i) => (
           <circle
             key={w.weekStart}
             cx={cx(i)}
             cy={yCum(w.cumulativeCount)}
             r={i === lastIdx ? 4.5 : 2.5}
-            fill="#111"
-            stroke="white"
+            fill="var(--color-ink)"
+            stroke="var(--color-surface)"
             strokeWidth="1.5"
           />
         ))}
-        <text x={cx(lastIdx) + 8} y={yCum(last.cumulativeCount) + 4} fontSize="11" fontWeight="700" fill="#111">
+        <text x={cx(lastIdx) + 8} y={yCum(last.cumulativeCount) + 4} fontSize="11" fontWeight="700" fill="var(--color-ink)">
           {last.cumulativeCount}개
         </text>
 
@@ -94,7 +94,7 @@ export function RecordWeeklyCard({ weeks }: { weeks: RecordPattern['rhythm']['we
               textAnchor="middle"
               fontSize="11"
               fontWeight={i === lastIdx ? 700 : 400}
-              fill={i === lastIdx ? '#111' : '#8b9099'}
+              fill={i === lastIdx ? 'var(--color-ink)' : 'var(--color-ink-3)'}
             >
               {i === lastIdx ? '이번 주' : `${monthOf(w.weekStart)}/${dayOfMonth(w.weekStart)}`}
             </text>
@@ -104,7 +104,7 @@ export function RecordWeeklyCard({ weeks }: { weeks: RecordPattern['rhythm']['we
 
       <div className="text-ink-3 mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px]">
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-[3px] bg-[#c3cbfb]" /> 그 주에 완료한 Task
+          <span className="h-3 w-3 rounded-[3px] bg-heat-2" /> 그 주에 완료한 Task
         </span>
         <span className="flex items-center gap-1.5">
           <span className="bg-ink h-0.5 w-4 rounded" /> 처음부터 누적

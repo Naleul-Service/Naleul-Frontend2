@@ -52,15 +52,15 @@ export function WeeklyTrend({ weekly }: { weekly?: PatternWeekly | null }) {
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="주차별 실행률 그래프">
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#3d5afe" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="#3d5afe" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="0.16" />
+            <stop offset="100%" stopColor="var(--color-brand)" stopOpacity="0" />
           </linearGradient>
         </defs>
 
         {ticks.map((t) => (
           <g key={t}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} stroke="#eceef1" />
-            <text x={PAD.left - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#8b9099">
+            <line x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} stroke="var(--color-line)" />
+            <text x={PAD.left - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="var(--color-ink-3)">
               {t}
             </text>
           </g>
@@ -72,9 +72,9 @@ export function WeeklyTrend({ weekly }: { weekly?: PatternWeekly | null }) {
           return (
             <g key={si}>
               {seg.length > 1 && <path d={area} fill={`url(#${gradientId})`} />}
-              <path d={line} fill="none" stroke="#3d5afe" strokeWidth="2.5" strokeLinejoin="round" />
+              <path d={line} fill="none" stroke="var(--color-brand)" strokeWidth="2.5" strokeLinejoin="round" />
               {seg.map((p) => (
-                <circle key={p.i} cx={x(p.i)} cy={y(p.r)} r="4.5" fill="#3d5afe" stroke="white" strokeWidth="2" />
+                <circle key={p.i} cx={x(p.i)} cy={y(p.r)} r="4.5" fill="var(--color-brand)" stroke="var(--color-surface)" strokeWidth="2" />
               ))}
             </g>
           )
@@ -87,13 +87,13 @@ export function WeeklyTrend({ weekly }: { weekly?: PatternWeekly | null }) {
             textAnchor="middle"
             fontSize="12"
             fontWeight="700"
-            fill="#111"
+            fill="var(--color-ink)"
           >
             {points[maxIdx].rate}%
           </text>
         )}
         {firstIdx >= 0 && firstIdx !== maxIdx && (
-          <text x={x(firstIdx) + 8} y={y(points[firstIdx].rate!) + 18} fontSize="11" fill="#8b9099">
+          <text x={x(firstIdx) + 8} y={y(points[firstIdx].rate!) + 18} fontSize="11" fill="var(--color-ink-3)">
             {points[firstIdx].rate}%
           </text>
         )}
@@ -107,7 +107,7 @@ export function WeeklyTrend({ weekly }: { weekly?: PatternWeekly | null }) {
               textAnchor="middle"
               fontSize="11"
               fontWeight={i === lastIdx ? 700 : 400}
-              fill={i === lastIdx ? '#111' : '#8b9099'}
+              fill={i === lastIdx ? 'var(--color-ink)' : 'var(--color-ink-3)'}
             >
               {p.index}주
             </text>

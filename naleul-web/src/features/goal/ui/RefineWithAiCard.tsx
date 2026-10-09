@@ -21,7 +21,7 @@ export function RefineWithAiCard({ goal, className }: { goal: GoalCategory; clas
   return (
     <section
       className={cn(
-        'border-brand/20 from-brand-soft flex flex-col gap-4 rounded-[20px] border bg-gradient-to-br to-white p-5 sm:flex-row sm:items-center sm:p-6',
+        'border-brand/20 from-brand-soft flex flex-col gap-4 rounded-[20px] border bg-gradient-to-br to-surface p-5 sm:flex-row sm:items-center sm:p-6',
         className
       )}
     >

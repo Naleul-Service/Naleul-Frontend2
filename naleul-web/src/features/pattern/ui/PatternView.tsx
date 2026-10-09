@@ -88,7 +88,7 @@ export function PatternView() {
                 onClick={() => setPeriod(p.value)}
                 className={cn(
                   'h-8 rounded-lg px-3.5 text-[14px] font-semibold transition-colors',
-                  period === p.value ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'
+                  period === p.value ? 'bg-ink text-on-ink' : 'text-ink-2 hover:text-ink'
                 )}
               >
                 {p.label}

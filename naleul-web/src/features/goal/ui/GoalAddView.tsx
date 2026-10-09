@@ -274,7 +274,7 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         {/* 업무형 */}
         <section className={cn(card, open === 'record' && 'border-ink ring-ink ring-1')} aria-labelledby="work-title">
-          <span className="bg-ink grid size-11 place-items-center rounded-2xl text-white">
+          <span className="bg-ink grid size-11 place-items-center rounded-2xl text-on-ink">
             <BriefcaseBusiness className="size-5" />
           </span>
           <p id="work-title" className="mt-4 flex flex-wrap items-center gap-2 text-[18px] font-bold">

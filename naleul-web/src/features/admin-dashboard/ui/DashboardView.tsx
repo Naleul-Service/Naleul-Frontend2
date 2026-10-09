@@ -142,7 +142,7 @@ export function DashboardView() {
 function Notes({ notes }: { notes: string[] }) {
   if (!notes.length) return null
   return (
-    <div className="bg-warning-soft mt-4 rounded-xl px-4 py-3 text-[13px] text-[#92400e]">
+    <div className="bg-warning-soft mt-4 rounded-xl px-4 py-3 text-[13px] text-warning-ink-strong">
       <ul className="space-y-1">
         {notes.map((n) => (
           <li key={n} className="flex gap-2">

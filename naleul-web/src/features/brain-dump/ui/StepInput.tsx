@@ -121,7 +121,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
           <span
             className={cn(
               'rounded-full px-3 py-1 text-xs font-semibold',
-              freeLimited ? 'bg-warning-soft text-[#b45309]' : 'bg-subtle text-ink-2'
+              freeLimited ? 'bg-warning-soft text-warning-ink' : 'bg-subtle text-ink-2'
             )}
             aria-live="polite"
           >
@@ -170,7 +170,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
             )}
           </div>
         ) : (
-          <label className="border-line-strong focus-within:border-brand flex items-center gap-2 rounded-2xl border bg-white px-4 py-1.5">
+          <label className="border-line-strong focus-within:border-brand flex items-center gap-2 rounded-2xl border bg-surface px-4 py-1.5">
             <span className="text-ink-4 w-5 shrink-0 text-right text-sm tabular-nums">{lines.length + 1}</span>
             <input
               ref={inputRef}

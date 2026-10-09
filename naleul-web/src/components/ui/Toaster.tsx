@@ -21,7 +21,7 @@ export function Toaster() {
           className={cn(
             'pointer-events-auto flex max-w-md items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium text-white',
             'shadow-pop animate-[toast-in_180ms_ease-out]',
-            t.tone === 'error' ? 'bg-danger' : 'bg-ink'
+            t.tone === 'error' ? 'bg-danger' : 'bg-inverse'
           )}
         >
           {t.tone === 'success' && <CheckCircle2 className="text-success size-4 shrink-0" />}

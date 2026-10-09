@@ -6,7 +6,7 @@ import { Emphasis } from './Emphasis'
 export function StyleCard({ style }: { style?: PatternStyle | null }) {
   const ready = !!style?.title
   return (
-    <section className="bg-ink rounded-card flex h-full flex-col p-6 text-white sm:p-8" aria-label="나의 실행 스타일">
+    <section className="bg-inverse rounded-card flex h-full flex-col p-6 text-white sm:p-8" aria-label="나의 실행 스타일">
       <p className="text-[13px] text-white/60">✦ AI가 분석한 나의 실행 스타일</p>
       {ready ? (
         <>

@@ -77,7 +77,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, placeholder,
         type="submit"
         disabled={!canSend}
         aria-label="보내기"
-        className="bg-ink grid size-10 shrink-0 place-items-center rounded-full text-white transition-opacity disabled:opacity-25"
+        className="bg-ink grid size-10 shrink-0 place-items-center rounded-full text-on-ink transition-opacity disabled:opacity-25"
       >
         <ArrowUp className="size-5" strokeWidth={2.4} />
       </button>

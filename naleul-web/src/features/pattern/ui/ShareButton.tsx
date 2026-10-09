@@ -24,7 +24,7 @@ export function ShareButton({ targetRef, fileDate }: { targetRef: RefObject<HTML
       // 가장자리에 여백을 두려고 캔버스를 PAD 만큼 키우고 복제본에 padding 을 줘요
       const url = await toPng(node, {
         pixelRatio: 2,
-        backgroundColor: '#f5f6f8',
+        backgroundColor: getComputedStyle(document.body).backgroundColor, // 라이트/다크 그대로
         cacheBust: true,
         width: node.offsetWidth + PAD * 2,
         height: node.offsetHeight + PAD * 2,

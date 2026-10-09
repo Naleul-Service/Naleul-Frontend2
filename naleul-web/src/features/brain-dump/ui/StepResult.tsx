@@ -183,7 +183,7 @@ export function StepResult({
             key={t.goalCategoryId}
             className="bg-warning-soft mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-3"
           >
-            <p className="text-sm text-[#92400e]">
+            <p className="text-sm text-warning-ink-strong">
               <b>
                 {t.emoji ? `${t.emoji} ` : ''}
                 {t.name}

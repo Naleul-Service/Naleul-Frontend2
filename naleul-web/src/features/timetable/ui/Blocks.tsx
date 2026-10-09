@@ -9,8 +9,8 @@ import type { ActualActivity, FixedBlock, TimeBlockTask } from '../types'
 
 /** 빗금 배경 (고정 시간) */
 export const HATCH: CSSProperties = {
-  backgroundColor: '#F6F7F9',
-  backgroundImage: 'repeating-linear-gradient(135deg, #E6E8EC 0 1.5px, transparent 1.5px 8px)',
+  backgroundColor: 'var(--color-hatch)',
+  backgroundImage: 'repeating-linear-gradient(135deg, var(--color-hatch-line) 0 1.5px, transparent 1.5px 8px)',
 }
 
 interface Geometry {
@@ -78,10 +78,10 @@ export function taskColors(t: TimeBlockTask): CSSProperties {
     // 아래 빗금(고정 시간)이 비치지 않도록 흰 바탕 위에 연한 색을 겹쳐요
     const soft = withAlpha(c, 0.16)
     return {
-      backgroundColor: '#fff',
+      backgroundColor: 'var(--color-surface)',
       backgroundImage: `linear-gradient(${soft}, ${soft})`,
       borderLeft: `3px solid ${c}`,
-      color: '#111',
+      color: 'var(--color-ink)',
     }
   }
   return { backgroundColor: c, color: '#fff' }
@@ -134,7 +134,7 @@ export function TaskBlock({
     left: `calc(${placed.col * width}% + 2px)`,
     width: `calc(${width}% - 4px)`,
     ...(proposed
-      ? { backgroundColor: withAlpha(goalColor, 0.1), color: '#111', border: `2px dashed ${goalColor}` }
+      ? { backgroundColor: withAlpha(goalColor, 0.1), color: 'var(--color-ink)', border: `2px dashed ${goalColor}` }
       : taskColors(t)),
     ...NO_CALLOUT,
   }
@@ -156,7 +156,7 @@ export function TaskBlock({
         dimmed && 'opacity-30',
         // 미리보기 중 제안 블록을 돋보이게 — 나머지는 흐리게(faded)
         faded && 'opacity-50 saturate-[.8]',
-        focused && 'ring-brand z-[12] shadow-[0_6px_18px_rgb(61_90_254/0.35)] ring-2 ring-offset-1',
+        focused && 'ring-brand z-[12] shadow-[0_6px_18px_rgb(61_90_254/0.35)] ring-2 ring-offset-1 ring-offset-surface',
         selected && 'ring-ink ring-2 ring-offset-1',
         grouped && 'outline-brand z-[11] outline-2 outline-offset-1 outline-dashed',
         placed.clippedTop && 'rounded-t-none',
@@ -182,7 +182,7 @@ export function TaskBlock({
           <span className="bg-danger shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-white">NEW</span>
         )}
         {proposed && (
-          <span className="bg-ink shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-white">
+          <span className="bg-ink shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-on-ink">
             {t.proposed ? 'AI 제안' : '옮길까요?'}
           </span>
         )}
@@ -261,8 +261,8 @@ export function FixedBlockView({
 
 /** 수면 배경 (고정 시간 빗금보다 진한 남색 톤) */
 const SLEEP_BG: CSSProperties = {
-  backgroundColor: '#EEF1FB',
-  backgroundImage: 'repeating-linear-gradient(135deg, #DFE4F6 0 1.5px, transparent 1.5px 9px)',
+  backgroundColor: 'var(--color-sleep)',
+  backgroundImage: 'repeating-linear-gradient(135deg, var(--color-sleep-line) 0 1.5px, transparent 1.5px 9px)',
 }
 
 /**
@@ -309,9 +309,9 @@ export function SleepBlockView({
         aria-hidden
         onPointerDown={drag ? (e) => drag(e, wake ? 'resize' : 'resize-top') : undefined}
         className={cn(
-          'flex h-6 shrink-0 items-center gap-1 border-[#8EA2FF] px-2 font-semibold text-[#4B5BB8]',
+          'flex h-6 shrink-0 items-center gap-1 border-[#8EA2FF] px-2 font-semibold text-sleep-ink',
           wake ? 'border-b-2' : 'border-t-2',
-          drag && 'cursor-ns-resize hover:bg-[#DFE4F6]'
+          drag && 'cursor-ns-resize hover:bg-sleep-line'
         )}
       >
         <span className="truncate">

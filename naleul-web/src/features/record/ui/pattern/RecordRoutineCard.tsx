@@ -46,7 +46,7 @@ export function RecordRoutineCard({ routines }: { routines: RecordPattern['routi
               </div>
               <div className="bg-subtle mt-1.5 h-2 overflow-hidden rounded-full">
                 <div
-                  className={i === 0 && value > 0 ? 'bg-brand h-full rounded-full' : 'h-full rounded-full bg-[#a9b5fa]'}
+                  className={i === 0 && value > 0 ? 'bg-brand h-full rounded-full' : 'h-full rounded-full bg-heat-2'}
                   style={{ width: `${(value / max) * 100}%` }}
                 />
               </div>

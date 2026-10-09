@@ -148,7 +148,7 @@ function RecordGoalBody({ goal }: { goal: GoalCategory }) {
             onClick={() => setTab(value)}
             className={cn(
               'flex h-9 items-center gap-1.5 rounded-lg px-4 text-[14px] font-semibold transition-colors',
-              tab === value ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'
+              tab === value ? 'bg-ink text-on-ink' : 'text-ink-2 hover:text-ink'
             )}
           >
             <Icon className="size-4" />
