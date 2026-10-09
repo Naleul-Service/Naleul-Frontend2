@@ -125,6 +125,29 @@ export function useRescheduleBatch() {
   )
 }
 
+// ── 22시 이월 제안에 답하기 ─────────────────────────────
+
+/** "옮길까요?" → 옮기기 (자동으로 잡은 자리 그대로 확정) */
+export function useAcceptCarry() {
+  return useTimetableMutation((taskId: number) => api.patch<TimeBlockTask>(`/v1/tasks/${taskId}/carry-over/accept`), {
+    success: () => '옮겼어요.',
+  })
+}
+
+/** "옮길까요?" → 안 옮기기 (시간을 비워 그날 "시간 미정"으로) */
+export function useDeclineCarry() {
+  return useTimetableMutation((taskId: number) => api.patch<TimeBlockTask>(`/v1/tasks/${taskId}/carry-over/decline`), {
+    success: () => '시간 미정으로 두었어요. 원하는 시간에 끌어다 놓거나 지울 수 있어요.',
+  })
+}
+
+/** 그날 이월 제안 모두 옮기기 */
+export function useAcceptAllCarry() {
+  return useTimetableMutation((date: string) => api.patch<number>(`/v1/tasks/carry-over/accept-all?date=${date}`), {
+    success: (n) => `${n ?? 0}개를 옮겼어요.`,
+  })
+}
+
 /** 드래그 결과 안내 문장: 밀려난 블록 · 덮은 고정 시간 */
 export function scheduleResultMessage(r: TaskScheduleResponse | null) {
   if (!r) return '시간을 바꿨어요.'

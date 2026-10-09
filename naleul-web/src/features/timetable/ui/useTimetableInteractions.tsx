@@ -35,6 +35,7 @@ import {
 } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityForm, draftOf, type ActivityDraft } from './ActivityForm'
+import { CarryProposalBar } from './CarryProposalBar'
 import { FixedDetail } from './FixedDetail'
 import { ScopeChooser, scopeOptions } from './ScopeChooser'
 import { TaskDetail } from './TaskDetail'
@@ -175,6 +176,21 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     return new Set(group.filter((id) => live.has(id))) as ReadonlySet<number>
   }, [days, group])
   const clearGroup = () => setGroup([])
+
+  // 22시 이월 제안 (아직 확인 안 한 것) — 오늘 이후, 시간순
+  const carryProposals = useMemo(() => {
+    const seen = new Set<number>()
+    return days
+      .flatMap((d) => [...d.tasks, ...d.unscheduledTasks])
+      .filter((t) => {
+        if (!t.carryPending || t.taskStatus !== 'TODO' || seen.has(t.taskId)) return false
+        seen.add(t.taskId)
+        return (t.plannedStartAt?.slice(0, 10) ?? t.date ?? today) >= today
+      })
+      .sort((a, b) =>
+        (a.plannedStartAt ?? `${a.date ?? today}T99`).localeCompare(b.plannedStartAt ?? `${b.date ?? today}T99`)
+      )
+  }, [days, today])
 
   // 데이터가 새로 오면 팝오버 안의 Task 도 최신 값으로
   const liveTask = (t: TimeBlockTask) =>
@@ -598,6 +614,9 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
           onDismiss={() => chooseScope('DAY')}
         />
       )}
+
+      {/* 22시 이월 제안 — 다른 안내 바가 없을 때만 (범위 고르기·묶음이 먼저) */}
+      {!ask && groupIds.size === 0 && <CarryProposalBar tasks={carryProposals} today={today} />}
 
       {/* 묶음 드래그 안내 */}
       {groupIds.size > 0 && !ask && (

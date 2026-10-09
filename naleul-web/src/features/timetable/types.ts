@@ -53,6 +53,10 @@ export interface TimeBlockTask {
   actualStartAt?: string | null
   actualEndAt?: string | null
   missed: boolean
+  /** 22시 이월로 놓였지만 아직 확인 안 함 → 점선 블록 + "옮길까요?" */
+  carryPending?: boolean
+  /** 이월되기 전 날짜 */
+  carriedFromDate?: string | null
 }
 
 export interface Covered {
