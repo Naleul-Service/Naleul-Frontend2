@@ -83,7 +83,7 @@ export function CalendarView() {
     proposing,
     focusIds,
     fadeOthers,
-  } = useTimetableInteractions(rawDays, date)
+  } = useTimetableInteractions(rawDays, date, { sidePanel: !!add })
   const { startHour, endHour } = useMemo(() => visibleHours(days, acts), [days, acts])
 
   // ── 이동 ──
@@ -282,8 +282,23 @@ export function CalendarView() {
           onClose={() => go({ add: null })}
           onAdded={(info) => {
             setNewIds((prev) => new Set([...prev, ...info.taskIds]))
+            const inView = (d: string) => d >= start && d <= end
+            // AI로 정리한 Task 는 바로 놓지 않고 점선으로 먼저 보여 줘요 → 아래 바에서 "이대로 진행할까요?"
+            if (info.pendingTaskIds?.length) {
+              previewFill(
+                { taskIds: info.pendingTaskIds },
+                {
+                  kind: 'new',
+                  onPreview: (r) => {
+                    const first = r.proposals.map((p) => p.date).sort()[0] ?? info.date
+                    if (first && !inView(first)) go({ date: first })
+                  },
+                }
+              )
+              return
+            }
             // 추가한 날이 지금 보는 기간 밖이면 그 주(날)로 옮겨요
-            if (info.date && (info.date < start || info.date > end)) go({ date: info.date })
+            if (info.date && !inView(info.date)) go({ date: info.date })
           }}
         />
       )}

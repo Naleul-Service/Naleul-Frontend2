@@ -112,9 +112,19 @@ export interface ConfirmResponse {
   created: boolean
   placements: Placement[]
   movedToOtherDays: Placement[]
-  unscheduled: { taskId: number; clientKey: string; title: string; date?: string | null }[]
+  unscheduled: {
+    taskId: number
+    clientKey: string
+    title: string
+    date?: string | null
+  }[]
   /** placeLater 로 저장만 한 Task — 이 id 들로 배치 미리보기를 받아 "이대로 진행할까요?"를 물어요 */
-  pending?: { taskId: number; clientKey: string; title: string; date?: string | null }[]
+  pending?: {
+    taskId: number
+    clientKey: string
+    title: string
+    date?: string | null
+  }[]
   conflicts: {
     clientKey: string
     title: string

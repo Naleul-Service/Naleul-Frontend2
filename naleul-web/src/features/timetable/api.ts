@@ -302,11 +302,15 @@ export interface FillPreviewResponse {
   unscheduled: number[]
 }
 
-/** 저장하지 않고 어디에 놓일지만 받아와요 */
+export type FillPreviewTarget = { startDate: string; endDate: string } | { taskIds: number[] }
+
+/** 저장하지 않고 어디에 놓일지만 받아와요 — 기간 전체(AI로 배치하기) 또는 정한 Task 들만(방금 추가한 Task) */
 export function useFillPreview() {
   return useMutation({
-    mutationFn: (v: { startDate: string; endDate: string }) =>
-      api.post<FillPreviewResponse>(`/v1/daily-plans/fill/preview?startDate=${v.startDate}&endDate=${v.endDate}`),
+    mutationFn: (v: FillPreviewTarget) =>
+      'taskIds' in v
+        ? api.post<FillPreviewResponse>('/v1/daily-plans/fill/preview-tasks', { taskIds: v.taskIds })
+        : api.post<FillPreviewResponse>(`/v1/daily-plans/fill/preview?startDate=${v.startDate}&endDate=${v.endDate}`),
     onError: (e) => toast.error(errorMessage(e)),
   })
 }

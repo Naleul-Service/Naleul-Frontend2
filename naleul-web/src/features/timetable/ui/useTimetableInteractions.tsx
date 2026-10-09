@@ -19,6 +19,8 @@ import {
   useToggleComplete,
   useUnlockTask,
   useUnscheduleTask,
+  type FillPreviewResponse,
+  type FillPreviewTarget,
 } from '../api'
 import { applyPending, applyProposals, type Pending, type Proposal } from '../layout'
 import {
@@ -131,6 +133,17 @@ function fullFixedEnd(block: FixedBlock, days: TimetableDay[], patternEnd?: stri
   return end
 }
 
+/** 배치 미리보기를 연 쪽에 알려 주는 콜백 */
+export interface PreviewFillOptions {
+  /** fill = "AI로 배치하기" · new = 방금 추가한 Task (확인 바 문구가 달라요) */
+  kind?: 'fill' | 'new'
+  onPreview?: (r: FillPreviewResponse) => void
+  /** 이대로 진행(applied=true) 또는 취소 — final 은 끌어서 고친 최종 자리 */
+  onResolve?: (applied: boolean, final: Proposal[]) => void
+  /** 미리보기를 받지 못했을 때 (네트워크 오류 등) — 확인 단계를 닫을 수 있게 */
+  onError?: () => void
+}
+
 /**
  * TimeTable 위에서 하는 모든 조작(상세 팝오버 · 완료 · 시간 변경 · 삭제 · 드래그)을 한곳에 모은 훅.
  * 캘린더(주간·일간·월간)와 Task 추가 3단계 · 내일 확인 화면이 같은 동작을 쓰도록 분리했어요.
@@ -138,8 +151,13 @@ function fullFixedEnd(block: FixedBlock, days: TimetableDay[], patternEnd?: stri
  * @param rawDays 서버에서 받은 날짜들 (드래그 직후 임시 위치를 덧입혀서 days 로 돌려줘요)
  * @param fallbackDate 시간 미정 Task 의 시간을 바꿀 때 기본 날짜
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- 시간 미정 Task 의 기본 날짜는 이제 상세 창이 직접 정해요 (호출부 호환용으로 남김)
-export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: string) {
+export function useTimetableInteractions(
+  rawDays: TimetableDay[],
+  // 시간 미정 Task 의 기본 날짜는 이제 상세 창이 직접 정해요 (호출부 호환용으로 남김)
+  fallbackDate: string,
+  /** sidePanel: 오른쪽 Task 추가 패널이 열려 있음 → 확인 바를 그만큼 비켜서 띄워요 */
+  opts: { sidePanel?: boolean } = {}
+) {
   const [opened, setOpened] = useState<Opened>(null)
   const [editing, setEditing] = useState<Editing>(null)
   // "삭제할까요?"를 띄운 Task (상세 창 안에서 확인해요)
@@ -152,6 +170,8 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   // "AI로 배치하기" 미리보기 제안 (저장 전 점선 블록). null 이면 미리보기 중 아님
   const [proposals, setProposals] = useState<Proposal[] | null>(null)
   const [proposalUnscheduled, setProposalUnscheduled] = useState(0)
+  const [proposalKind, setProposalKind] = useState<'fill' | 'new'>('fill')
+  const resolveRef = useRef<PreviewFillOptions['onResolve']>(undefined)
   const today = todayKst()
 
   const toggleComplete = useToggleComplete()
@@ -177,10 +197,13 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   )
 
   // ── AI로 배치하기: 미리보기 → (끌어서 고치기) → 이대로 진행 / 취소 ──
-  const previewFill = (range: { startDate: string; endDate: string }) =>
-    fillPreview.mutate(range, {
+  const previewFill = (target: FillPreviewTarget, o: PreviewFillOptions = {}) =>
+    fillPreview.mutate(target, {
       onSuccess: (r) => {
         if (!r) return
+        resolveRef.current = o.onResolve
+        setProposalKind(o.kind ?? 'fill')
+        o.onPreview?.(r)
         setProposals(
           r.proposals.map((p) => ({
             taskId: p.taskId,
@@ -193,8 +216,13 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
         )
         setProposalUnscheduled(r.unscheduled.length)
       },
+      onError: () => o.onError?.(),
     })
-  const cancelProposals = () => setProposals(null)
+  const cancelProposals = () => {
+    resolveRef.current?.(false, proposals ?? [])
+    resolveRef.current = undefined
+    setProposals(null)
+  }
   const applyProposalsNow = () => {
     if (!proposals?.length) return
     fillApply.mutate(
@@ -208,7 +236,13 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
           reason: p.reason,
         })),
       },
-      { onSuccess: () => setProposals(null) }
+      {
+        onSuccess: () => {
+          resolveRef.current?.(true, proposals)
+          resolveRef.current = undefined
+          setProposals(null)
+        },
+      }
     )
   }
   const editedProposals = (proposals ?? []).filter((p) => p.start !== p.proposedStart || p.end !== p.proposedEnd).length
@@ -218,7 +252,11 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   useEffect(() => {
     if (!proposing) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !e.defaultPrevented && !opened && !editing) setProposals(null)
+      if (e.key === 'Escape' && !e.defaultPrevented && !opened && !editing) {
+        resolveRef.current?.(false, [])
+        resolveRef.current = undefined
+        setProposals(null)
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -697,6 +735,8 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
       {/* AI 배치 미리보기 확인 — 범위 고르기 바가 없을 때 */}
       {proposals && !ask && (
         <FillProposalBar
+          kind={proposalKind}
+          sidePanel={opts.sidePanel}
           count={proposals.length}
           edited={editedProposals}
           unscheduled={proposalUnscheduled}
@@ -760,6 +800,8 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     previewFill,
     fillPreviewing: fillPreview.isPending,
     proposing,
+    /** 지금 보여 주는 점선 제안 (끌어서 고친 자리 반영) — 미리보기 중이 아니면 null */
+    proposals,
     /**
      * 확인을 기다리는 블록 — AI 배치 미리보기면 제안들(나머지는 흐리게), 아니면 화면 아래에서 묻고 있는 이월 제안 하나.
      * TimeGrid focusIds · fadeOthers 로 넘겨요.

@@ -59,6 +59,8 @@ export interface TaskAddedInfo {
   taskIds: number[]
   /** 가장 이른 날짜 (시간 미정이면 그날) */
   date: string | null
+  /** 저장만 하고 아직 시간을 정하지 않은 Task — 캘린더가 점선 미리보기로 "이대로 진행할까요?"를 물어요 */
+  pendingTaskIds?: number[]
 }
 
 export function TaskAddView({
@@ -139,6 +141,8 @@ export function TaskAddView({
           endTime: i.dateType === 'ON' && i.startTime ? i.endTime : null,
         })),
         tempGoals: tempGoals.filter((t) => used.has(t.tempKey)).map((t) => ({ ...t, name: t.name.trim() })),
+        // 시간을 정하지 않은 Task 는 저장만 → 점선 미리보기로 "이대로 진행할까요?" 물은 뒤 배치
+        placeLater: true,
       },
       {
         onSuccess: (res) => {
@@ -155,19 +159,26 @@ export function TaskAddView({
           }
           setResult(res)
           setStep(2)
-          toast.success(`${items.length}개 Task를 추가했어요.`)
+          const pending = res.pending ?? []
+          toast.success(
+            pending.length
+              ? `${items.length}개 Task를 추가했어요. 점선 자리를 확인해 주세요.`
+              : `${items.length}개 Task를 추가했어요.`
+          )
           const placedDates = [...res.placements, ...res.movedToOtherDays].map((p) => p.date)
           const allDates = [
             ...placedDates,
-            ...res.unscheduled.map((u) => u.date).filter((d): d is string => !!d),
+            ...[...res.unscheduled, ...pending].map((u) => u.date).filter((d): d is string => !!d),
           ].sort()
           onAdded?.({
             taskIds: [
               ...res.placements.map((p) => p.taskId),
               ...res.movedToOtherDays.map((p) => p.taskId),
               ...res.unscheduled.map((u) => u.taskId),
+              ...pending.map((u) => u.taskId),
             ],
             date: allDates[0] ?? null,
+            pendingTaskIds: pending.map((u) => u.taskId),
           })
         },
         onError: (e) => toast.error(isApiError(e) ? e.message : '저장하지 못했어요. 다시 시도해 주세요.'),
@@ -336,10 +347,11 @@ export function TaskAddView({
 }
 
 /**
- * 패널에서 저장한 뒤 — 옆 캘린더에 이미 새 블록(NEW)이 보이므로 격자를 또 그리지 않고 어디에 놓였는지만 요약해요.
- * 블록을 옮기거나 고치는 건 캘린더에서 바로 하면 돼요.
+ * 패널에서 저장한 뒤 — 옆 캘린더에 새 블록(NEW)과 점선 제안이 보이므로 격자를 또 그리지 않고 요약만 해요.
+ * 시간을 정하지 않은 Task 는 캘린더 아래 바에서 "이대로 진행할까요?"를 확인해야 놓여요.
  */
 function PanelResult({ result, onAddMore }: { result: ConfirmResponse; onAddMore: () => void }) {
+  const pending = result.pending ?? []
   const rows = [
     ...result.placements.map((p) => ({
       id: p.taskId,
@@ -356,6 +368,11 @@ function PanelResult({ result, onAddMore }: { result: ConfirmResponse; onAddMore
       title: u.title,
       when: u.date ? `${formatMonthDay(u.date)} 시간 미정` : '시간 미정',
     })),
+    ...pending.map((u) => ({
+      id: u.taskId,
+      title: u.title,
+      when: u.date ? `${formatMonthDay(u.date)} · 점선 확인` : '점선 확인',
+    })),
   ]
   return (
     <div className="border-line bg-surface rounded-2xl border p-4">
@@ -363,7 +380,11 @@ function PanelResult({ result, onAddMore }: { result: ConfirmResponse; onAddMore
         <CalendarCheck className="text-success size-4" />
         {rows.length}개를 추가했어요
       </p>
-      <p className="text-ink-3 mt-1 text-[13px]">왼쪽 캘린더에 NEW로 표시돼요. 끌어서 바로 옮길 수 있어요.</p>
+      <p className="text-ink-3 mt-1 text-[13px]">
+        {pending.length > 0
+          ? `시간을 정하지 않은 ${pending.length}개는 왼쪽 캘린더에 점선으로 먼저 보여 드려요. 끌어서 고친 뒤 아래에서 "이대로 진행"을 누르면 그 자리에 놓이고, "아니요"면 시간 미정으로 남아요.`
+          : '왼쪽 캘린더에 NEW로 표시돼요. 끌어서 바로 옮길 수 있어요.'}
+      </p>
       <ul className="mt-3 space-y-1.5">
         {rows.map((r) => (
           <li key={r.id} className="flex items-center gap-2 text-[13px]">
