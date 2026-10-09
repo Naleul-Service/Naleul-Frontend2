@@ -2,7 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { cn } from '@/lib/cn'
-import { MAX_TASKS_AT_ONCE, crowdedTasks, placeActivities, placeFixed, placeTasks } from '../layout'
+import {
+  MAX_TASKS_AT_ONCE,
+  crowdedTasks,
+  layoutColumns,
+  placeActivities,
+  placeFixed,
+  placeTasks,
+  type Placed,
+} from '../layout'
 import { WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, minutesFrom, nowKst, weekdayIndex } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityBlock, FixedBlockView, HATCH, TaskBlock, taskColors } from './Blocks'
@@ -297,10 +305,13 @@ export function TimeGrid({
         {/* ── 날짜 칸 ── */}
         {days.map((d) => {
           const fixed = placeFixed(d, from, to)
-          const tasks = placeTasks(d, from, to)
           const acts = placeActivities(d.date, activities, from, to)
-          // 실제 기록이 있는 날은 "계획 | 실제"로 나눠서 나란히 보여줘요
-          const split = acts.length > 0
+          // 일간: 실제 기록이 있으면 "계획 | 실제"로 나눠서 나란히 보여줘요
+          // 주간: 칸이 좁아서 나누지 않고 한 열에 같이 그려요 (겹칠 때만 나란히)
+          const split = single && acts.length > 0
+          const tasks = placeTasks(d, from, to)
+          // 한 열로 그릴 땐 Task 와 실제 기록을 같이 놓고 겹치는 것끼리만 나란히 (col/cols 를 다시 정해요)
+          if (!split && acts.length) layoutColumns<Placed<unknown>>([...tasks, ...acts])
           const isToday = d.date === now.date
           const canClickEmpty = !!onEmptyClick && d.date <= now.date
           return (
@@ -385,6 +396,19 @@ export function TimeGrid({
                   )
                 })}
               </div>
+              {!split && acts.length > 0 && (
+                <div className="pointer-events-none absolute inset-0 *:pointer-events-auto">
+                  {acts.map((p) => (
+                    <ActivityBlock
+                      key={p.item.activityId}
+                      placed={p}
+                      geometry={geometry}
+                      selected={selection?.kind === 'activity' && selection.id === p.item.activityId}
+                      onSelect={selectActivity}
+                    />
+                  ))}
+                </div>
+              )}
               {split && (
                 <div className="border-line/70 pointer-events-none absolute inset-y-0 right-0 w-[40%] border-l border-dashed *:pointer-events-auto">
                   {acts.map((p) => (

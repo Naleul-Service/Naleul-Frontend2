@@ -120,11 +120,19 @@ export function placeTasks(day: TimetableDay, from: number, to: number): Placed<
       return { t, c: c && { ...c, end: m.end } }
     })
     .filter((x): x is { t: TimeBlockTask; c: NonNullable<ReturnType<typeof clip>> } => !!x.c)
-    .sort((a, b) => a.c.top - b.c.top || b.c.bottom - a.c.bottom)
 
-  const out: Placed<TimeBlockTask>[] = []
+  return layoutColumns(items.map(({ t, c }) => ({ item: t, ...c, col: 0, cols: 1 })))
+}
+
+/**
+ * 겹치는 블록을 나란히 놓도록 열(col / cols)을 정해요 (넘겨준 객체를 고쳐서 위→아래 순으로 돌려줘요).
+ * 서로 다른 종류(Task · 실제로 한 일)를 섞어 넘기면 한 칸 안에서 같이 나눠 그려요.
+ */
+export function layoutColumns<P extends { top: number; bottom: number; col: number; cols: number }>(list: P[]): P[] {
+  const items = [...list].sort((a, b) => a.top - b.top || b.bottom - a.bottom)
+  const out: P[] = []
   // 겹치는 덩어리(cluster)마다 열을 나눠요
-  let cluster: Placed<TimeBlockTask>[] = []
+  let cluster: P[] = []
   let clusterEnd = -Infinity
   const colEnds: number[] = []
   const flush = () => {
@@ -134,15 +142,17 @@ export function placeTasks(day: TimetableDay, from: number, to: number): Placed<
     cluster = []
     colEnds.length = 0
   }
-  for (const { t, c } of items) {
-    if (c.top >= clusterEnd) flush()
-    let col = colEnds.findIndex((end) => end <= c.top)
+  for (const p of items) {
+    if (p.top >= clusterEnd) flush()
+    let col = colEnds.findIndex((end) => end <= p.top)
     if (col === -1) {
       col = colEnds.length
-      colEnds.push(c.bottom)
-    } else colEnds[col] = c.bottom
-    cluster.push({ item: t, ...c, col, cols: 1 })
-    clusterEnd = Math.max(clusterEnd, c.bottom)
+      colEnds.push(p.bottom)
+    } else colEnds[col] = p.bottom
+    p.col = col
+    p.cols = 1
+    cluster.push(p)
+    clusterEnd = Math.max(clusterEnd, p.bottom)
   }
   flush()
   return out

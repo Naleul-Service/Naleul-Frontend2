@@ -266,6 +266,10 @@ export function ActivityBlock({
       }}
       style={{
         ...pos(placed, geometry),
+        // 주간처럼 Task 와 한 열에 섞어 그릴 때 겹치면 나란히 (cols 가 1 이면 칸 전체)
+        ...(placed.cols > 1
+          ? { left: `calc(${(placed.col * 100) / placed.cols}% + 2px)`, width: `calc(${100 / placed.cols}% - 4px)` }
+          : {}),
         ...NO_CALLOUT,
         borderLeftColor: color ?? 'var(--color-success)',
       }}
