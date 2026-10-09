@@ -97,6 +97,8 @@ export function TaskBlock({
   isNew,
   grouped,
   planned,
+  faded,
+  focused,
 }: {
   placed: Placed<TimeBlockTask>
   geometry: Geometry
@@ -111,6 +113,10 @@ export function TaskBlock({
   grouped?: boolean
   /** 일간 "계획" 칸: 완료했어도 계획한 시각으로 그렸으니 "실제" 표시를 하지 않아요 */
   planned?: boolean
+  /** 확인을 기다리는 블록에 눈이 가도록 흐리게 */
+  faded?: boolean
+  /** 확인을 기다리는 블록 (테두리 강조) */
+  focused?: boolean
 }) {
   const t = placed.item
   const heightPx = (placed.bottom - placed.top) * geometry.ppm
@@ -148,6 +154,9 @@ export function TaskBlock({
         done && 'opacity-55',
         drag && 'cursor-grab active:cursor-grabbing',
         dimmed && 'opacity-30',
+        // 미리보기 중 제안 블록을 돋보이게 — 나머지는 흐리게(faded)
+        faded && 'opacity-50 saturate-[.8]',
+        focused && 'ring-brand z-[12] shadow-[0_6px_18px_rgb(61_90_254/0.35)] ring-2 ring-offset-1',
         selected && 'ring-ink ring-2 ring-offset-1',
         grouped && 'outline-brand z-[11] outline-2 outline-offset-1 outline-dashed',
         placed.clippedTop && 'rounded-t-none',

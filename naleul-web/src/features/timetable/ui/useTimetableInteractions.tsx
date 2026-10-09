@@ -251,6 +251,13 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
       )
   }, [days, today])
 
+  // 확인을 기다리는 블록 (화면 이동 · 강조용)
+  const focusIds = useMemo<ReadonlySet<number>>(() => {
+    if (proposals) return new Set(proposals.map((p) => p.taskId))
+    const carry = carryProposals[0]
+    return new Set(carry && !ask && groupIds.size === 0 ? [carry.taskId] : [])
+  }, [proposals, carryProposals, ask, groupIds])
+
   // 데이터가 새로 오면 팝오버 안의 Task 도 최신 값으로
   const liveTask = (t: TimeBlockTask) =>
     days.flatMap((d) => [...d.tasks, ...d.unscheduledTasks]).find((x) => x.taskId === t.taskId) ?? t
@@ -753,5 +760,11 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     previewFill,
     fillPreviewing: fillPreview.isPending,
     proposing,
+    /**
+     * 확인을 기다리는 블록 — AI 배치 미리보기면 제안들(나머지는 흐리게), 아니면 화면 아래에서 묻고 있는 이월 제안 하나.
+     * TimeGrid focusIds · fadeOthers 로 넘겨요.
+     */
+    focusIds,
+    fadeOthers: proposing,
   }
 }

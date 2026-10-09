@@ -81,6 +81,8 @@ export function CalendarView() {
     previewFill,
     fillPreviewing,
     proposing,
+    focusIds,
+    fadeOthers,
   } = useTimetableInteractions(rawDays, date)
   const { startHour, endHour } = useMemo(() => visibleHours(days, acts), [days, acts])
 
@@ -249,6 +251,8 @@ export function CalendarView() {
               onDragStart={close}
               groupIds={groupIds}
               highlightIds={newIds}
+              focusIds={focusIds}
+              fadeOthers={fadeOthers}
               onDayClick={(d) => {
                 close()
                 go({ view: 'day', date: d })

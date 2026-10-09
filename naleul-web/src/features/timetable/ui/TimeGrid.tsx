@@ -61,6 +61,12 @@ interface Props {
   onDragStart?: () => void
   /** "NEW" 표시할 Task (방금 만든 것) */
   highlightIds?: ReadonlySet<number>
+  /**
+   * 확인을 기다리는 블록 (AI 배치 미리보기 · 이월 제안). 바뀌면 그 블록이 보이게 스크롤하고 테두리로 강조해요.
+   * fadeOthers 면 나머지 블록·고정 시간을 흐리게 해서 제안만 눈에 들어오게 해요.
+   */
+  focusIds?: ReadonlySet<number>
+  fadeOthers?: boolean
   /** 묶음으로 같이 옮길 Task (2개 이상이면 하나를 끌 때 같이 움직여요) */
   groupIds?: ReadonlySet<number>
   /** 격자 최대 높이 (기본: 화면 높이에 맞춤) */
@@ -122,6 +128,8 @@ export function TimeGrid({
   onDrop,
   onDragStart,
   highlightIds,
+  focusIds,
+  fadeOthers = false,
   groupIds,
   maxHeightClass = 'max-h-[max(480px,calc(100dvh-230px))]',
   activities = [],
@@ -150,6 +158,35 @@ export function TimeGrid({
     const hasToday = days.some((d) => d.date === now.date)
     el.scrollTop = hasToday ? Math.max(0, (now.minutes - from - 90) * PPM) : 0
   }, [rangeKey, days, now, from])
+
+  // 확인을 기다리는 블록이 생기면 그 블록으로 화면을 옮겨요 (격자 안 스크롤 + 페이지 스크롤)
+  const focusKey = focusIds?.size ? [...focusIds].sort((a, b) => a - b).join(',') : ''
+  useEffect(() => {
+    const root = scrollRef.current
+    if (!focusKey || !root) return
+    const ids = new Set(focusKey.split(',').map(Number))
+    const raf = window.requestAnimationFrame(() => {
+      const els = [...root.querySelectorAll<HTMLElement>('[data-date] [data-task-id]')].filter((el) =>
+        ids.has(Number(el.dataset.taskId))
+      )
+      if (!els.length) return
+      const rect = (el: HTMLElement) => el.getBoundingClientRect()
+      const first = els.reduce((a, b) => (rect(a).top <= rect(b).top ? a : b))
+      const r = rect(first)
+      const box = root.getBoundingClientRect()
+      root.scrollTo({
+        top: root.scrollTop + (r.top - box.top) - HEADER_PX - 72,
+        // 주간: 가로로도 그 날짜 칸이 보이게 (왼쪽 시간 눈금 56px 만큼 비켜서)
+        left:
+          r.left < box.left + 56 || r.right > box.right ? root.scrollLeft + (r.left - box.left) - 72 : root.scrollLeft,
+        behavior: 'smooth',
+      })
+      // 격자 자체가 화면 밖이면 페이지도 격자 쪽으로
+      if (box.top < 0 || box.top > window.innerHeight * 0.6) root.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+    return () => window.cancelAnimationFrame(raf)
+  }, [focusKey])
+  const fadeTask = (id: number) => fadeOthers && !!focusIds?.size && !focusIds.has(id)
 
   // ── 드래그 ──
   // 한 시각에 Task 는 2개까지 겹쳐 둘 수 있어요 (백엔드 TaskScheduleService 와 같은 규칙)
@@ -380,7 +417,7 @@ export function TimeGrid({
                   geometry={geometry}
                   selected={selection?.kind === 'fixed' && selection.key === fixedKey(p.item)}
                   onSelect={selectFixed}
-                  dimmed={isDragging('fixed', fixedKey(p.item))}
+                  dimmed={isDragging('fixed', fixedKey(p.item)) || (fadeOthers && !!focusIds?.size)}
                   drag={
                     enabled
                       ? (e, mode) =>
@@ -396,7 +433,7 @@ export function TimeGrid({
                   geometry={geometry}
                   selected={selection?.kind === 'fixed' && selection.key === fixedKey(p.item)}
                   onSelect={selectFixed}
-                  dimmed={isDragging('fixed', fixedKey(p.item))}
+                  dimmed={isDragging('fixed', fixedKey(p.item)) || (fadeOthers && !!focusIds?.size)}
                   drag={
                     enabled && canDragFixed(p.item, d.date)
                       ? (e, mode) =>
@@ -429,6 +466,8 @@ export function TimeGrid({
                       selected={selection?.kind === 'task' && selection.id === p.item.taskId}
                       onSelect={selectTask}
                       dimmed={isDragging('task', p.item.taskId)}
+                      faded={fadeTask(p.item.taskId)}
+                      focused={!!focusIds?.has(p.item.taskId)}
                       isNew={highlightIds?.has(p.item.taskId)}
                       grouped={grouped}
                       planned={compare}
@@ -454,7 +493,12 @@ export function TimeGrid({
                 })}
               </div>
               {!split && acts.length > 0 && (
-                <div className="pointer-events-none absolute inset-0 *:pointer-events-auto">
+                <div
+                  className={cn(
+                    'pointer-events-none absolute inset-0 *:pointer-events-auto',
+                    fadeOthers && !!focusIds?.size && 'opacity-55'
+                  )}
+                >
                   {acts.map((p) => (
                     <ActivityBlock
                       key={p.item.activityId}
@@ -467,7 +511,12 @@ export function TimeGrid({
                 </div>
               )}
               {split && (
-                <div className="border-line/70 pointer-events-none absolute inset-y-0 right-0 w-[40%] border-l border-dashed *:pointer-events-auto">
+                <div
+                  className={cn(
+                    'border-line/70 pointer-events-none absolute inset-y-0 right-0 w-[40%] border-l border-dashed *:pointer-events-auto',
+                    fadeOthers && !!focusIds?.size && 'opacity-55'
+                  )}
+                >
                   {doneTasks.map((p) => (
                     <TaskBlock
                       key={`done-${p.item.taskId}`}
