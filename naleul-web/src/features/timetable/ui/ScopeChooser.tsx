@@ -93,7 +93,8 @@ export function ScopeChips({
 
 /**
  * 드래그로 루틴·고정 시간을 옮긴 직후 화면 아래에 뜨는 선택 바.
- * 1 / 2 / 3 키 또는 버튼으로 고르고, Enter = 첫 번째(이날만), Esc = 취소(원래 자리로).
+ * 1 / 2 / 3 키 또는 버튼으로 고르고, Enter = 첫 번째(이날만), Esc·X = 취소(원래 자리로).
+ * 아무것도 고르지 않고 바깥을 누르거나 포커스가 빠져나가면 onDismiss (= "이날만"으로 저장).
  */
 export function ScopeChooser({
   title,
@@ -101,19 +102,42 @@ export function ScopeChooser({
   loading,
   onChoose,
   onCancel,
+  onDismiss,
 }: {
   title: string
   options: ScopeOption[]
   loading?: boolean
   onChoose: (s: ChangeScope) => void
   onCancel: () => void
+  /** 고르지 않고 바깥을 누르거나 포커스가 빠져나감 (없으면 아무것도 안 함) */
+  onDismiss?: () => void
 }) {
   const firstRef = useRef<HTMLButtonElement>(null)
+  const dialogRef = useRef<HTMLDivElement>(null)
   // 렌더마다 새 함수여도 키보드 핸들러가 최신 값을 쓰도록
-  const latest = useRef({ options, onChoose, onCancel, loading })
+  const latest = useRef({ options, onChoose, onCancel, onDismiss, loading })
   useEffect(() => {
-    latest.current = { options, onChoose, onCancel, loading }
+    latest.current = { options, onChoose, onCancel, onDismiss, loading }
   })
+
+  // 바깥 클릭 · 포커스 이동 → "이날만" (사용자가 그냥 다른 일을 하러 가면 바꾼 대로 두는 게 자연스러워요)
+  useEffect(() => {
+    const outside = (target: EventTarget | null) =>
+      target instanceof Node && !!dialogRef.current && !dialogRef.current.contains(target)
+    const onPointerDown = (e: PointerEvent) => {
+      // 다른 블록을 끌려고 누른 경우도 여기서 먼저 "이날만"으로 저장돼요
+      if (outside(e.target) && !latest.current.loading) latest.current.onDismiss?.()
+    }
+    const onFocusIn = (e: FocusEvent) => {
+      if (outside(e.target) && !latest.current.loading) latest.current.onDismiss?.()
+    }
+    document.addEventListener('pointerdown', onPointerDown, true)
+    document.addEventListener('focusin', onFocusIn)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true)
+      document.removeEventListener('focusin', onFocusIn)
+    }
+  }, [])
 
   useEffect(() => {
     firstRef.current?.focus()
@@ -137,6 +161,7 @@ export function ScopeChooser({
   return createPortal(
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-50 flex justify-center px-4">
       <div
+        ref={dialogRef}
         role="dialog"
         aria-label="적용 범위 고르기"
         className="bg-surface shadow-pop border-line pointer-events-auto w-full max-w-[560px] animate-[modal-in_160ms_ease-out] rounded-2xl border p-4"

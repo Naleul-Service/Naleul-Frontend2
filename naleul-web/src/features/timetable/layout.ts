@@ -223,19 +223,64 @@ export function applyPending(
   })
 }
 
-/** 자동 배치가 밀어낼 수 없는 블록 (겹치면 백엔드 409) — 백엔드 isMovableEngineBlock 의 반대 */
+/** 자동 배치가 밀어낼 수 없는 블록 — 백엔드 isMovableEngineBlock 의 반대 (건너뛴 Task 는 자리를 차지하지 않아요) */
 export const isBlockingTask = (t: TimeBlockTask) =>
-  t.locked || t.placedBy !== 'ENGINE' || t.taskStatus !== 'TODO' || t.sourceType === 'MISSION'
+  t.taskStatus !== 'SKIPPED' &&
+  (t.locked || t.placedBy !== 'ENGINE' || t.taskStatus !== 'TODO' || t.sourceType === 'MISSION')
 
-/** start~end 에 겹치는 "밀어낼 수 없는" Task (자기 자신 제외) */
-export function blockingOverlap(day: TimetableDay, start: number, end: number, selfId: number) {
-  return day.tasks.find((t) => {
-    if (t.taskId === selfId || !t.plannedStartAt || !isBlockingTask(t)) return false
-    // 백엔드(TaskScheduleService)와 같게 계획 시각 기준으로 봐요 (완료한 Task 도 계획 자리를 차지)
-    const s = minutesFrom(day.date, t.plannedStartAt)
-    const e = t.plannedEndAt ? minutesFrom(day.date, t.plannedEndAt) : s + 30
-    return s < end && e > start
-  })
+/**
+ * 한 시각에 같이 둘 수 있는 (밀어낼 수 없는) Task 수 — 백엔드 Concurrency.MAX_TASKS_AT_ONCE 와 같아야 해요.
+ * 새 자리에 먼저 놓고 원래 있던 Task 를 나중에 옮기는 식으로 정리할 수 있게 2개까지 허용해요.
+ */
+export const MAX_TASKS_AT_ONCE = 2
+
+export interface MinuteRange {
+  start: number
+  end: number
+}
+
+/** window 안에서 ranges 가 가장 많이 겹치는 순간의 개수 (끝과 시작이 같으면 겹치지 않음) */
+export function maxOverlap(ranges: MinuteRange[], window: MinuteRange) {
+  const events: [number, number][] = []
+  for (const r of ranges) {
+    if (!(r.start < window.end && r.end > window.start)) continue
+    events.push([Math.max(r.start, window.start), 1], [Math.min(r.end, window.end), -1])
+  }
+  // 같은 시각이면 끝(-1)을 먼저 → 10~11 과 11~12 는 겹치지 않음
+  events.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  let cur = 0
+  let max = 0
+  for (const [, d] of events) {
+    cur += d
+    max = Math.max(max, cur)
+  }
+  return max
+}
+
+/**
+ * start~end 에 놓으면 한 시각에 밀어낼 수 없는 Task 가 3개 이상이 되는지.
+ * 완료한 Task 는 "실제로 한 시간"이 자리를 차지해요 (화면에 그려진 자리 = 막힌 자리. 계획 자리는 비어 있어요).
+ *
+ * @param exclude 같이 옮기는 Task 들 (원래 자리는 빼고 봐요)
+ * @param extra   같이 옮기는 다른 Task 들의 새 자리
+ * @returns 놓을 수 없으면 그 자리에 이미 있는 Task 들, 놓을 수 있으면 null
+ */
+export function crowdedTasks(
+  day: TimetableDay,
+  start: number,
+  end: number,
+  exclude: ReadonlySet<number>,
+  extra: MinuteRange[] = []
+): TimeBlockTask[] | null {
+  const hits: { task: TimeBlockTask; range: MinuteRange }[] = []
+  for (const t of day.tasks) {
+    if (exclude.has(t.taskId) || !isBlockingTask(t)) continue
+    const range = shownMinutes(day.date, t, 30)
+    if (range && range.start < end && range.end > start) hits.push({ task: t, range })
+  }
+  const ranges = [...hits.map((h) => h.range), ...extra]
+  if (maxOverlap(ranges, { start, end }) < MAX_TASKS_AT_ONCE) return null
+  return hits.map((h) => h.task)
 }
 
 /**

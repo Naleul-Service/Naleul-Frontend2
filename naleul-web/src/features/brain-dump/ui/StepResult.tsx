@@ -56,7 +56,7 @@ export function StepResult({
 
   const { data, isPending } = useTimetable(start, end)
   const rawDays = useMemo(() => (data?.days ?? []).filter((d) => d.date >= start && d.date <= end), [data, start, end])
-  const { days, selection, onSelectTask, onSelectFixed, onDrop, close, overlays } = useTimetableInteractions(
+  const { days, selection, onSelectTask, onSelectFixed, onDrop, close, overlays, groupIds } = useTimetableInteractions(
     rawDays,
     start
   )
@@ -128,6 +128,7 @@ export function StepResult({
           onDrop={onDrop}
           onDragStart={close}
           highlightIds={newIds}
+          groupIds={groupIds}
           maxHeightClass="max-h-[560px]"
         />
       )}

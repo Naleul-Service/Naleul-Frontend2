@@ -2,11 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { cn } from '@/lib/cn'
-import { blockingOverlap, placeActivities, placeFixed, placeTasks } from '../layout'
+import { MAX_TASKS_AT_ONCE, crowdedTasks, placeActivities, placeFixed, placeTasks } from '../layout'
 import { WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, minutesFrom, nowKst, weekdayIndex } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityBlock, FixedBlockView, HATCH, TaskBlock, taskColors } from './Blocks'
-import { canUnschedule, useGridDrag, type DragSource, type DragState, type DropTarget } from './useGridDrag'
+import {
+  canUnschedule,
+  groupMoves,
+  useGridDrag,
+  type DragSource,
+  type DragState,
+  type DropTarget,
+  type GroupMember,
+} from './useGridDrag'
 
 export const HOUR_PX = 60
 const PPM = HOUR_PX / 60
@@ -44,6 +52,8 @@ interface Props {
   onDragStart?: () => void
   /** "NEW" 표시할 Task (방금 만든 것) */
   highlightIds?: ReadonlySet<number>
+  /** 묶음으로 같이 옮길 Task (2개 이상이면 하나를 끌 때 같이 움직여요) */
+  groupIds?: ReadonlySet<number>
   /** 격자 최대 높이 (기본: 화면 높이에 맞춤) */
   maxHeightClass?: string
   /** 실제로 한 일 — 있으면 그날 칸 오른쪽에 "실제" 칸이 생겨요 */
@@ -79,6 +89,7 @@ export function TimeGrid({
   onDrop,
   onDragStart,
   highlightIds,
+  groupIds,
   maxHeightClass = 'max-h-[max(480px,calc(100dvh-230px))]',
   activities = [],
   onSelectActivity,
@@ -107,12 +118,24 @@ export function TimeGrid({
   }, [rangeKey, days, now, from])
 
   // ── 드래그 ──
+  // 한 시각에 Task 는 2개까지 겹쳐 둘 수 있어요 (백엔드 TaskScheduleService 와 같은 규칙)
   const validate = useCallback(
     (source: DragSource, target: DropTarget) => {
       if (source.kind !== 'task' || target.type !== 'grid') return null
-      const day = days.find((d) => d.date === target.date)
-      const hit = day && blockingOverlap(day, target.start, target.end, source.task.taskId)
-      return hit ? `"${hit.taskName}"과(와) 겹쳐요` : null
+      const moves = groupMoves(source, target)
+      const moving = new Set(moves.map((m) => m.task.taskId))
+      for (const m of moves) {
+        const day = days.find((d) => d.date === m.date)
+        if (!day) continue
+        // 같이 옮기는 다른 Task 들의 새 자리도 자리를 차지해요
+        const others = moves.filter((o) => o !== m).map((o) => ({ start: o.start, end: o.end }))
+        const hit = crowdedTasks(day, m.start, m.end, moving, others)
+        if (hit) {
+          const who = moves.length > 1 ? `"${m.task.taskName}" 자리에 ` : ''
+          return `${who}이미 Task ${MAX_TASKS_AT_ONCE}개가 겹쳐 있어요`
+        }
+      }
+      return null
     },
     [days]
   )
@@ -132,8 +155,14 @@ export function TimeGrid({
   const isDragging = (kind: 'task' | 'fixed', id: string | number) =>
     !!drag &&
     (kind === 'task'
-      ? drag.source.kind === 'task' && drag.source.task.taskId === id
+      ? drag.source.kind === 'task' &&
+        (drag.source.task.taskId === id || !!drag.source.group?.some((m) => m.task.taskId === id))
       : drag.source.kind === 'fixed' && fixedKey(drag.source.block) === id)
+  // 묶음 드래그 중 같이 움직이는 나머지 Task 들의 새 자리
+  const groupGhosts =
+    drag?.source.kind === 'task' && drag.source.group?.length && drag.target?.type === 'grid'
+      ? groupMoves(drag.source, drag.target).slice(1)
+      : []
 
   const selectTask = (t: TimeBlockTask, e: MouseEvent<HTMLElement>) => {
     if (!consumeClick()) onSelectTask(t, e)
@@ -204,7 +233,14 @@ export function TimeGrid({
                 <span className={cn('block text-xs font-semibold', isToday ? 'text-brand' : 'text-ink-3')}>
                   {WEEKDAY_LABEL[wd]}요일
                 </span>
-                <span className="text-ink-3 block truncate text-[11px]">
+                <span
+                  className="text-ink-3 block truncate text-[11px]"
+                  title={
+                    d.stats.carriedOver
+                      ? `다음 날로 넘어간 ${d.stats.carriedOver}개도 이날 못 한 일로 세요 (넘어가도 실행률은 그대로)`
+                      : undefined
+                  }
+                >
                   {/* 아직 오지 않은 날은 실행률 대신 개수 */}
                   {!d.stats.total
                     ? 'Task 없음'
@@ -308,23 +344,46 @@ export function TimeGrid({
                   split ? 'right-[40%]' : 'right-0'
                 )}
               >
-                {tasks.map((p) => (
-                  <TaskBlock
-                    key={p.item.taskId}
-                    placed={p}
-                    geometry={geometry}
-                    selected={selection?.kind === 'task' && selection.id === p.item.taskId}
-                    onSelect={selectTask}
-                    dimmed={isDragging('task', p.item.taskId)}
-                    isNew={highlightIds?.has(p.item.taskId)}
-                    drag={
-                      enabled && canDragTask(p.item)
-                        ? (e, mode) =>
-                            startDrag(e, { kind: 'task', task: p.item, date: d.date, start: p.start, end: p.end }, mode)
-                        : undefined
-                    }
-                  />
-                ))}
+                {tasks.map((p) => {
+                  const grouped = !!groupIds && groupIds.size > 1 && groupIds.has(p.item.taskId)
+                  // 묶음에 든 Task 를 옮기면(크기 조절 말고) 같은 날의 나머지 묶음도 같이 움직여요
+                  const group: GroupMember[] = grouped
+                    ? tasks
+                        .filter(
+                          (q) => q.item.taskId !== p.item.taskId && groupIds!.has(q.item.taskId) && canDragTask(q.item)
+                        )
+                        .map((q) => ({ task: q.item, date: d.date, start: q.start, end: q.end }))
+                    : []
+                  return (
+                    <TaskBlock
+                      key={p.item.taskId}
+                      placed={p}
+                      geometry={geometry}
+                      selected={selection?.kind === 'task' && selection.id === p.item.taskId}
+                      onSelect={selectTask}
+                      dimmed={isDragging('task', p.item.taskId)}
+                      isNew={highlightIds?.has(p.item.taskId)}
+                      grouped={grouped}
+                      drag={
+                        enabled && canDragTask(p.item)
+                          ? (e, mode) =>
+                              startDrag(
+                                e,
+                                {
+                                  kind: 'task',
+                                  task: p.item,
+                                  date: d.date,
+                                  start: p.start,
+                                  end: p.end,
+                                  group: mode === 'move' && group.length ? group : undefined,
+                                },
+                                mode
+                              )
+                          : undefined
+                      }
+                    />
+                  )
+                })}
               </div>
               {split && (
                 <div className="border-line/70 pointer-events-none absolute inset-y-0 right-0 w-[40%] border-l border-dashed *:pointer-events-auto">
@@ -342,6 +401,10 @@ export function TimeGrid({
               {drag?.target?.type === 'grid' && drag.target.date === d.date && (
                 <DragGhost drag={drag} target={drag.target} from={from} />
               )}
+              {drag &&
+                groupGhosts
+                  .filter((m) => m.date === d.date)
+                  .map((m) => <GroupGhost key={m.task.taskId} member={m} from={from} invalid={!!drag.invalid} />)}
               {nowLine(d.date) !== null && (
                 <div
                   className="pointer-events-none absolute inset-x-0 z-20 h-0 border-t-2 border-red-500"
@@ -418,6 +481,35 @@ function UnscheduledCell({
         >
           +{more}개 더보기
         </button>
+      )}
+    </div>
+  )
+}
+
+/** 묶음 드래그 중 같이 움직이는 Task 의 새 자리 */
+function GroupGhost({ member, from, invalid }: { member: GroupMember; from: number; invalid: boolean }) {
+  const t = member.task
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        'pointer-events-none absolute inset-x-0.5 z-30 flex flex-col overflow-hidden rounded-lg border px-2 py-1 text-xs leading-tight opacity-90 shadow-[0_8px_24px_rgb(17_17_17/0.18)]',
+        invalid ? 'border-danger ring-danger ring-2' : 'border-white/60'
+      )}
+      style={{
+        ...taskColors(t),
+        top: (member.start - from) * PPM,
+        height: Math.max((member.end - member.start) * PPM - 2, 14),
+      }}
+    >
+      <span className="truncate font-semibold">
+        {t.emoji ? `${t.emoji} ` : ''}
+        {t.taskName}
+      </span>
+      {(member.end - member.start) * PPM >= 34 && (
+        <span className="truncate font-bold tabular-nums">
+          {formatMinutes(member.start)} – {formatMinutes(member.end)}
+        </span>
       )}
     </div>
   )

@@ -16,7 +16,17 @@ import type { FixedBlock, TimeBlockTask } from '../types'
  *  - 마우스: 4px 이상 움직이면 드래그 시작 (그보다 적으면 클릭 → 상세 팝오버)
  *  - 터치: 0.35초 길게 누르면 드래그 시작 (그 전에 움직이면 평소처럼 스크롤)
  *  - 10분 단위로 맞춰져요. ESC 로 취소. 위·아래 끝에 가까이 가면 자동 스크롤.
+ *  - 크기 조절: 블록 아래 끝(끝 시각) · 위 끝(시작 시각) 둘 다 잡을 수 있어요.
+ *  - 묶음: 여러 Task 를 묶어 두면(group) 하나를 끌 때 나머지도 같은 만큼 같이 움직여요.
  */
+
+/** 묶음으로 같이 옮길 Task (끄는 Task 와 같은 날, 시간이 있는 것) */
+export interface GroupMember {
+  task: TimeBlockTask
+  date: string
+  start: number
+  end: number
+}
 
 export type DragSource =
   | {
@@ -26,10 +36,15 @@ export type DragSource =
       date: string
       start: number | null
       end: number | null
+      /** 같이 옮길 다른 Task 들 (묶음 드래그). 비어 있으면 혼자 움직여요 */
+      group?: GroupMember[]
     }
   | { kind: 'fixed'; block: FixedBlock; date: string; start: number; end: number }
 
-export type DragMode = 'move' | 'resize'
+/** resize = 아래 끝(끝 시각) 조절, resize-top = 위 끝(시작 시각) 조절 */
+export type DragMode = 'move' | 'resize' | 'resize-top'
+
+export const isResize = (m: DragMode) => m !== 'move'
 
 export type DropTarget =
   { type: 'grid'; date: string; start: number; end: number } | { type: 'unscheduled'; date: string }
@@ -71,7 +86,28 @@ export const durationOf = (s: DragSource) =>
 
 /** 시간 미정으로 보낼 수 있는 Task (백엔드: 루틴·미션은 400) */
 export const canUnschedule = (s: DragSource) =>
-  s.kind === 'task' && s.start !== null && s.task.sourceType === 'MANUAL' && s.task.taskStatus !== 'COMPLETED'
+  s.kind === 'task' &&
+  s.start !== null &&
+  !s.group?.length &&
+  s.task.sourceType === 'MANUAL' &&
+  s.task.taskStatus !== 'COMPLETED'
+
+/**
+ * 묶음 드래그 결과: 끈 Task 를 포함해 묶음 전체가 놓일 자리.
+ * 끈 Task 가 움직인 만큼(분) 나머지도 똑같이 움직이고, 날짜는 끈 Task 가 놓인 날로 같이 가요.
+ */
+export function groupMoves(
+  source: Extract<DragSource, { kind: 'task' }>,
+  target: Extract<DropTarget, { type: 'grid' }>
+): GroupMember[] {
+  const self: GroupMember = { task: source.task, date: target.date, start: target.start, end: target.end }
+  if (!source.group?.length || source.start === null) return [self]
+  const delta = target.start - source.start
+  return [
+    self,
+    ...source.group.map((m) => ({ task: m.task, date: target.date, start: m.start + delta, end: m.end + delta })),
+  ]
+}
 
 export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onDrop, onActivate }: Options) {
   const [drag, setDrag] = useState<DragState | null>(null)
@@ -121,7 +157,7 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
       // ② 날짜 칸 (고정 시간·크기 조절은 원래 날짜에서만)
       const cols = [...root.querySelectorAll<HTMLElement>('[data-date]')]
       if (!cols.length) return null
-      const sameDay = s.source.kind === 'fixed' || s.mode === 'resize'
+      const sameDay = s.source.kind === 'fixed' || isResize(s.mode)
       let col = sameDay ? cols.find((c) => c.dataset.date === s.source.date) : undefined
       if (!col) {
         // 칸 밖이면 가장 가까운 칸
@@ -145,9 +181,25 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
         const end = Math.min(to, Math.max(start + SNAP_MINUTES, snap(minute)))
         return { type: 'grid', date, start, end }
       }
+      if (s.mode === 'resize-top') {
+        // 끝은 그대로 두고 시작 시각만 움직여요 (최소 10분은 남김)
+        const end = s.source.end!
+        const start = Math.max(from, Math.min(end - SNAP_MINUTES, snap(minute)))
+        return { type: 'grid', date, start, end }
+      }
       const dur = durationOf(s.source)
       if (s.grab === null) s.grab = Math.min(dur / 2, 30) // 시간 미정 칩: 블록 위쪽 조금 아래를 잡은 것으로
-      const start = Math.min(Math.max(snap(minute - s.grab), from), Math.max(from, to - dur))
+      // 묶음이면 묶음 전체가 격자 안에 들어오게 (가장 이른 Task 가 위로, 가장 늦은 Task 가 아래로 넘치지 않게)
+      let before = 0
+      let after = dur
+      if (s.source.kind === 'task' && s.source.group?.length && s.source.start !== null) {
+        for (const m of s.source.group) {
+          before = Math.max(before, s.source.start - m.start)
+          after = Math.max(after, m.end - s.source.start)
+        }
+      }
+      const lo = from + before
+      const start = Math.min(Math.max(snap(minute - s.grab), lo), Math.max(lo, to - after))
       return { type: 'grid', date, start, end: start + dur }
     },
     [scrollRef]
@@ -201,7 +253,7 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
     if (!s || s.active) return
     s.active = true
     document.body.style.userSelect = 'none'
-    document.body.style.cursor = s.mode === 'resize' ? 'ns-resize' : 'grabbing'
+    document.body.style.cursor = isResize(s.mode) ? 'ns-resize' : 'grabbing'
     opts.current.onActivate?.()
     if (s.touch && navigator.vibrate) navigator.vibrate(10)
     update()
@@ -217,7 +269,7 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
   const startDrag = useCallback(
     (e: ReactPointerEvent<HTMLElement>, source: DragSource, mode: DragMode = 'move') => {
       if (e.button !== 0 || session.current) return
-      if (mode === 'resize') e.stopPropagation()
+      if (isResize(mode)) e.stopPropagation()
       const touch = e.pointerType === 'touch'
 
       // 잡은 지점: 블록 위쪽에서 몇 분 아래를 잡았는지 (놓을 때 같은 지점이 커서 아래에 오도록)

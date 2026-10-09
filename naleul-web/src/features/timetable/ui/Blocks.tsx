@@ -21,23 +21,39 @@ interface Geometry {
 }
 
 /** 드래그 가능한 블록에 붙는 핸들러. 없으면 드래그 불가 */
-export type BlockDrag = (e: PointerEvent<HTMLElement>, mode: 'move' | 'resize') => void
+export type BlockDrag = (e: PointerEvent<HTMLElement>, mode: 'move' | 'resize' | 'resize-top') => void
+
+/** 이보다 낮은 블록은 위 끝 핸들을 숨겨요 (위·아래 핸들이 블록을 다 덮으면 옮길 곳이 없어서) */
+const TOP_HANDLE_MIN_PX = 22
 
 // 길게 눌렀을 때 iOS 의 텍스트 선택·메뉴가 뜨지 않게
 const NO_CALLOUT: CSSProperties = { WebkitTouchCallout: 'none', WebkitUserSelect: 'none', userSelect: 'none' }
 
-/** 블록 아래쪽 가장자리를 잡고 늘리기/줄이기 */
-function ResizeHandle({ onDrag, light }: { onDrag: BlockDrag; light?: boolean }) {
+/** 블록 위·아래 가장자리를 잡고 늘리기/줄이기 (위 = 시작 시각, 아래 = 끝 시각) */
+function ResizeHandle({
+  onDrag,
+  light,
+  edge = 'bottom',
+}: {
+  onDrag: BlockDrag
+  light?: boolean
+  edge?: 'top' | 'bottom'
+}) {
+  const top = edge === 'top'
   return (
     <span
       aria-hidden
-      data-resize-handle
-      onPointerDown={(e) => onDrag(e, 'resize')}
-      className="group/handle absolute inset-x-0 bottom-0 flex h-2 cursor-ns-resize items-end justify-center"
+      data-resize-handle={edge}
+      onPointerDown={(e) => onDrag(e, top ? 'resize-top' : 'resize')}
+      className={cn(
+        'group/handle absolute inset-x-0 flex h-2 cursor-ns-resize justify-center',
+        top ? 'top-0 items-start' : 'bottom-0 items-end'
+      )}
     >
       <span
         className={cn(
-          'mb-0.5 h-1 w-6 rounded-full opacity-0 transition-opacity group-hover/handle:opacity-100',
+          'h-1 w-6 rounded-full opacity-0 transition-opacity group-hover/handle:opacity-100',
+          top ? 'mt-0.5' : 'mb-0.5',
           light ? 'bg-white/70' : 'bg-ink-4'
         )}
       />
@@ -79,6 +95,7 @@ export function TaskBlock({
   drag,
   dimmed,
   isNew,
+  grouped,
 }: {
   placed: Placed<TimeBlockTask>
   geometry: Geometry
@@ -89,6 +106,8 @@ export function TaskBlock({
   dimmed?: boolean
   /** 방금 만든 Task (NEW 표시) */
   isNew?: boolean
+  /** 묶음 드래그로 같이 옮길 Task (점선 테두리) */
+  grouped?: boolean
 }) {
   const t = placed.item
   const heightPx = (placed.bottom - placed.top) * geometry.ppm
@@ -122,6 +141,7 @@ export function TaskBlock({
         drag && 'cursor-grab active:cursor-grabbing',
         dimmed && 'opacity-30',
         selected && 'ring-ink ring-2 ring-offset-1',
+        grouped && 'outline-brand z-[11] outline-2 outline-offset-1 outline-dashed',
         placed.clippedTop && 'rounded-t-none',
         placed.clippedBottom && 'rounded-b-none'
       )}
@@ -156,6 +176,9 @@ export function TaskBlock({
           {actual && '실제 '}
           {formatMinutes(placed.start)} – {formatMinutes(placed.end)}
         </span>
+      )}
+      {drag && !placed.clippedTop && heightPx >= TOP_HANDLE_MIN_PX && (
+        <ResizeHandle onDrag={drag} light={solid} edge="top" />
       )}
       {drag && !placed.clippedBottom && <ResizeHandle onDrag={drag} light={solid} />}
     </button>
@@ -208,6 +231,7 @@ export function FixedBlockView({
           {formatMinutes(placed.start)} – {formatMinutes(placed.end)}
         </span>
       )}
+      {drag && !placed.clippedTop && heightPx >= TOP_HANDLE_MIN_PX && <ResizeHandle onDrag={drag} edge="top" />}
       {drag && !placed.clippedBottom && <ResizeHandle onDrag={drag} />}
     </button>
   )

@@ -89,6 +89,8 @@ export interface DayStats {
   missed: number
   /** 완료/전체 × 100. Task 가 없으면 null */
   rate?: number | null
+  /** 이날 못 해서 다음 날로 넘어간 Task 수 (total·missed 에 이미 포함 — 넘어가도 실천률이 바뀌지 않게) */
+  carriedOver?: number
 }
 
 export interface TimetableDay {
@@ -110,6 +112,14 @@ export interface TaskScheduleResponse {
   moved: { taskId: number; fromStart: string; toStart: string; toEnd: string; reason?: string | null }[]
   unscheduled: number[]
   coveredFixedBlocks: { lifePatternId: number; title: string }[]
+}
+
+/** 여러 Task 를 한 번에 옮긴 결과 (묶음 드래그) */
+export interface TaskBatchScheduleResponse {
+  tasks: TimeBlockTask[]
+  moved: TaskScheduleResponse['moved']
+  unscheduled: number[]
+  coveredFixedBlocks: TaskScheduleResponse['coveredFixedBlocks']
 }
 
 export interface LifePattern {

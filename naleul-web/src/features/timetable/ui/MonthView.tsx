@@ -291,6 +291,7 @@ function DayPanel({
             <p className="text-ink-3 text-xs tabular-nums">
               완료 {stats.completed} / 전체 {stats.total}
               {stats.missed > 0 && <span className="text-danger"> · 놓침 {stats.missed}</span>}
+              {!!stats.carriedOver && <span className="text-ink-4"> (다음 날로 넘김 {stats.carriedOver} 포함)</span>}
             </p>
           )}
         </div>

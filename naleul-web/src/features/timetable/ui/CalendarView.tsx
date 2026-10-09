@@ -66,6 +66,7 @@ export function CalendarView() {
     close,
     toggleComplete,
     overlays,
+    groupIds,
   } = useTimetableInteractions(rawDays, date)
   const { startHour, endHour } = useMemo(() => visibleHours(days, acts), [days, acts])
 
@@ -215,6 +216,7 @@ export function CalendarView() {
             onEmptyClick={onEmptyClick}
             onDrop={onDrop}
             onDragStart={close}
+            groupIds={groupIds}
             onDayClick={(d) => {
               close()
               go({ view: 'day', date: d })

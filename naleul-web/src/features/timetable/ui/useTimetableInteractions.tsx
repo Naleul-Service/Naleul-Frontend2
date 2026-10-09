@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useState, type MouseEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { Link2, X } from 'lucide-react'
 import { Popover, rectOf, type AnchorRect } from '@/components/ui/Popover'
 import {
   useCompleteWithActual,
@@ -9,6 +10,7 @@ import {
   useLifePatterns,
   usePatternOverride,
   usePatternScopedChange,
+  useRescheduleBatch,
   useRescheduleTask,
   useRoutineScopedReschedule,
   type ChangeScope,
@@ -18,6 +20,7 @@ import {
 } from '../api'
 import { applyPending, type Pending } from '../layout'
 import {
+  SNAP_MINUTES,
   formatMinutes,
   formatMonthDay,
   minutesFrom,
@@ -33,8 +36,8 @@ import { FixedDetail } from './FixedDetail'
 import { ScopeChooser, scopeOptions } from './ScopeChooser'
 import { TaskDetail } from './TaskDetail'
 import { TimeEditModal, type TimeValue } from './TimeEditModal'
-import { fixedKey, type Selection } from './TimeGrid'
-import type { DragSource, DropTarget } from './useGridDrag'
+import { canDragTask, fixedKey, type Selection } from './TimeGrid'
+import { groupMoves, type DragSource, type DropTarget } from './useGridDrag'
 
 type Opened =
   | { kind: 'task'; task: TimeBlockTask; anchor: AnchorRect }
@@ -53,6 +56,46 @@ type Editing =
 type ScopeAsk =
   | { kind: 'routine'; task: TimeBlockTask; date: string; start: number; end: number; pending: Pending }
   | { kind: 'fixed'; block: FixedBlock; date: string; start: number; end: number; pending: Pending }
+
+/** 묶음에 넣을 수 있는 Task: 시간이 정해져 있고 드래그로 옮길 수 있는 것 */
+const groupable = (t: TimeBlockTask) => !!t.plannedStartAt && canDragTask(t)
+
+/** 블록 날짜 (계획 시작일) */
+const blockDay = (t: TimeBlockTask) => t.plannedStartAt?.slice(0, 10) ?? null
+
+/**
+ * t 와 앞뒤로 바로 이어진 Task 들 (사이 간격 10분 이하). 쪼개 둔 연속 작업을 한 번에 고르려고 써요.
+ * 그날 블록을 시작 순으로 놓고 t 에서 위·아래로 이어지는 동안 모아요.
+ */
+function chainOf(t: TimeBlockTask, days: TimetableDay[]): TimeBlockTask[] {
+  const date = blockDay(t)
+  const day = days.find((d) => d.date === date)
+  if (!day || !date || !groupable(t)) return [t]
+  const range = (x: TimeBlockTask) => {
+    const s = minutesFrom(date, x.plannedStartAt!)
+    const e = x.plannedEndAt ? minutesFrom(date, x.plannedEndAt) : s + (x.plannedDurationMinutes ?? 30)
+    return { s, e }
+  }
+  const list = day.tasks
+    .filter((x) => groupable(x) && blockDay(x) === date)
+    .map((x) => ({ x, ...range(x) }))
+    .sort((a, b) => a.s - b.s)
+  const i = list.findIndex((v) => v.x.taskId === t.taskId)
+  if (i < 0) return [t]
+  let lo = i
+  let hi = i
+  let end = list[i].e
+  while (hi + 1 < list.length && list[hi + 1].s - end <= SNAP_MINUTES) {
+    hi++
+    end = Math.max(end, list[hi].e)
+  }
+  let start = list[i].s
+  while (lo - 1 >= 0 && start - list[lo - 1].e <= SNAP_MINUTES) {
+    lo--
+    start = Math.min(start, list[lo].s)
+  }
+  return list.slice(lo, hi + 1).map((v) => v.x)
+}
 
 /** 루틴 Task 가 속한 날짜 (루틴 인스턴스 날짜) */
 const routineDay = (t: TimeBlockTask) => t.date ?? t.plannedStartAt?.slice(0, 10) ?? null
@@ -87,6 +130,8 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   // 드래그로 옮긴 뒤 서버 응답을 기다리는 동안 새 위치에 그려 둘 블록들
   const [pending, setPending] = useState<Pending[]>([])
   const [ask, setAsk] = useState<ScopeAsk | null>(null)
+  // 묶음 드래그로 같이 옮길 Task id (Shift·⌘·Ctrl+클릭, 또는 상세의 "이어진 N개 묶어 옮기기")
+  const [group, setGroup] = useState<number[]>([])
   const today = todayKst()
 
   const toggleComplete = useToggleComplete()
@@ -94,6 +139,7 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   const unlock = useUnlockTask()
   const unschedule = useUnscheduleTask()
   const reschedule = useRescheduleTask()
+  const rescheduleBatch = useRescheduleBatch()
   const completeWithActual = useCompleteWithActual()
   const override = usePatternOverride()
   const routineScoped = useRoutineScopedReschedule()
@@ -104,6 +150,18 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   const patterns = useLifePatterns(needsPatterns)
 
   const days = useMemo(() => applyPending(rawDays, pending, fixedKey), [rawDays, pending])
+
+  // 묶음 중 지금도 옮길 수 있는 Task 만 (완료했거나 시간 미정이 된 Task 는 빠져요)
+  const groupIds = useMemo(() => {
+    const live = new Set(
+      days
+        .flatMap((d) => d.tasks)
+        .filter(groupable)
+        .map((t) => t.taskId)
+    )
+    return new Set(group.filter((id) => live.has(id))) as ReadonlySet<number>
+  }, [days, group])
+  const clearGroup = () => setGroup([])
 
   // 데이터가 새로 오면 팝오버 안의 Task 도 최신 값으로
   const liveTask = (t: TimeBlockTask) =>
@@ -125,6 +183,26 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
 
   // ⚠️ e.currentTarget 은 이벤트 처리 중에만 값이 있어요 → setState 콜백 밖에서 먼저 위치를 읽어 둬요
   const onSelectTask = (task: TimeBlockTask, e: MouseEvent<HTMLElement>) => {
+    // Shift · ⌘ · Ctrl + 클릭 → 묶음에 넣기/빼기 (상세 창은 열지 않아요)
+    if ((e.shiftKey || e.metaKey || e.ctrlKey) && groupable(task)) {
+      e.preventDefault()
+      const date = blockDay(task)
+      const all = days.flatMap((d) => d.tasks)
+      setGroup((g) => {
+        // 묶음은 같은 날 Task 끼리만 — 다른 날 Task 를 고르면 새로 시작해요
+        const sameDay = g.filter((id) => blockDay(all.find((x) => x.taskId === id) ?? task) === date)
+        // 처음 묶을 때 상세 창이 열려 있던 같은 날 Task 도 같이 넣어요
+        const seed =
+          !sameDay.length && opened?.kind === 'task' && opened.task.taskId !== task.taskId
+            ? [opened.task].filter((o) => groupable(o) && blockDay(o) === date).map((o) => o.taskId)
+            : []
+        const base = [...seed, ...sameDay]
+        return base.includes(task.taskId) ? base.filter((id) => id !== task.taskId) : [...base, task.taskId]
+      })
+      setOpened(null)
+      setConfirmDeleteId(null)
+      return
+    }
     const anchor = rectOf(e.currentTarget)
     setConfirmDeleteId(null)
     setOpened((o) => (o?.kind === 'task' && o.task.taskId === task.taskId ? null : { kind: 'task', task, anchor }))
@@ -186,6 +264,11 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     onUnschedule: (t: TimeBlockTask) => unschedule.mutate(t.taskId, { onSuccess: close }),
     // 삭제는 바로 지우지 않고 상세 창 안에 "삭제할까요?"를 띄워요 (Delete 키와 같음)
     onDelete: (t: TimeBlockTask) => setConfirmDeleteId(t.taskId),
+    chainSize: (t: TimeBlockTask) => chainOf(t, days).length,
+    onSelectChain: (t: TimeBlockTask) => {
+      setGroup(chainOf(t, days).map((x) => x.taskId))
+      close()
+    },
   }
 
   // ── Delete / Backspace 키로 삭제 ──
@@ -284,10 +367,56 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     setAsk(null)
   }
 
+  // 범위를 고르지 않고 떠나면(화면 이동 등) "이날만"으로 저장해요
+  const askRef = useRef<{ ask: ScopeAsk | null; save: (scope: ChangeScope) => void }>({ ask: null, save: () => {} })
+  useEffect(() => {
+    askRef.current = { ask, save: chooseScope }
+  })
+  useEffect(
+    () => () => {
+      if (askRef.current.ask) askRef.current.save('DAY')
+    },
+    []
+  )
+
+  // 묶음: Esc 로 풀기 (상세 창·범위 고르기가 떠 있을 땐 그쪽이 Esc 를 받아요)
+  useEffect(() => {
+    if (!group.length) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !opened && !ask && !editing) setGroup([])
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [group.length, opened, ask, editing])
+
   // ── 드래그 앤 드롭 (명세 3-4) ──
   const onDrop = (source: DragSource, target: DropTarget) => {
-    // 묻고 있던 게 있으면 원래대로 두고 새 드래그를 처리해요
-    if (ask) cancelAsk()
+    // 범위를 고르지 않고 다음 드래그를 하면 앞의 변경은 "이날만"으로 저장해요
+    if (ask) chooseScope('DAY')
+
+    // 묶음 드래그: 끈 만큼 묶음 전체를 같이 옮기고 한 번에 저장 (루틴도 이날만 바뀌어요)
+    if (source.kind === 'task' && source.group?.length && target.type === 'grid') {
+      const moves = groupMoves(source, target)
+      const ps: Pending[] = moves.map((m) => ({
+        kind: 'task',
+        taskId: m.task.taskId,
+        date: m.date,
+        start: m.start,
+        end: m.end,
+      }))
+      setPending((list) => [...list, ...ps])
+      rescheduleBatch.mutate(
+        {
+          items: moves.map((m) => ({
+            taskId: m.task.taskId,
+            plannedStartAt: toDateTime(m.date, m.start),
+            plannedEndAt: toDateTime(m.date, m.end),
+          })),
+        },
+        { onSettled: () => setPending((list) => list.filter((x) => !ps.includes(x))) }
+      )
+      return
+    }
     const p: Pending | null =
       source.kind === 'task'
         ? target.type === 'grid'
@@ -435,7 +564,39 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
           })}
           onChoose={chooseScope}
           onCancel={cancelAsk}
+          onDismiss={() => chooseScope('DAY')}
         />
+      )}
+
+      {/* 묶음 드래그 안내 */}
+      {groupIds.size > 0 && !ask && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+          <div
+            role="status"
+            className="bg-ink pointer-events-auto flex max-w-[560px] items-center gap-2 rounded-full py-2 pr-2 pl-4 text-[13px] text-white shadow-[0_8px_24px_rgb(17_17_17/0.25)]"
+          >
+            <Link2 className="size-4 shrink-0" />
+            <span className="min-w-0">
+              {groupIds.size > 1 ? (
+                <>
+                  <b>{groupIds.size}개 묶음</b> · 하나를 끌면 같이 움직여요
+                </>
+              ) : (
+                <>
+                  <b>1개 선택</b> · Shift(⌘)+클릭으로 더 묶어요
+                </>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={clearGroup}
+              className="flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold hover:bg-white/15"
+            >
+              <X className="size-3.5" />
+              묶음 풀기
+            </button>
+          </div>
+        </div>
       )}
     </>
   )
@@ -452,5 +613,7 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     close,
     toggleComplete,
     overlays,
+    /** 묶음 드래그로 같이 옮길 Task (TimeGrid groupIds 로 넘겨요) */
+    groupIds,
   }
 }

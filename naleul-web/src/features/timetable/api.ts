@@ -7,6 +7,7 @@ import type {
   LifePattern,
   MonthlyTimetableResponse,
   ReplanResponse,
+  TaskBatchScheduleResponse,
   TaskScheduleResponse,
   TimeBlockTask,
   TimetableResponse,
@@ -106,6 +107,21 @@ export function useRescheduleTask() {
         plannedEndAt: v.plannedEndAt,
       }),
     { success: (r) => scheduleResultMessage(r) }
+  )
+}
+
+/** 여러 Task 를 한 번에 옮기기 (묶음 드래그) — 하나라도 자리가 없으면 아무것도 바뀌지 않아요 */
+export function useRescheduleBatch() {
+  return useTimetableMutation(
+    (v: { items: { taskId: number; plannedStartAt: string; plannedEndAt: string }[] }) =>
+      api.patch<TaskBatchScheduleResponse>('/v1/tasks/schedule/batch', { items: v.items }),
+    {
+      success: (r, v) =>
+        scheduleResultMessage(r ? { ...r, task: r.tasks[0] } : null).replace(
+          '시간을 바꿨어요',
+          `${v.items.length}개를 함께 옮겼어요`
+        ),
+    }
   )
 }
 

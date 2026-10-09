@@ -8,6 +8,7 @@ import {
   Ellipsis,
   Flag,
   Layers,
+  Link2,
   Pin,
   PinOff,
   Pencil,
@@ -48,6 +49,10 @@ export interface TaskActions {
   onCompleteWithTime?: (t: TimeBlockTask) => void
   /** "이 시간에 다른 일을 했어요" — 계획 대신 실제로 한 일 기록 */
   onRecordInstead?: (t: TimeBlockTask) => void
+  /** 앞뒤로 바로 이어진 Task 개수 (자기 포함). 2개 이상이면 "묶어서 옮기기"를 보여줘요 */
+  chainSize?: (t: TimeBlockTask) => number
+  /** 이어진 Task 들을 묶음으로 선택 → 하나를 끌면 같이 움직여요 */
+  onSelectChain?: (t: TimeBlockTask) => void
 }
 
 /** 어떤 작업을 할 수 있는지 (백엔드 규칙과 같게) */
@@ -258,6 +263,7 @@ export function TaskDetail({
   const [draft, setDraft] = useState({ emoji: '', name: '' })
   const perm = taskPermissions(t)
   const done = t.taskStatus === 'COMPLETED'
+  const chain = actions.onSelectChain ? (actions.chainSize?.(t) ?? 0) : 0
   const color = hexOf(t.goalColorCode)
   const actual = t.taskStatus === 'COMPLETED' && t.actualStartAt && t.actualEndAt ? t : null
 
@@ -551,7 +557,7 @@ export function TaskDetail({
             {!done && <Check className="size-4" strokeWidth={2.6} />}
             {done ? '완료 취소' : '완료'}
           </Button>
-          {(perm.unlock || perm.unschedule || perm.delete) && (
+          {(perm.unlock || perm.unschedule || perm.delete || chain > 1) && (
             <div className="relative">
               <Button
                 variant="secondary"
@@ -565,8 +571,19 @@ export function TaskDetail({
               {menuOpen && (
                 <div
                   role="menu"
-                  className="bg-surface shadow-pop border-line absolute right-0 bottom-12 z-10 w-44 overflow-hidden rounded-xl border py-1"
+                  className="bg-surface shadow-pop border-line absolute right-0 bottom-12 z-10 w-52 overflow-hidden rounded-xl border py-1"
                 >
+                  {chain > 1 && (
+                    <MenuItem
+                      onClick={() => {
+                        setMenuOpen(false)
+                        actions.onSelectChain?.(t)
+                      }}
+                    >
+                      <Link2 className="size-4" />
+                      이어진 {chain}개 묶어 옮기기
+                    </MenuItem>
+                  )}
                   {perm.unlock && (
                     <MenuItem onClick={() => actions.onUnlock(t)}>
                       <PinOff className="size-4" />
