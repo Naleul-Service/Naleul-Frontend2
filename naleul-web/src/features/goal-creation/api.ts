@@ -5,6 +5,7 @@ import type {
   DraftRequested,
   DraftResponse,
   GoalPlan,
+  PlanIntensity,
   PlanningStyle,
   SessionDetail,
   SlotsPatch,
@@ -64,6 +65,7 @@ export const goalCreationApi = {
     body: {
       feedback?: string
       planningStyle?: PlanningStyle
+      intensity?: PlanIntensity
       basePlan?: GoalPlan
     } = {}
   ) => api.post<DraftRequested>(`${BASE}/${sessionId}/drafts`, body),

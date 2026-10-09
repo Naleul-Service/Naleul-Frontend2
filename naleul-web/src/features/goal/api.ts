@@ -253,6 +253,36 @@ export interface GoalProgress {
   tasks: TaskProgress
   /** 최근 하루 회고 (최신순) */
   reflections?: GoalReflection[]
+  /** 끝난 목표의 결과 (진행 중이면 null) */
+  outcome?: GoalOutcome | null
+  /** 주간 점검 제안 — 2주 연속 실천률이 낮거나 높을 때만 내려와요 */
+  adjustment?: GoalAdjustment | null
+}
+
+/** 목표 결과: 달성 · 일부 달성 · 못 함 */
+export type OutcomeResult = 'ACHIEVED' | 'PARTIAL' | 'NOT_ACHIEVED'
+
+export interface GoalOutcome {
+  result: OutcomeResult
+  /** USER 직접 고름 · AUTO 기간이 끝나 자동 판정 */
+  source: 'USER' | 'AUTO'
+  metricPercent: number | null
+  routineRate: number | null
+  taskRate: number | null
+}
+
+export interface GoalAdjustment {
+  key: string
+  /** DOWN 하루 줄이기 · UP 하루 늘리기 */
+  direction: 'DOWN' | 'UP'
+  routineId: number
+  routineName: string
+  fromDays: number
+  toDays: number
+  day: JavaDayOfWeek
+  previousWeekRate: number
+  lastWeekRate: number
+  message: string
 }
 
 /** 그날 목표를 돌아본 느낌 */
@@ -328,5 +358,70 @@ export function useDeleteMetricLog(goalId: number) {
       qc.invalidateQueries({ queryKey: goalKeys.detail(goalId) })
       qc.invalidateQueries({ queryKey: goalKeys.list() })
     },
+  })
+}
+
+/** 루틴 요일이 바뀌면 Task · 시간표 · 진행 화면이 모두 달라져요 */
+function invalidateGoalPlan(qc: ReturnType<typeof useQueryClient>, goalId: number) {
+  qc.invalidateQueries({ queryKey: goalKeys.tasks(goalId) })
+  qc.invalidateQueries({ queryKey: goalKeys.heatmap(goalId) })
+  qc.invalidateQueries({ queryKey: goalKeys.detail(goalId) })
+  qc.invalidateQueries({ queryKey: timetableKeys.all })
+}
+
+/** 주간 점검 제안 적용 — 내일부터 루틴 요일이 바뀌어요 */
+export function useApplyAdjustment(goalId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (key: string) => api.post<GoalProgress>(`/v1/goal-categories/${goalId}/adjustments/apply`, { key }),
+    onSuccess: (data) => {
+      qc.setQueryData(goalKeys.progress(goalId), data)
+      invalidateGoalPlan(qc, goalId)
+      toast.success('내일부터 바뀐 요일로 진행해요.')
+    },
+    onError: (e) => {
+      toast.error(isApiError(e) ? e.message : '바꾸지 못했어요. 다시 시도해 주세요.')
+      // 이미 루틴이 바뀌었으면(STALE) 새 진행 정보로 제안을 다시 받아요
+      qc.invalidateQueries({ queryKey: goalKeys.progress(goalId) })
+    },
+  })
+}
+
+/** 주간 점검 제안 넘기기 — 같은 제안은 7일 동안 다시 안 보여요 */
+export function useDismissAdjustment(goalId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (key: string) => api.post<GoalProgress>(`/v1/goal-categories/${goalId}/adjustments/dismiss`, { key }),
+    onSuccess: (data) => qc.setQueryData(goalKeys.progress(goalId), data),
+    onError: (e) => toast.error(isApiError(e) ? e.message : '처리하지 못했어요. 다시 시도해 주세요.'),
+  })
+}
+
+/** 끝난 목표의 결과를 직접 고르기 (자동 판정을 덮어써요) */
+export function useUpdateOutcome(goalId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (result: OutcomeResult) => api.patch<GoalProgress>(`/v1/goal-categories/${goalId}/outcome`, { result }),
+    onSuccess: (data) => {
+      qc.setQueryData(goalKeys.progress(goalId), data)
+      toast.success('결과를 남겼어요.')
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : '저장하지 못했어요. 다시 시도해 주세요.'),
+  })
+}
+
+/** 목표 마무리 — 결과 · 소감과 함께 끝내요. 이후 예정된 Task 는 서버가 정리해요 */
+export function useCompleteGoal(goalId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { goalCategoryEndDate: string; achievement?: string | null; result: OutcomeResult }) =>
+      api.patch<GoalCategory>(`/v1/goal-categories/${goalId}/complete`, body),
+    onSuccess: () => {
+      toast.success('목표를 마무리했어요. 수고했어요!')
+      qc.invalidateQueries({ queryKey: goalKeys.progress(goalId) })
+      qc.invalidateQueries({ queryKey: goalKeys.list() })
+      invalidateGoalPlan(qc, goalId)
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : '마무리하지 못했어요. 다시 시도해 주세요.'),
   })
 }

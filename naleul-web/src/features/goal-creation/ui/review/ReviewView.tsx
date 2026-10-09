@@ -11,10 +11,10 @@ import { cn } from '@/lib/cn'
 import { isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
 import { goalCreationApi, goalCreationKeys } from '../../api'
-import { PLANNING_STYLE_LABEL } from '../../constants'
+import { PLAN_INTENSITY_DESCRIPTION, PLAN_INTENSITY_LABEL, PLANNING_STYLE_LABEL } from '../../constants'
 import { markStyleSelectedByUser, wasStyleSelectedByUser } from '../../planningStyleMemory'
 import { goalFlowPath } from '../../routes'
-import type { PlanningStyle, SessionDetail, SlotKey, SlotsPatch } from '../../types'
+import type { PlanIntensity, PlanningStyle, SessionDetail, SlotKey, SlotsPatch } from '../../types'
 import { MustDoPicker, withDraft } from '../MustDoPicker'
 import { FlowShell } from '../SessionGate'
 import { SlotEditModal } from './SlotEditModal'
@@ -71,6 +71,8 @@ export function ReviewView({ session }: { session: SessionDetail }) {
   const [style, setStyle] = useState<PlanningStyle>(aiStyle)
   const [styleByUser, setStyleByUser] = useState(() => wasStyleSelectedByUser(sessionId))
   const [generating, setGenerating] = useState(false)
+  // 계획 강도 — 기본은 안정형. 초안 화면에서 바꾸면 한 번 다시 만들어요
+  const [intensity, setIntensity] = useState<PlanIntensity>('STEADY')
 
   const openEdit = (slot: SlotKey) => {
     setSaveError(null)
@@ -116,7 +118,10 @@ export function ReviewView({ session }: { session: SessionDetail }) {
     setGenerating(true)
     try {
       // 성향은 사용자가 직접 골랐을 때만 보내요 (안 보내면 서버가 대화에서 추정한 값 사용)
-      const res = await goalCreationApi.requestDraft(sessionId, styleByUser ? { planningStyle: style } : {})
+      const res = await goalCreationApi.requestDraft(sessionId, {
+        intensity,
+        ...(styleByUser ? { planningStyle: style } : {}),
+      })
       queryClient.removeQueries({ queryKey: goalCreationKeys.session(sessionId) })
       router.replace(goalFlowPath.generating(sessionId, res.draftId))
     } catch (error) {
@@ -194,6 +199,36 @@ export function ReviewView({ session }: { session: SessionDetail }) {
                       {PLANNING_STYLE_LABEL[value]}
                     </span>
                     <span className="text-ink-3 mt-1 block text-[13px]">{STYLE_DESCRIPTION[value]}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </Section>
+
+          <Section
+            title="계획 강도"
+            aside={<span className="text-ink-3 text-xs">최근 실천 기록에 맞춰 양을 정해요</span>}
+          >
+            <div className="grid grid-cols-2 gap-3" role="radiogroup" aria-label="계획 강도">
+              {(['STEADY', 'CHALLENGE'] as const).map((value) => {
+                const selected = intensity === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setIntensity(value)}
+                    className={cn(
+                      'rounded-2xl border p-4 text-left transition-colors',
+                      selected ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
+                    )}
+                  >
+                    <span className={cn('block text-[15px] font-bold', selected && 'text-brand')}>
+                      {PLAN_INTENSITY_LABEL[value]}
+                      {value === 'STEADY' && <span className="text-ink-3 ml-1.5 text-xs font-medium">추천</span>}
+                    </span>
+                    <span className="text-ink-3 mt-1 block text-[13px]">{PLAN_INTENSITY_DESCRIPTION[value]}</span>
                   </button>
                 )
               })}

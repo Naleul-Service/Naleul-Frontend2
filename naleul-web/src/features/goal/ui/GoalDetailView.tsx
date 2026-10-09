@@ -17,6 +17,7 @@ import { EditingContext } from '../edit/inline'
 import { dDayLabel, periodProgress } from '../format'
 import { GoalAiEditBar } from './GoalAiEditBar'
 import { GoalHeader, GoalNotes } from './GoalHeader'
+import { GoalAdjustmentBanner, GoalOutcomeSection, GoalWrapUpSection } from './GoalOutcomeSection'
 import { GoalTaskList } from './GoalTaskList'
 import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
 import { DailyCheckInCard } from './progress/DailyCheckInCard'
@@ -240,12 +241,20 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
  *  - 오른쪽: 수치 기록 · Task 실천률 · 접어 둔 "세부 구조"(마일스톤 · 세부 목표)
  */
 function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
+  const completed = goal.goalCategoryStatus === 'COMPLETED'
+  const ongoing = !goal.temporary && goal.goalCategoryStatus === 'IN_PROGRESS'
   return (
     <>
       {/* 임시 목표는 기간·수치가 없어 진행률이 의미 없어요 → 구체화 카드만 보여줘요 */}
       {!goal.temporary && (
         <div className="mt-6">
           <Hero goal={goal} />
+        </div>
+      )}
+      {/* 주간 점검: 2주 연속 너무 힘들거나 너무 쉬우면 루틴 하루 빼기/더하기 제안 */}
+      {ongoing && (
+        <div className="mt-4 empty:hidden">
+          <GoalAdjustmentBanner goal={goal} />
         </div>
       )}
       {/* 사용자가 매일 채우는 칸 — 진행 요약 바로 아래에 크게 (수치 · 오늘 어땠는지 · 무엇을 했는지) */}
@@ -273,10 +282,12 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
         </div>
 
         <div className="space-y-5">
+          {completed && !goal.temporary && <GoalOutcomeSection goal={goal} />}
           {/* 목표 지점까지 지금 어디쯤인지 (수치 기록 그래프 · Task 누적) */}
           {!goal.temporary && <ProgressSection goal={goal} />}
           <TaskRateSection goal={goal} />
           <StructurePanel goal={goal} />
+          {ongoing && <GoalWrapUpSection goal={goal} />}
           {goal.achievement && (
             <Section title="달성 기록">
               <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{goal.achievement}</p>

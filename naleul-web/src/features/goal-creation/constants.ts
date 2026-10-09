@@ -1,8 +1,18 @@
-import type { PlanningStyle } from './types'
+import type { PlanIntensity, PlanningStyle } from './types'
 
 export const PLANNING_STYLE_LABEL: Record<PlanningStyle, string> = {
   PLANNER: '차근차근 계획형',
   SPONTANEOUS: '몰아서 하는 즉흥형',
+}
+
+export const PLAN_INTENSITY_LABEL: Record<PlanIntensity, string> = {
+  STEADY: '안정형',
+  CHALLENGE: '도전형',
+}
+
+export const PLAN_INTENSITY_DESCRIPTION: Record<PlanIntensity, string> = {
+  STEADY: '지금 실천량에 맞춰 작게 시작해 꾸준히 이어가요',
+  CHALLENGE: '조금 더 빡빡하게, 평소보다 한 단계 높여 잡아요',
 }
 
 /** 시작 화면의 예시 목표 칩 */

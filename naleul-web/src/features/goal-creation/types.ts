@@ -9,6 +9,8 @@ export type SessionStatus =
 export type SlotKey = 'goalStatement' | 'metric' | 'motivation' | 'deadline' | 'practicePreference'
 export type SlotStatus = 'EMPTY' | 'FILLED' | 'SKIPPED'
 export type PlanningStyle = 'PLANNER' | 'SPONTANEOUS'
+/** 계획 강도 — 안정형(기본)은 지금 실력 기준, 도전형은 조금 더 높게 */
+export type PlanIntensity = 'STEADY' | 'CHALLENGE'
 export type DayOfWeek = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN'
 
 export interface Slot<T> {
@@ -180,6 +182,19 @@ export interface GoalPlan {
   milestones: PlanMilestone[]
   tasks: PlanTask[]
   warnings: PlanIssue[]
+  /** 이 계획이 나에게 어떻게 맞춰졌는지 (기존 초안엔 없을 수 있어요) */
+  fit?: PlanFit | null
+}
+
+export interface PlanFit {
+  intensity: PlanIntensity
+  /** 이 사용자 기준 루틴 주간 상한 (분) */
+  weeklyCapMinutes: number
+  /** 이 계획의 루틴 주간 합계 (분) */
+  planWeeklyMinutes: number
+  /** 최근 4주 실행 기록을 바탕으로 했는지 */
+  basedOnHistory: boolean
+  notes: string[]
 }
 
 // ─── 초안 생성 / 폴링 ─────────────────────────────────────────────

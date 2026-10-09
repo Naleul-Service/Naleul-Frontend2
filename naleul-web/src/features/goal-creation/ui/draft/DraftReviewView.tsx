@@ -4,7 +4,15 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, ChevronDown, CornerDownLeft, MessageSquareText, RefreshCw, Sparkles } from 'lucide-react'
+import {
+  AlertTriangle,
+  ChevronDown,
+  CornerDownLeft,
+  MessageSquareText,
+  RefreshCw,
+  Sparkles,
+  UserCheck,
+} from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
@@ -14,10 +22,18 @@ import { toast } from '@/stores/toastStore'
 import { useUserColors } from '@/features/color/api'
 import { goalKeys } from '@/features/goal/api'
 import { goalCreationApi, goalCreationKeys } from '../../api'
-import { PLANNING_STYLE_LABEL } from '../../constants'
+import { PLAN_INTENSITY_DESCRIPTION, PLAN_INTENSITY_LABEL, PLANNING_STYLE_LABEL } from '../../constants'
 import { markStyleSelectedByUser, wasStyleSelectedByUser } from '../../planningStyleMemory'
 import { goalFlowPath } from '../../routes'
-import type { DraftResponse, GoalPlan, PlanIssue, PlanningStyle, SessionDetail } from '../../types'
+import type {
+  DraftResponse,
+  GoalPlan,
+  PlanFit,
+  PlanIntensity,
+  PlanIssue,
+  PlanningStyle,
+  SessionDetail,
+} from '../../types'
 import { useAiUsage, usageItem, usageKeys } from '@/features/usage/api'
 import { UsageLine } from '@/features/usage/ui/UsageLine'
 import { FlowShell } from '../SessionGate'
@@ -31,7 +47,15 @@ import {
   RoutinesCard,
   SubGoalsCard,
 } from './PlanSections'
-import { LIMITS, groupIssues, isRoutine, itemKeyOf, normalizePlan, validatePlan } from './planUtils'
+import {
+  LIMITS,
+  groupIssues,
+  isRoutine,
+  itemKeyOf,
+  normalizePlan,
+  validatePlan,
+  weeklyRoutineMinutes,
+} from './planUtils'
 
 const FEEDBACK_MAX = 200
 
@@ -84,6 +108,8 @@ export function DraftReviewView({ session, draft }: Props) {
   const [regenerating, setRegenerating] = useState(false)
   const [styleOpen, setStyleOpen] = useState(false)
   const [pendingStyle, setPendingStyle] = useState<PlanningStyle | null>(null)
+  const [intensityOpen, setIntensityOpen] = useState(false)
+  const [pendingIntensity, setPendingIntensity] = useState<PlanIntensity | null>(null)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [quickFix, setQuickFix] = useState('')
@@ -198,7 +224,12 @@ export function DraftReviewView({ session, draft }: Props) {
   }
 
   // ── 다시 생성 / 성향 변경 ──────────────────────────────────
-  const regenerate = async (body: { feedback?: string; planningStyle?: PlanningStyle; basePlan?: GoalPlan }) => {
+  const regenerate = async (body: {
+    feedback?: string
+    planningStyle?: PlanningStyle
+    intensity?: PlanIntensity
+    basePlan?: GoalPlan
+  }) => {
     setRegenerating(true)
     try {
       const res = await goalCreationApi.requestDraft(sessionId, body)
@@ -241,6 +272,15 @@ export function DraftReviewView({ session, draft }: Props) {
     markStyleSelectedByUser(sessionId)
     setPendingStyle(null)
     regenerate({ planningStyle: pendingStyle })
+  }
+
+  /** 강도 변경 — 서버가 이 사용자 기준 상한을 다시 계산해서 처음부터 다시 만들어요 (강도 선택은 다음 재생성에도 유지돼요) */
+  const changeIntensity = () => {
+    if (!pendingIntensity) return
+    const style = wasStyleSelectedByUser(sessionId) ? plan.goal.planningStyle : undefined
+    const next = pendingIntensity
+    setPendingIntensity(null)
+    regenerate({ intensity: next, ...(style ? { planningStyle: style } : {}) })
   }
 
   // ── 확정 ────────────────────────────────────────────────────
@@ -311,15 +351,22 @@ export function DraftReviewView({ session, draft }: Props) {
     session.mustDoItems?.length ? `꼭 할 일: ${session.mustDoItems.join(' · ')}` : null,
   ].filter(Boolean)
 
+  const currentIntensity: PlanIntensity = plan.fit?.intensity ?? 'STEADY'
+  const chipClass =
+    'border-line-strong text-ink-2 hover:border-ink-4 inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-xs font-semibold'
   const styleChip = (
-    <button
-      type="button"
-      onClick={() => setStyleOpen(true)}
-      className="border-line-strong text-ink-2 hover:border-ink-4 inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-xs font-semibold"
-    >
-      {PLANNING_STYLE_LABEL[plan.goal.planningStyle]}
-      <ChevronDown className="size-3" />
-    </button>
+    <>
+      <button type="button" onClick={() => setStyleOpen(true)} className={chipClass}>
+        {PLANNING_STYLE_LABEL[plan.goal.planningStyle]}
+        <ChevronDown className="size-3" />
+      </button>
+      {plan.fit && (
+        <button type="button" onClick={() => setIntensityOpen(true)} className={chipClass}>
+          {PLAN_INTENSITY_LABEL[currentIntensity]}
+          <ChevronDown className="size-3" />
+        </button>
+      )}
+    </>
   )
 
   return (
@@ -362,6 +409,15 @@ export function DraftReviewView({ session, draft }: Props) {
               </Link>
             </div>
           </div>
+
+          {/* 이 계획이 나에게 어떻게 맞춰졌는지 */}
+          {plan.fit && (
+            <PlanFitCard
+              fit={plan.fit}
+              weeklyMinutes={weeklyRoutineMinutes(plan.tasks)}
+              onChangeIntensity={() => setIntensityOpen(true)}
+            />
+          )}
 
           {/* SOFT 경고 */}
           {plan.warnings.length > 0 && (
@@ -588,6 +644,43 @@ export function DraftReviewView({ session, draft }: Props) {
           })}
         </div>
       </Modal>
+      {/* 계획 강도 변경 */}
+      <Modal open={intensityOpen} onClose={() => setIntensityOpen(false)} title="계획 강도" size="sm">
+        <div className="space-y-2 pb-2">
+          {(['STEADY', 'CHALLENGE'] as const).map((value) => {
+            const current = currentIntensity === value
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  setIntensityOpen(false)
+                  if (!current) setPendingIntensity(value)
+                }}
+                className={cn(
+                  'w-full rounded-2xl border px-4 py-3.5 text-left',
+                  current ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
+                )}
+              >
+                <span className={cn('block text-[15px] font-semibold', current && 'text-brand')}>
+                  {PLAN_INTENSITY_LABEL[value]}
+                  {current && <span className="ml-2 text-xs font-medium">현재</span>}
+                </span>
+                <span className="text-ink-3 mt-0.5 block text-[13px]">{PLAN_INTENSITY_DESCRIPTION[value]}</span>
+              </button>
+            )
+          })}
+        </div>
+      </Modal>
+      <ConfirmDialog
+        open={!!pendingIntensity}
+        title={`${pendingIntensity ? PLAN_INTENSITY_LABEL[pendingIntensity] : ''}으로 바꿀까요?`}
+        description="루틴 양이 달라져서 계획을 처음부터 다시 만들어요. 직접 고친 내용은 사라져요."
+        confirmLabel="바꾸고 다시 만들기"
+        loading={regenerating}
+        onConfirm={changeIntensity}
+        onCancel={() => setPendingIntensity(null)}
+      />
       <ConfirmDialog
         open={!!pendingStyle}
         title="성향을 바꿀까요?"
@@ -610,5 +703,60 @@ export function DraftReviewView({ session, draft }: Props) {
         onCancel={() => setCancelOpen(false)}
       />
     </FlowShell>
+  )
+}
+
+function hoursText(minutes: number) {
+  if (minutes < 60) return `${minutes}분`
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return m ? `${h}시간 ${m}분` : `${h}시간`
+}
+
+/** "나에게 맞춘 점" — 서버가 실제 계획과 대조해 확인한 근거만 보여줘요 */
+function PlanFitCard({
+  fit,
+  weeklyMinutes,
+  onChangeIntensity,
+}: {
+  fit: PlanFit
+  /** 직접 고친 내용까지 반영한 지금 계획의 루틴 주간 합계 */
+  weeklyMinutes: number
+  onChangeIntensity: () => void
+}) {
+  const over = weeklyMinutes > fit.weeklyCapMinutes
+  return (
+    <div className="border-line bg-surface mt-4 rounded-2xl border px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="flex items-center gap-1.5 text-sm font-bold">
+          <UserCheck className="text-brand size-4" />
+          나에게 맞춘 점
+        </p>
+        <button
+          type="button"
+          onClick={onChangeIntensity}
+          className="text-ink-2 hover:text-ink text-[13px] font-semibold underline-offset-2 hover:underline"
+        >
+          {PLAN_INTENSITY_LABEL[fit.intensity]} · 바꾸기
+        </button>
+      </div>
+      <p className="text-ink-2 mt-1.5 text-[13px]">
+        루틴은 일주일에{' '}
+        <b className={cn('tabular-nums', over ? 'text-[#b45309]' : 'text-ink')}>{hoursText(weeklyMinutes)}</b>
+        <span className="text-ink-3"> · 내 기준 {hoursText(fit.weeklyCapMinutes)} 이내 추천</span>
+      </p>
+      {over && (
+        <p className="mt-1 text-[13px] text-[#b45309]">
+          지금 실천량보다 많아요. 처음엔 조금 줄여서 시작하면 끝까지 가기 쉬워요.
+        </p>
+      )}
+      {fit.notes.length > 0 && (
+        <ul className="text-ink-2 mt-1.5 space-y-0.5 text-[13px]">
+          {fit.notes.map((note) => (
+            <li key={note}>· {note}</li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
