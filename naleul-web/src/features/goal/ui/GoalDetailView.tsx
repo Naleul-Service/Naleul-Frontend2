@@ -104,20 +104,14 @@ function Hero({ goal }: { goal: GoalCategory }) {
 // ─── 기록형 목표 ───────────────────────────────────────────────
 
 /**
- * 기록형 목표 (회사 업무 등) — 진행률·마일스톤 대신 "완료한 Task"가 쌓이는 모습을 보여줘요.
- *  - 위: 이 목표에 대한 나의 패턴 (완료한 Task 기준 그래프)
- *  - 아래 왼쪽: 오늘 한 일 한 줄 기록 + 업무 일지 (완료한 Task + 직접 남긴 기록, 날짜별 · 복사)
- *  - 아래 오른쪽: (선택) 메모 · 반복 루틴 · Task
+ * 업무형(기록형) 목표 — 매일 쓰는 것을 위에, 돌아보는 통계는 아래에.
+ *  - 위 왼쪽: 오늘 한 일 한 줄 기록 + 업무 일지 (완료한 Task + 직접 남긴 기록, 날짜별 · 복사)
+ *  - 위 오른쪽: (선택) 메모 · 반복 루틴 · Task
+ *  - 아래: 이 목표에 대한 나의 패턴 (완료한 Task 기준 그래프)
  */
 function RecordGoalBody({ goal }: { goal: GoalCategory }) {
   return (
     <>
-      <section className="mt-6" aria-labelledby="record-pattern-heading">
-        <h2 id="record-pattern-heading" className="mb-3 text-[19px] font-bold">
-          이 목표에 대한 나의 패턴
-        </h2>
-        <RecordPatternSection goalId={goal.goalCategoryId} />
-      </section>
       <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-5">
           <RecordQuickLog goal={goal} />
@@ -130,6 +124,12 @@ function RecordGoalBody({ goal }: { goal: GoalCategory }) {
           <GoalTaskList goal={goal} />
         </div>
       </div>
+      <section className="mt-10" aria-labelledby="record-pattern-heading">
+        <h2 id="record-pattern-heading" className="mb-3 text-[19px] font-bold">
+          이 목표에 대한 나의 패턴
+        </h2>
+        <RecordPatternSection goalId={goal.goalCategoryId} />
+      </section>
     </>
   )
 }
