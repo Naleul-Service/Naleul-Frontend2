@@ -27,6 +27,15 @@ export interface RoutineSummary {
   /** 하는 방법 (AI 루틴: "스쿼트 4x10, 런지 3x12…") */
   description?: string | null
   durationMinutes?: number | null
+  /** 기본 시간과 다른 요일만 (예: 수요일만 07:00~07:25). 비어 있으면 모든 요일이 repeatStartTime~repeatEndTime */
+  dayTimes?: RoutineDayTime[]
+}
+
+/** 요일별 시간 — "HH:mm" 또는 "HH:mm:ss" */
+export interface RoutineDayTime {
+  dayOfWeek: JavaDayOfWeek
+  startTime: string
+  endTime: string
 }
 
 export interface SubGoalInfo {

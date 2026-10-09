@@ -153,6 +153,8 @@ export interface RoutineInput {
   notificationEnabled: boolean
   /** 하는 방법 — 수정 때 "" 를 보내면 지워져요 */
   description?: string
+  /** 요일별 시간 — 기본 시간과 다른 요일만. 수정 때 [] 를 보내면 모든 요일이 기본 시간으로 돌아가요 */
+  dayTimes?: { dayOfWeek: JavaDayOfWeek; startTime: string; endTime: string }[]
 }
 
 export const useCreateRoutine = (goalId: number) =>

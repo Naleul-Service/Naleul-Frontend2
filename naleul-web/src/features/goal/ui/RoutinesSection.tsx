@@ -20,6 +20,31 @@ import { JAVA_DAYS, JAVA_DAY_LABEL, formatDot, hhmm } from '../format'
 import { Section } from './sections'
 import { activeSubGoals, areasOf, bucketOf, defaultPeriod } from './SubGoalsSection'
 
+type DayTimeMap = Partial<Record<JavaDayOfWeek, { start: string; end: string }>>
+
+const toDayTimeMap = (routine?: RoutineSummary): DayTimeMap =>
+  Object.fromEntries(
+    (routine?.dayTimes ?? []).map((t) => [t.dayOfWeek, { start: hhmm(t.startTime) ?? '', end: hhmm(t.endTime) ?? '' }])
+  )
+
+/**
+ * 루틴 시간 한 줄 — 요일별 시간이 있으면 시간이 같은 요일끼리 묶어서
+ * "월·금 20:00~20:25 · 수 07:00~07:30"
+ */
+function routineTimeText(routine: RoutineSummary): string {
+  const base = hhmm(routine.repeatStartTime)
+  const baseEnd = hhmm(routine.repeatEndTime)
+  const fmt = (s: string | null, e: string | null) => (s ? `${s}${e ? `~${e}` : ''}` : '시간 자동')
+  if (!routine.dayTimes?.length) return fmt(base, baseEnd)
+  const groups = new Map<string, JavaDayOfWeek[]>()
+  for (const d of JAVA_DAYS.filter((x) => routine.repeatDays.includes(x))) {
+    const own = routine.dayTimes.find((t) => t.dayOfWeek === d)
+    const key = own ? fmt(hhmm(own.startTime), hhmm(own.endTime)) : fmt(base, baseEnd)
+    groups.set(key, [...(groups.get(key) ?? []), d])
+  }
+  return [...groups.entries()].map(([time, ds]) => `${ds.map((d) => JAVA_DAY_LABEL[d]).join('·')} ${time}`).join(' · ')
+}
+
 function DayChips({ days }: { days: JavaDayOfWeek[] }) {
   return (
     <span className="flex gap-1">
@@ -71,6 +96,33 @@ function RoutineForm({
   const [end, setEnd] = useState(routine?.repeatEndDate ?? (period.end < today ? today : period.end))
   const [notify, setNotify] = useState(routine?.notificationEnabled ?? true)
   const [howTo, setHowTo] = useState(routine?.description ?? '')
+  // 요일별 시간: 기본은 모든 요일 같은 시간, 원하면 요일마다 다르게 (기본과 다른 요일만 저장돼요)
+  const [perDay, setPerDay] = useState(!!routine?.dayTimes?.length)
+  const [dayTimes, setDayTimes] = useState<DayTimeMap>(() => toDayTimeMap(routine))
+
+  /** 요일별 칸에 보여줄 값 — 따로 정한 게 없으면 기본 시간 */
+  const timeOf = (d: JavaDayOfWeek) => dayTimes[d] ?? { start: startTime, end: endTime }
+  const setDayTime = (d: JavaDayOfWeek, key: 'start' | 'end', v: string) =>
+    setDayTimes((m) => ({ ...m, [d]: { ...timeOf(d), [key]: v } }))
+  const resetDay = (d: JavaDayOfWeek) =>
+    setDayTimes((m) => {
+      const next = { ...m }
+      delete next[d]
+      return next
+    })
+  const shownDays = JAVA_DAYS.filter((d) => days.includes(d))
+  // 기본 시간과 실제로 다른 요일만 보내요
+  const overrides = perDay
+    ? shownDays
+        .map((d) => ({ dayOfWeek: d, startTime: timeOf(d).start, endTime: timeOf(d).end }))
+        .filter((t) => t.startTime && t.endTime && (t.startTime !== startTime || t.endTime !== endTime))
+    : []
+  const badDay = perDay
+    ? shownDays.find((d) => {
+        const t = timeOf(d)
+        return !!t.start !== !!t.end || (t.start && t.end && t.start >= t.end)
+      })
+    : undefined
 
   const hadTime = !!routine?.repeatStartTime
   const oneTimeOnly = !!startTime !== !!endTime
@@ -86,7 +138,9 @@ function RoutineForm({
             ? '이미 정한 시간은 비울 수 없어요. 시간 없이 하려면 루틴을 다시 만들어 주세요.'
             : !start || !end || start > end
               ? '반복 기간을 확인해 주세요.'
-              : null
+              : badDay
+                ? `${JAVA_DAY_LABEL[badDay]}요일 시간을 확인해 주세요. (시작·종료를 함께, 종료가 더 늦게)`
+                : null
   const valid = !!name.trim() && !error
 
   const submit = () => {
@@ -101,6 +155,8 @@ function RoutineForm({
       repeatEndTime: endTime || null,
       notificationEnabled: notify,
       description: howTo.trim(),
+      // 수정: 요일별을 끄면 [] → 모든 요일이 기본 시간으로 돌아가요
+      dayTimes: overrides,
     }
     if (routine) update.mutate({ id: routine.routineId, ...body }, { onSuccess: onDone })
     else create.mutate(body, { onSuccess: onDone })
@@ -161,7 +217,7 @@ function RoutineForm({
         <DaysPicker value={days} onChange={setDays} />
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Field label="시작 시간 (선택)">
+        <Field label={perDay ? '기본 시작 시간' : '시작 시간 (선택)'}>
           <input
             type="time"
             step={600}
@@ -170,7 +226,7 @@ function RoutineForm({
             className={inlineInput}
           />
         </Field>
-        <Field label="종료 시간 (선택)">
+        <Field label={perDay ? '기본 종료 시간' : '종료 시간 (선택)'}>
           <input
             type="time"
             step={600}
@@ -190,6 +246,80 @@ function RoutineForm({
           </>
         )}
       </div>
+      {/* 요일별 시간 — 기본은 같은 시간, 필요할 때만 펼쳐요 */}
+      {days.length > 1 &&
+        (perDay ? (
+          <div className="bg-subtle/60 space-y-2 rounded-xl p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[13px] font-semibold">요일별 시간</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setPerDay(false)
+                  setDayTimes({})
+                }}
+                className="text-ink-3 hover:text-ink text-[12px] font-semibold underline"
+              >
+                모든 요일 같은 시간으로
+              </button>
+            </div>
+            <ul className="space-y-1.5">
+              {shownDays.map((d) => {
+                const t = timeOf(d)
+                const custom = !!dayTimes[d] && (t.start !== startTime || t.end !== endTime)
+                return (
+                  <li key={d} className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        'grid size-8 shrink-0 place-items-center rounded-lg text-[13px] font-bold',
+                        custom ? 'bg-brand text-white' : 'bg-surface text-ink-2'
+                      )}
+                    >
+                      {JAVA_DAY_LABEL[d]}
+                    </span>
+                    <input
+                      type="time"
+                      step={600}
+                      value={t.start}
+                      onChange={(e) => setDayTime(d, 'start', e.target.value)}
+                      aria-label={`${JAVA_DAY_LABEL[d]}요일 시작`}
+                      className={cn(inlineInput, 'h-9 min-w-0 flex-1')}
+                    />
+                    <span className="text-ink-4">~</span>
+                    <input
+                      type="time"
+                      step={600}
+                      value={t.end}
+                      onChange={(e) => setDayTime(d, 'end', e.target.value)}
+                      aria-label={`${JAVA_DAY_LABEL[d]}요일 종료`}
+                      className={cn(inlineInput, 'h-9 min-w-0 flex-1')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => resetDay(d)}
+                      disabled={!custom}
+                      className="text-ink-3 hover:text-ink w-12 shrink-0 text-[12px] font-semibold disabled:invisible"
+                    >
+                      기본으로
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+            <p className="text-ink-3 text-xs">
+              파란 요일만 기본 시간과 달라요. 비워 둔 요일은{' '}
+              {startTime && endTime ? `기본 시간(${startTime}~${endTime})` : '자동 배치'}을 따라요.
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setPerDay(true)}
+            className="text-brand self-start text-[13px] font-semibold"
+          >
+            + 요일마다 시간을 다르게 하기
+          </button>
+        ))}
       {!showPeriod && (
         <p className="text-ink-3 text-xs">
           {formatDot(start)} – {formatDot(end)} 동안 반복해요.{' '}
@@ -232,7 +362,6 @@ function RoutineRow({
   const del = useEditing(`del:${key}`)
   const remove = useDeleteRoutine()
   const start = hhmm(routine.repeatStartTime)
-  const end = hhmm(routine.repeatEndTime)
 
   if (edit.isOpen) {
     return (
@@ -267,8 +396,8 @@ function RoutineRow({
             <span className="bg-subtle text-ink-2 rounded-full px-2 py-0.5 text-[12px] font-medium">{subGoal}</span>
           )}
           <span>
-            {start ? `${start}${end ? `~${end}` : ''}` : '시간 자동'}
-            {!start && routine.durationMinutes ? ` · ${routine.durationMinutes}분` : ''}
+            {routineTimeText(routine)}
+            {!start && !routine.dayTimes?.length && routine.durationMinutes ? ` · ${routine.durationMinutes}분` : ''}
           </span>
         </p>
         {routine.description && (
