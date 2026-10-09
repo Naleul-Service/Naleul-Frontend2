@@ -20,7 +20,14 @@ const field =
  * Task 직접 추가 — 목표를 고르고, 이름·날짜·시간(선택)·영역(선택)을 정해 Enter.
  * 시간을 비워 두면 그날 "시간 미정"으로 들어가고, 바로 "AI로 빈 시간에 배치하기"를 누를 수 있어요.
  */
-export function ManualTaskAdd() {
+export function ManualTaskAdd({
+  inPanel = false,
+  onCreated,
+}: {
+  /** 캘린더 옆 패널 안 — 캘린더가 이미 보이므로 "캘린더에서 보기"는 숨겨요 */
+  inPanel?: boolean
+  onCreated?: (t: TimeBlockTask) => void
+} = {}) {
   const goals = useGoalCategories()
   const ongoing = (goals.data ?? []).filter((g) => isOngoing(g.goalCategoryStatus))
   const [goalId, setGoalId] = useState<number | null>(null)
@@ -90,7 +97,10 @@ export function ManualTaskAdd() {
             goal={goal.data}
             // 저장하면 폼을 비우고 다음 Task 를 바로 적을 수 있게
             onDone={() => setFormKey((k) => k + 1)}
-            onCreated={(t) => setAdded((a) => [t, ...a])}
+            onCreated={(t) => {
+              setAdded((a) => [t, ...a])
+              onCreated?.(t)
+            }}
           />
         ) : (
           <div className="grid min-h-[160px] place-items-center">
@@ -139,13 +149,15 @@ export function ManualTaskAdd() {
                 시간 미정 {unplaced.length}개 AI로 빈 시간에 배치하기
               </Button>
             )}
-            <Link
-              href={`/calendar?view=week&date=${(added[0].plannedStartAt ?? added[0].date ?? '').slice(0, 10)}`}
-              className={buttonClass('secondary', 'sm')}
-            >
-              <CalendarDays className="size-3.5" />
-              캘린더에서 보기
-            </Link>
+            {!inPanel && (
+              <Link
+                href={`/calendar?view=week&date=${(added[0].plannedStartAt ?? added[0].date ?? '').slice(0, 10)}`}
+                className={buttonClass('secondary', 'sm')}
+              >
+                <CalendarDays className="size-3.5" />
+                캘린더에서 보기
+              </Link>
+            )}
           </div>
         </div>
       )}

@@ -56,7 +56,8 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
         <Logo />
       </Link>
 
-      <Link href="/tasks/new" onClick={onNavigate} className={cn(buttonClass('primary', 'lg', true), 'mt-6')}>
+      {/* 캘린더를 보면서 추가하도록 캘린더 오른쪽 패널로 열어요 (/tasks/new 전체 화면도 그대로 있어요) */}
+      <Link href="/calendar?add=ai" onClick={onNavigate} className={cn(buttonClass('primary', 'lg', true), 'mt-6')}>
         <Plus className="size-4" strokeWidth={2.6} />
         Task 추가
       </Link>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { rectOf } from '@/components/ui/Popover'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { TaskAddPanel } from '@/features/brain-dump/ui/TaskAddPanel'
 import { useActivities, useTimetable } from '../api'
 import { visibleHours } from '../layout'
 import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst } from '../time'
@@ -19,6 +20,7 @@ import { TimeGrid } from './TimeGrid'
 import { useTimetableInteractions } from './useTimetableInteractions'
 
 export type CalendarMode = 'day' | 'week' | 'month'
+type AddMode = 'ai' | 'manual' | 'log'
 
 /** URL(?view=week&date=2026-11-18) ↔ 화면 상태 */
 function useCalendarParams() {
@@ -29,21 +31,29 @@ function useCalendarParams() {
   const view: CalendarMode = rawView === 'day' || rawView === 'month' ? rawView : 'week'
   const rawDate = params.get('date')
   const date = isYmd(rawDate) ? rawDate : todayKst()
+  // ?add=ai|manual|log → 오른쪽 Task 추가 패널 (사이드바 "Task 추가"가 여기로 와요)
+  const rawAdd = params.get('add')
+  const add: AddMode | null = rawAdd === 'ai' || rawAdd === 'manual' || rawAdd === 'log' ? rawAdd : rawAdd ? 'ai' : null
 
   const go = useCallback(
-    (next: { view?: CalendarMode; date?: string }) => {
+    (next: { view?: CalendarMode; date?: string; add?: AddMode | null }) => {
       const q = new URLSearchParams(params.toString())
       q.set('view', next.view ?? view)
       q.set('date', next.date ?? date)
+      const nextAdd = next.add === undefined ? add : next.add
+      if (nextAdd) q.set('add', nextAdd)
+      else q.delete('add')
       router.replace(`${pathname}?${q.toString()}`, { scroll: false })
     },
-    [params, router, pathname, view, date]
+    [params, router, pathname, view, date, add]
   )
-  return { view, date, go }
+  return { view, date, add, go }
 }
 
 export function CalendarView() {
-  const { view, date, go } = useCalendarParams()
+  const { view, date, add, go } = useCalendarParams()
+  // 패널에서 방금 추가한 Task — 캘린더에 NEW 로 표시
+  const [newIds, setNewIds] = useState<ReadonlySet<number>>(new Set())
   // 월간은 오른쪽 패널에 보여줄 "선택한 날" 하루만 불러와요 (달 전체 요약은 MonthView 가 따로)
   const start = view === 'week' ? startOfWeek(date) : date
   const end = view === 'week' ? addDays(start, 6) : date
@@ -79,36 +89,45 @@ export function CalendarView() {
 
   const today = todayKst()
   return (
-    <>
+    // 패널이 열려 있으면 xl 이상에서는 캘린더가 패널 폭만큼 비켜서 나란히 보여요
+    <div className={cn(add && 'xl:pr-[420px]')}>
       <PageHeader
         title="캘린더"
         description="블록을 눌러 배치 이유를 보고, 끌어서 시간을 바꿔요. 지난 빈 시간을 누르면 실제로 한 일을 남길 수 있어요."
         actions={
-          <div className="bg-subtle flex rounded-xl p-1" role="tablist" aria-label="보기">
-            {(
-              [
-                ['day', '일간'],
-                ['week', '주간'],
-                ['month', '월간'],
-              ] as const
-            ).map(([v, label]) => (
-              <button
-                key={v}
-                type="button"
-                role="tab"
-                aria-selected={view === v}
-                onClick={() => {
-                  close()
-                  go({ view: v })
-                }}
-                className={cn(
-                  'h-8 rounded-lg px-3.5 text-[13px] font-semibold transition-colors',
-                  view === v ? 'bg-surface text-ink shadow-card' : 'text-ink-3 hover:text-ink'
-                )}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            {!add && (
+              <Button size="sm" onClick={() => go({ add: 'ai', view: view === 'month' ? 'week' : view })}>
+                <Plus className="size-4" />
+                Task 추가
+              </Button>
+            )}
+            <div className="bg-subtle flex rounded-xl p-1" role="tablist" aria-label="보기">
+              {(
+                [
+                  ['day', '일간'],
+                  ['week', '주간'],
+                  ['month', '월간'],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="tab"
+                  aria-selected={view === v}
+                  onClick={() => {
+                    close()
+                    go({ view: v })
+                  }}
+                  className={cn(
+                    'h-8 rounded-lg px-3.5 text-[13px] font-semibold transition-colors',
+                    view === v ? 'bg-surface text-ink shadow-card' : 'text-ink-3 hover:text-ink'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         }
       />
@@ -217,6 +236,7 @@ export function CalendarView() {
             onDrop={onDrop}
             onDragStart={close}
             groupIds={groupIds}
+            highlightIds={newIds}
             onDayClick={(d) => {
               close()
               go({ view: 'day', date: d })
@@ -226,7 +246,19 @@ export function CalendarView() {
       )}
 
       {overlays}
-    </>
+
+      {add && (
+        <TaskAddPanel
+          mode={add}
+          onClose={() => go({ add: null })}
+          onAdded={(info) => {
+            setNewIds((prev) => new Set([...prev, ...info.taskIds]))
+            // 추가한 날이 지금 보는 기간 밖이면 그 주(날)로 옮겨요
+            if (info.date && (info.date < start || info.date > end)) go({ date: info.date })
+          }}
+        />
+      )}
+    </div>
   )
 }
 

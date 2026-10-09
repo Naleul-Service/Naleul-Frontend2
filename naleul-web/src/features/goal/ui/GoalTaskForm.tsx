@@ -171,39 +171,42 @@ export function GoalTaskForm({
       </div>
 
       {more && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <Field label="소요 시간 (분)">
-            <input
-              inputMode="numeric"
-              value={hasTime ? String(span) : f.duration}
-              onChange={(e) => set('duration', e.target.value)}
-              disabled={hasTime}
-              placeholder="30"
-              className={`${inlineInput} disabled:bg-subtle disabled:text-ink-3`}
-            />
-          </Field>
-          <Field label="마감일">
-            <input
-              type="date"
-              value={f.dueDate}
-              onChange={(e) => set('dueDate', e.target.value)}
-              className={inlineInput}
-            />
-          </Field>
-          <Field label="마일스톤" className="col-span-2 sm:col-span-1">
-            <select
-              value={f.milestone ?? ''}
-              onChange={(e) => set('milestone', e.target.value ? Number(e.target.value) : null)}
-              className={inlineInput}
-            >
-              <option value="">없음</option>
-              {milestones.map((m) => (
-                <option key={m.milestoneId} value={m.milestoneId}>
-                  {m.title}
-                </option>
-              ))}
-            </select>
-          </Field>
+        // 좁은 패널(캘린더 옆 Task 추가)에서도 맞게 화면 폭이 아니라 이 칸의 폭으로 나눠요
+        <div className="@container">
+          <div className="grid grid-cols-2 gap-2 @md:grid-cols-3">
+            <Field label="소요 시간 (분)">
+              <input
+                inputMode="numeric"
+                value={hasTime ? String(span) : f.duration}
+                onChange={(e) => set('duration', e.target.value)}
+                disabled={hasTime}
+                placeholder="30"
+                className={`${inlineInput} disabled:bg-subtle disabled:text-ink-3`}
+              />
+            </Field>
+            <Field label="마감일">
+              <input
+                type="date"
+                value={f.dueDate}
+                onChange={(e) => set('dueDate', e.target.value)}
+                className={inlineInput}
+              />
+            </Field>
+            <Field label="마일스톤" className="col-span-2 @md:col-span-1">
+              <select
+                value={f.milestone ?? ''}
+                onChange={(e) => set('milestone', e.target.value ? Number(e.target.value) : null)}
+                className={inlineInput}
+              >
+                <option value="">없음</option>
+                {milestones.map((m) => (
+                  <option key={m.milestoneId} value={m.milestoneId}>
+                    {m.title}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
         </div>
       )}
 
