@@ -8,8 +8,8 @@ import {
   Ellipsis,
   Flag,
   Layers,
-  Lock,
-  LockOpen,
+  Pin,
+  PinOff,
   Pencil,
   Repeat,
   Sparkles,
@@ -310,7 +310,7 @@ export function TaskDetail({
         {t.taskKind === 'APPOINTMENT' && <Badge tone="warning">약속</Badge>}
         {t.locked ? (
           <Badge>
-            <Lock className="size-3" />
+            <Pin className="size-3 rotate-45" />
             직접 정한 시간
           </Badge>
         ) : (
@@ -569,8 +569,8 @@ export function TaskDetail({
                 >
                   {perm.unlock && (
                     <MenuItem onClick={() => actions.onUnlock(t)}>
-                      <LockOpen className="size-4" />
-                      잠금 해제
+                      <PinOff className="size-4" />
+                      고정 풀기
                     </MenuItem>
                   )}
                   {perm.unschedule && (

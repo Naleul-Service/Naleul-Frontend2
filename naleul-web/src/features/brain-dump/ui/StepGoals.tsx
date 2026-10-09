@@ -237,7 +237,7 @@ function ItemRow({
               <span className="flex items-center gap-1">
                 <Clock className="size-3.5" />
                 {it.startTime.slice(0, 5)}
-                {it.endTime ? `–${it.endTime.slice(0, 5)}` : ''} 🔒
+                {it.endTime ? `–${it.endTime.slice(0, 5)}` : ''} 📌
               </span>
             )}
             <span>예상 {formatDuration(it.estimatedMinutes ?? 30)}</span>

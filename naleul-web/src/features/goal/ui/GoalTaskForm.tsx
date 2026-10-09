@@ -12,7 +12,7 @@ import { areasOf } from './SubGoalsSection'
 /**
  * 목표 상세에서 Task 추가·수정.
  * 이름과 날짜만 넣고 Enter 하면 그날 "시간 미정"으로 들어가고, 자동 배치가 빈 시간에 넣어 줘요.
- * 시간을 넣으면 그 시간에 바로 고정(🔒)돼요 — 다른 고정 일정과 겹치면 저장되지 않아요.
+ * 시간을 넣으면 그 시간에 바로 고정(📌)돼요 — 다른 고정 일정과 겹치면 저장되지 않아요.
  */
 export function GoalTaskForm({
   goal,

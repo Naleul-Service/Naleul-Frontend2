@@ -277,7 +277,7 @@ export function ItemEditModal({ item, goals, tempGoals, today, onSave, onClose, 
             <p className={timeInvalid ? 'text-danger mt-1 text-xs' : 'text-ink-3 mt-1 text-xs'}>
               {timeInvalid
                 ? '종료 시각이 시작 시각보다 늦어야 해요.'
-                : '시간을 정하면 그 시간에 고정(🔒)돼요. 비워 두면 AI가 빈 시간에 놓아요.'}
+                : '시간을 정하면 그 시간에 고정(📌)돼요. 비워 두면 AI가 빈 시간에 놓아요.'}
             </p>
           </div>
         )}

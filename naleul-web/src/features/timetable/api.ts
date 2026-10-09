@@ -87,7 +87,7 @@ export function useDeleteTask() {
 
 export function useUnlockTask() {
   return useTimetableMutation((taskId: number) => api.patch<TimeBlockTask>(`/v1/tasks/${taskId}/unlock`), {
-    success: () => '잠금을 풀었어요. 다음 자동 배치 때 옮겨질 수 있어요.',
+    success: () => '고정을 풀었어요. 다음 자동 배치 때 옮겨질 수 있어요.',
   })
 }
 
@@ -97,7 +97,7 @@ export function useUnscheduleTask() {
   })
 }
 
-/** 시간 변경 (드래그·직접 입력 공통). 저장하면 잠겨요. */
+/** 시간 변경 (드래그·직접 입력 공통). 저장하면 그 시간에 고정(📌)돼요. */
 export function useRescheduleTask() {
   return useTimetableMutation(
     (v: { taskId: number; plannedStartAt: string; plannedEndAt: string }) =>
@@ -251,7 +251,7 @@ export interface FillResponse {
 
 /**
  * POST /daily-plans/fill?startDate&endDate (최대 7일)
- * 직접 정한 시간(🔒)·이미 배치된 블록·고정 시간은 그대로 두고, 시간 미정 Task 만 남은 빈 시간에 넣어요.
+ * 직접 정한 시간(📌)·이미 배치된 블록·고정 시간은 그대로 두고, 시간 미정 Task 만 남은 빈 시간에 넣어요.
  * 오늘은 지금 + 10분 이후만 써요.
  */
 export function useFillTimetable() {

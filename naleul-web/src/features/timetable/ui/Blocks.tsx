@@ -1,7 +1,7 @@
 'use client'
 
 import type { CSSProperties, MouseEvent, PointerEvent } from 'react'
-import { Check, Lock, X } from 'lucide-react'
+import { Check, Pin, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { hexOf, shownTime, withAlpha, type Placed } from '../layout'
 import { formatMinutes, todayKst } from '../time'
@@ -54,7 +54,7 @@ const pos = (p: Placed<unknown>, g: Geometry): CSSProperties => ({
  * 블록 스타일 (명세 8)
  *  - 루틴: 연한 목표 색 + 왼쪽 진한 선
  *  - 일반 Task: 진한 목표 색 + 흰 글씨
- *  - 완료: ✓ 초록, 흐리게 / 놓침: ✕ 빨강 / 잠김: 🔒
+ *  - 완료: ✓ 초록, 흐리게 / 놓침: ✕ 빨강 / 직접 정한 시간: 📌 (자물쇠는 "못 움직인다"로 보여서 핀으로 — 드래그로 옮길 수 있어요)
  */
 export function taskColors(t: TimeBlockTask): CSSProperties {
   const c = hexOf(t.goalColorCode)
@@ -144,7 +144,12 @@ export function TaskBlock({
         {isNew && (
           <span className="bg-danger shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-white">NEW</span>
         )}
-        {t.locked && <Lock className={cn('size-3 shrink-0', solid ? 'text-white/85' : 'text-ink-3')} />}
+        {t.locked && (
+          <Pin
+            aria-label="직접 정한 시간"
+            className={cn('size-3 shrink-0 rotate-45', solid ? 'text-white/85' : 'text-ink-3')}
+          />
+        )}
       </span>
       {heightPx >= 34 && (
         <span className={cn('mt-0.5 truncate', solid ? 'text-white/80' : 'text-ink-3')}>

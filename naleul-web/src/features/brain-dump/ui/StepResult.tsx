@@ -78,7 +78,7 @@ export function StepResult({
               {result.placements.length}개를 배치했어요
               {result.movedToOtherDays.length > 0 && ` · 다른 날로 ${result.movedToOtherDays.length}개`}
               {result.unscheduled.length > 0 && ` · 시간 미정 ${result.unscheduled.length}개`}. 블록을 끌어서 옮기면 그
-              시간으로 잠겨요.
+              시간에 고정돼요.
             </p>
           </div>
           <div className="flex gap-2">
@@ -154,7 +154,7 @@ export function StepResult({
               key={p.taskId}
               title={p.title}
               when={`${formatMonthDay(p.date)} ${hm(p.start)}–${hm(p.end)}`}
-              reason="직접 정한 시간이에요 🔒"
+              reason="직접 정한 시간이에요 📌"
             />
           ))}
           {result.placements.length === 0 && <li className="text-ink-3 text-sm">그날 안에 놓인 Task가 없어요.</li>}

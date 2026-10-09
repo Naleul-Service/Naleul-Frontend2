@@ -19,7 +19,7 @@ export function unplacedOf(days: TimetableDay[], today: string) {
 
 /**
  * 캘린더 위 "AI로 TimeTable 배치하기" 띠.
- * 시간 미정 Task 가 있을 때만 버튼이 켜져요. 직접 정한 시간(🔒)과 고정 시간은 그대로 두고 남은 빈 시간에 넣어요.
+ * 시간 미정 Task 가 있을 때만 버튼이 켜져요. 직접 정한 시간(📌)과 고정 시간은 그대로 두고 남은 빈 시간에 넣어요.
  */
 export function AutoPlaceBar({ days, today }: { days: TimetableDay[]; today: string }) {
   const fill = useFillTimetable()
@@ -48,7 +48,7 @@ export function AutoPlaceBar({ days, today }: { days: TimetableDay[]; today: str
           {active ? `아직 시간이 정해지지 않은 Task가 ${total}개 있어요` : '모든 Task가 TimeTable에 배치돼 있어요'}
         </p>
         <p className="text-ink-3 text-xs leading-relaxed">
-          직접 정한 시간(🔒)과 고정 시간은 그대로 두고, 남은 빈 시간에 집중이 잘 되는 시간대부터 넣어요.
+          직접 정한 시간(📌)과 고정 시간은 그대로 두고, 남은 빈 시간에 집중이 잘 되는 시간대부터 넣어요.
           {targets.some((d) => d.date === today) && ' 오늘은 지금 이후 시간만 써요.'}
         </p>
       </div>

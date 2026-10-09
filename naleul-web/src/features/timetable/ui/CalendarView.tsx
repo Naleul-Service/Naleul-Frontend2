@@ -244,7 +244,7 @@ function Legend() {
         <span className="border-line-strong size-2.5 rounded-sm border" style={HATCH} />
         고정 시간
       </li>
-      <li className={item}>🔒 직접 정한 시간</li>
+      <li className={item}>📌 직접 정한 시간</li>
       <li className={item}>
         <span className="border-success border-line bg-surface size-2.5 rounded-sm border border-l-2" />
         실제로 한 일
