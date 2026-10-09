@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { BarChart3, Bell, CalendarPlus, ChevronRight, Clock, FileText, type LucideIcon } from 'lucide-react'
+import { BarChart3, Bell, CalendarPlus, ChevronRight, Clock, Crown, FileText, type LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { LogoutButton } from '@/features/account/ui/LogoutButton'
@@ -13,6 +13,12 @@ import { COOKIE, type UserRole } from '@/lib/server/session'
 export const metadata: Metadata = { title: '설정' }
 
 const ITEMS: { href: string; icon: LucideIcon; title: string; description: string }[] = [
+  {
+    href: '/settings/membership',
+    icon: Crown,
+    title: '멤버십',
+    description: 'Pro 구독 · 결제 카드 · 결제 내역',
+  },
   {
     href: '/settings/life-pattern',
     icon: Clock,
