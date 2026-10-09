@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
 import { goalKeys, type GoalCategory, type JavaDayOfWeek } from '@/features/goal/api'
@@ -19,6 +19,7 @@ export const recordKeys = {
   all: ['record'] as const,
   goal: (goalId: number) => [...recordKeys.all, 'goal', goalId] as const,
   pattern: (goalId: number) => [...recordKeys.all, 'pattern', goalId] as const,
+  journal: (goalId: number) => [...recordKeys.all, 'journal', goalId] as const,
 }
 
 // ── 기록형 목표 만들기 ──────────────────────────────────────────
@@ -104,14 +105,6 @@ export function useLogActivities() {
   })
 }
 
-/** 목표에 쌓인 기록, 최근 것부터 */
-export function useGoalActivities(goalId: number, size = 60) {
-  return useQuery({
-    queryKey: recordKeys.goal(goalId),
-    queryFn: async () => (await api.get<ActualActivity[]>(`/v1/activities/goals/${goalId}?size=${size}`)) ?? [],
-  })
-}
-
 export function useDeleteRecord() {
   const qc = useQueryClient()
   return useMutation({
@@ -135,41 +128,47 @@ export type TimeBand = 'DAWN' | 'MORNING' | 'AFTERNOON' | 'EVENING'
 export interface RecordPeriodStat {
   start: string
   end: string
+  /** 완료한 Task 수 */
+  count: number
+  /** 시간을 알 수 있는 Task 의 시간 합 */
   minutes: number
-  records: number
   activeDays: number
-  /** 한 번 기록에 평균 몇 분 (기록이 없으면 null) */
-  avgSessionMinutes: number | null
 }
 
+/**
+ * 이 목표의 완료한 Task(일반 + 루틴) 기준 패턴.
+ * Task 날짜: 실제 시각 → 계획 시각 → 루틴 날짜 → 권장일 → 완료 버튼 누른 시각.
+ * 직접 남긴 "한 일" 기록은 섞지 않아요 (업무 일지에서 함께 보여줘요).
+ */
 export interface RecordPattern {
   summary: {
+    totalCount: number
     totalMinutes: number
-    totalRecords: number
     activeDays: number
-    firstRecordDate: string | null
+    firstDoneDate: string | null
     /** 최근 4주 (오늘 포함 28일) */
     recent: RecordPeriodStat
     /** 그 전 4주 */
     previous: RecordPeriodStat
-    /** 기록이 있는 주가 몇 주째 이어지는지 (이번 주가 비었으면 지난주까지) */
+    /** 완료한 Task 가 있는 주가 몇 주째 이어지는지 (이번 주가 비었으면 지난주까지) */
     weekStreak: number
-    thisWeekRecorded: boolean
+    thisWeekDone: boolean
   }
   rhythm: {
     /** 잔디 시작일 (월요일) */
     heatmapStart: string
-    /** 기록이 있는 날만 */
-    days: { date: string; minutes: number; count: number }[]
+    /** 완료가 있는 날만 */
+    days: { date: string; count: number; minutes: number }[]
     /** 최근 12주, 오래된 것부터 (빈 주 포함) */
-    weeks: { weekStart: string; minutes: number; count: number; cumulativeMinutes: number }[]
+    weeks: { weekStart: string; count: number; minutes: number; cumulativeCount: number; cumulativeMinutes: number }[]
   }
   when: {
-    cells: { dayOfWeek: JavaDayOfWeek; band: TimeBand; minutes: number; count: number }[]
-    weekdays: { dayOfWeek: JavaDayOfWeek; minutes: number; count: number }[]
-    bands: { band: TimeBand; minutes: number; count: number }[]
+    cells: { dayOfWeek: JavaDayOfWeek; band: TimeBand; count: number; minutes: number }[]
+    bands: { band: TimeBand; count: number; minutes: number }[]
     peakDay: JavaDayOfWeek | null
     peakBand: TimeBand | null
+    /** 시각을 몰라서 표에서 뺀 Task 수 (시간 미정으로 완료) */
+    untimedCount: number
   }
   /** 목표에 루틴이 없으면 items 가 비어 있어요 → 카드를 숨겨요 */
   routines: {
@@ -195,10 +194,57 @@ export interface RecordRoutineStat {
   previousCount: number
 }
 
-/** 기록을 남기거나 지우면 recordKeys.all 이 무효화돼서 같이 다시 불러와요 */
+/** 기록을 남기거나 지우면 recordKeys.all 이 무효화돼서 같이 다시 불러와요 (Task 완료 토글도 같이) */
 export function useRecordPattern(goalId: number) {
   return useQuery({
     queryKey: recordKeys.pattern(goalId),
     queryFn: () => api.get<RecordPattern>(`/v1/activities/goals/${goalId}/pattern`),
+  })
+}
+
+// ── 업무 일지 (GET /activities/goals/{id}/journal) ──
+
+/** TASK: 완료한 Task · RECORD: 직접 남긴 기록 */
+export interface JournalItem {
+  type: 'TASK' | 'RECORD'
+  id: number
+  title: string
+  emoji: string | null
+  /** 모르면 null (시간 미정으로 완료한 Task) */
+  startAt: string | null
+  endAt: string | null
+  minutes: number | null
+  /** 루틴 Task 인지 */
+  routine: boolean
+  memo: string | null
+}
+
+export interface JournalDay {
+  date: string
+  taskCount: number
+  recordCount: number
+  /** 시간을 알 수 있는 항목의 합 */
+  minutes: number
+  /** 시각순 (시각 없는 Task 는 뒤로) */
+  items: JournalItem[]
+}
+
+export interface RecordJournal {
+  /** 최근 날짜부터 */
+  days: JournalDay[]
+  /** 더 오래된 일지가 있으면 다음 쪽을 부를 날짜 (없으면 null) */
+  nextBefore: string | null
+}
+
+/** 업무 일지 — 2주씩, "더 보기"로 과거를 이어 불러요 */
+export function useRecordJournal(goalId: number) {
+  return useInfiniteQuery({
+    queryKey: recordKeys.journal(goalId),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) =>
+      api.get<RecordJournal>(
+        `/v1/activities/goals/${goalId}/journal?days=14${pageParam ? `&before=${pageParam}` : ''}`
+      ),
+    getNextPageParam: (last) => last.nextBefore ?? undefined,
   })
 }

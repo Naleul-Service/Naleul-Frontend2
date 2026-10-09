@@ -4,27 +4,25 @@ import { NotEnough, Section } from '@/features/pattern/ui/Section'
 import type { RecordPattern } from '../../api'
 import { BAND_LABEL, BAND_RANGE, BANDS, LEVEL_BG, levelOf, shortDuration } from './format'
 
-/** 언제 이 일을 하나요? — 요일 × 시간대 (시작 시각 기준, 처음부터 쌓인 시간) */
+/** 언제 이 일을 하나요? — 요일 × 시간대 (완료한 Task 의 실제·계획 시각 기준, 처음부터) */
 export function RecordWhenCard({
   when,
-  totalRecords,
   wide = false,
 }: {
   when: RecordPattern['when']
-  totalRecords: number
   /** 한 줄을 혼자 쓸 때(루틴 카드가 없을 때): 넓은 화면에서 표와 강조 박스를 옆으로 나란히 */
   wide?: boolean
 }) {
-  const total = when.bands.reduce((n, b) => n + b.minutes, 0)
+  const total = when.bands.reduce((n, b) => n + b.count, 0)
   const cell = new Map(when.cells.map((c) => [`${c.dayOfWeek}-${c.band}`, c]))
-  const max = Math.max(0, ...when.cells.map((c) => c.minutes))
+  const max = Math.max(0, ...when.cells.map((c) => c.count))
   const peak = when.peakDay && when.peakBand ? cell.get(`${when.peakDay}-${when.peakBand}`) : null
-  const topBand = [...when.bands].sort((a, b) => b.minutes - a.minutes)[0]
+  const topBand = [...when.bands].sort((a, b) => b.count - a.count)[0]
 
   return (
     <Section title="언제 이 일을 하나요?" aside="요일 × 시간대">
-      {totalRecords < 3 ? (
-        <NotEnough>기록이 3개 이상 쌓이면 주로 언제 하는지 보여드려요</NotEnough>
+      {total < 3 ? (
+        <NotEnough>시간을 정한 Task를 3개 이상 완료하면 주로 언제 하는지 보여드려요</NotEnough>
       ) : (
         <div className={wide ? 'xl:grid xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start xl:gap-6' : undefined}>
           <table className="w-full border-separate border-spacing-[3px] text-center">
@@ -47,11 +45,11 @@ export function RecordWhenCard({
                   </th>
                   {BANDS.map((b) => {
                     const c = cell.get(`${d}-${b}`)
-                    const level = c ? levelOf(c.minutes, max) : 0
+                    const level = c ? levelOf(c.count, max) : 0
                     return (
                       <td
                         key={b}
-                        title={`${DAY_SHORT[d]} ${BAND_LABEL[b]} · ${c?.minutes ? `${shortDuration(c.minutes)}, ${c.count}개` : '기록 없음'}`}
+                        title={`${DAY_SHORT[d]} ${BAND_LABEL[b]} · ${c?.count ? `Task ${c.count}개${c.minutes ? ` · ${shortDuration(c.minutes)}` : ''}` : '완료 없음'}`}
                         className={
                           level
                             ? `h-9 rounded-md text-[11px] font-semibold ${level >= 3 ? 'text-white' : 'text-ink-2'}`
@@ -59,7 +57,7 @@ export function RecordWhenCard({
                         }
                         style={level ? { background: LEVEL_BG[level] } : undefined}
                       >
-                        {c?.minutes ? shortDuration(c.minutes) : ''}
+                        {c?.count ? `${c.count}개` : ''}
                       </td>
                     )
                   })}
@@ -75,26 +73,31 @@ export function RecordWhenCard({
               }
             >
               <div className="bg-brand-soft rounded-2xl px-4 py-3.5">
-                <p className="text-brand text-[13px] font-bold">🌟 가장 많이 하는 때</p>
+                <p className="text-brand text-[13px] font-bold">🌟 가장 많이 끝내는 때</p>
                 <p className="mt-0.5 text-[16px] font-bold">
                   {DAY_SHORT[when.peakDay]}요일 {BAND_LABEL[when.peakBand]}
                 </p>
                 <p className="text-ink-3 text-[13px]">
-                  {shortDuration(peak.minutes)} · 전체의 {Math.round((peak.minutes / Math.max(total, 1)) * 100)}%
+                  Task {peak.count}개 · 전체의 {Math.round((peak.count / Math.max(total, 1)) * 100)}%
                 </p>
               </div>
-              {topBand && topBand.minutes > 0 && (
+              {topBand && topBand.count > 0 && (
                 <div className="bg-subtle rounded-2xl px-4 py-3.5">
                   <p className="text-ink-2 text-[13px] font-bold">⏰ 주로 하는 시간대</p>
                   <p className="mt-0.5 text-[16px] font-bold">
                     {BAND_LABEL[topBand.band]} {BAND_RANGE[topBand.band]}
                   </p>
                   <p className="text-ink-3 text-[13px]">
-                    전체 시간의 {Math.round((topBand.minutes / Math.max(total, 1)) * 100)}%
+                    완료한 Task의 {Math.round((topBand.count / Math.max(total, 1)) * 100)}%
                   </p>
                 </div>
               )}
             </div>
+          )}
+          {when.untimedCount > 0 && (
+            <p className="text-ink-3 mt-3 text-[12px] xl:col-span-2">
+              시간을 정하지 않고 완료한 Task {when.untimedCount}개는 이 표에서 뺐어요.
+            </p>
           )}
         </div>
       )}

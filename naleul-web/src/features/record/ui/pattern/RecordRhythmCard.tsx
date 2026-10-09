@@ -6,26 +6,26 @@ import { LEVEL_BG, levelOf, shortDuration } from './format'
 const ROW_LABEL = ['월', '', '수', '', '금', '', '일']
 
 /**
- * 기록의 리듬 — 최근 16주 잔디 (하루 한 칸, 많이 한 날일수록 진하게).
+ * 완료의 리듬 — 최근 16주 잔디 (하루 한 칸, Task 를 많이 끝낸 날일수록 진하게).
  * 기록형 목표의 핵심은 "얼마나"보다 "끊기지 않았는지"라서, 빈칸·채운 칸이 한눈에 보이게 했어요.
  */
 export function RecordRhythmCard({ rhythm }: { rhythm: RecordPattern['rhythm'] }) {
   const today = todayKst()
   const byDate = new Map(rhythm.days.map((d) => [d.date, d]))
-  const max = Math.max(0, ...rhythm.days.map((d) => d.minutes))
+  const max = Math.max(0, ...rhythm.days.map((d) => d.count))
   const weeks = Array.from({ length: 16 }, (_, w) => addDays(rhythm.heatmapStart, w * 7))
   const recordedWeeks = weeks.filter((w) =>
     Array.from({ length: 7 }, (_, i) => addDays(w, i)).some((d) => byDate.has(d))
   ).length
   const best = rhythm.days.reduce<(typeof rhythm.days)[number] | null>(
-    (b, d) => (!b || d.minutes > b.minutes ? d : b),
+    (b, d) => (!b || d.count > b.count ? d : b),
     null
   )
 
   return (
-    <Section title="기록의 리듬" aside="최근 16주">
+    <Section title="완료의 리듬" aside="최근 16주">
       {rhythm.days.length === 0 ? (
-        <NotEnough>기록을 남기면 하루 한 칸씩 채워져요</NotEnough>
+        <NotEnough>Task를 완료하면 하루 한 칸씩 채워져요</NotEnough>
       ) : (
         <>
           <div className="-mx-1 overflow-x-auto px-1 pb-1">
@@ -50,7 +50,7 @@ export function RecordRhythmCard({ rhythm }: { rhythm: RecordPattern['rhythm'] }
                       {Array.from({ length: 7 }, (_, i) => {
                         const d = addDays(w, i)
                         const stat = byDate.get(d)
-                        const level = stat ? levelOf(stat.minutes, max) : 0
+                        const level = stat ? levelOf(stat.count, max) : 0
                         const future = d > today
                         return (
                           <span
@@ -58,7 +58,7 @@ export function RecordRhythmCard({ rhythm }: { rhythm: RecordPattern['rhythm'] }
                             title={
                               future
                                 ? undefined
-                                : `${formatMonthDay(d)} · ${stat ? `${shortDuration(stat.minutes)}, ${stat.count}개` : '기록 없음'}`
+                                : `${formatMonthDay(d)} · ${stat ? `Task ${stat.count}개${stat.minutes ? ` · ${shortDuration(stat.minutes)}` : ''}` : '완료 없음'}`
                             }
                             className={
                               future
@@ -89,13 +89,13 @@ export function RecordRhythmCard({ rhythm }: { rhythm: RecordPattern['rhythm'] }
             </span>
             {best && (
               <span>
-                가장 많이 한 날 · {formatMonthDay(best.date)} {shortDuration(best.minutes)}
+                가장 많이 끝낸 날 · {formatMonthDay(best.date)} {best.count}개
               </span>
             )}
           </div>
 
           <p className="bg-subtle text-ink-2 mt-4 rounded-2xl px-4 py-3 text-[14px] leading-relaxed">
-            16주 중 <strong className="text-brand font-bold">{recordedWeeks}주</strong> 기록했어요
+            16주 중 <strong className="text-brand font-bold">{recordedWeeks}주</strong> Task를 완료했어요
             {recordedWeeks >= 12 ? '. 거의 매주 이어오고 있어요' : recordedWeeks >= 6 ? '. 리듬이 생기고 있어요' : ''}
           </p>
         </>

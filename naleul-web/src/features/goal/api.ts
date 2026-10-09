@@ -159,6 +159,8 @@ export function useToggleGoalTask(goalId: number) {
       qc.invalidateQueries({ queryKey: goalKeys.progress(goalId) })
       qc.invalidateQueries({ queryKey: goalKeys.heatmap(goalId) })
       qc.invalidateQueries({ queryKey: timetableKeys.all })
+      // 기록형 목표의 "나의 패턴" · "업무 일지"도 완료한 Task 로 계산해요 (record/api 의 recordKeys.all)
+      qc.invalidateQueries({ queryKey: ['record'] })
     },
   })
 }
