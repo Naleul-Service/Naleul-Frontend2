@@ -32,13 +32,15 @@ export interface RecordGoalInput {
   goalType?: GoalType | null
   goalSubType?: GoalSubType | null
   goalKindLabel?: string | null
+  /** 한 줄 설명 — "내가 맡은 일" / "무엇을 만드는지" (100자, motive 에 저장) */
+  description?: string | null
 }
 
 export function useCreateRecordGoal() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: RecordGoalInput) => api.post<GoalCategory>('/v1/goal-categories/record', body),
-    onSuccess: () => toast.success('기록형 목표를 만들었어요. 오늘 한 일을 바로 적어 보세요.'),
+    onSuccess: () => toast.success('업무형 목표를 만들었어요. 첫 Task를 추가해 보세요.'),
     onError: (e) => toast.error(errorMessage(e)),
     onSettled: () => qc.invalidateQueries({ queryKey: goalKeys.all }),
   })
@@ -49,7 +51,7 @@ export function useKeepAsRecord(goalId: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => api.patch<GoalCategory>(`/v1/goal-categories/${goalId}/keep-as-record`),
-    onSuccess: () => toast.success('기록형 목표로 바꿨어요.'),
+    onSuccess: () => toast.success('업무형 목표로 바꿨어요.'),
     onError: (e) => toast.error(errorMessage(e)),
     onSettled: () => qc.invalidateQueries({ queryKey: goalKeys.all }),
   })

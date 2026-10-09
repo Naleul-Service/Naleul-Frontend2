@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Pencil, Sparkles, Trash2 } from 'lucide-react'
-import { Badge } from '@/components/ui/Chip'
+import { Badge, Chip } from '@/components/ui/Chip'
 import { Card } from '@/components/ui/Card'
 import { useUserColors } from '@/features/color/api'
 import type { GoalCategory } from '../api'
@@ -21,7 +21,7 @@ import {
 } from '../edit/inline'
 import { formatDot, goalColor, periodProgress, statusLabel } from '../format'
 import { metricSentence } from './metricSentence'
-import { isKindComplete, kindBody, type GoalKindValue } from '../kind'
+import { WORK_TYPE, isKindComplete, kindBody, subOption, type GoalKindValue } from '../kind'
 import { GoalKindPicker } from './GoalKindPicker'
 
 const numStr = (v: number | null | undefined) => (v == null ? '' : String(v))
@@ -52,6 +52,8 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
       : null
   )
   const [showMetric, setShowMetric] = useState(goal.targetValue != null || !!goal.metricName)
+  // 업무형(기록형)은 기한·수치가 없어요 → 기간·수치 칸을 숨기고, 카테고리는 회사 업무 / 사이드 프로젝트만
+  const isWork = goal.goalMode === 'RECORD'
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }))
 
   const colorId = f.colorId ?? colorIdOf(colors.data, goal.colorCode)
@@ -132,22 +134,39 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
           />
         </Field>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="시작일">
-          <input type="date" value={f.start} onChange={(e) => set('start', e.target.value)} className={inlineInput} />
-        </Field>
-        <Field label="종료일">
-          <input type="date" value={f.end} onChange={(e) => set('end', e.target.value)} className={inlineInput} />
-        </Field>
-      </div>
+      {!isWork && (
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="시작일">
+            <input type="date" value={f.start} onChange={(e) => set('start', e.target.value)} className={inlineInput} />
+          </Field>
+          <Field label="종료일">
+            <input type="date" value={f.end} onChange={(e) => set('end', e.target.value)} className={inlineInput} />
+          </Field>
+        </div>
+      )}
       <div>
-        <span className="text-ink-3 mb-1 block text-[12px] font-medium">카테고리</span>
-        <GoalKindPicker value={kind} onChange={setKind} compact />
+        <span className="text-ink-3 mb-1 block text-[12px] font-medium">{isWork ? '어떤 일인가요?' : '카테고리'}</span>
+        {isWork ? (
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="업무 종류">
+            {WORK_TYPE.subs.map((o) => (
+              <Chip
+                key={o.value}
+                selected={kind?.goalSubType === o.value}
+                size="sm"
+                onClick={() => setKind({ goalType: 'WORK', goalSubType: o.value })}
+              >
+                {o.emoji} {o.label}
+              </Chip>
+            ))}
+          </div>
+        ) : (
+          <GoalKindPicker value={kind} onChange={setKind} compact />
+        )}
       </div>
       <Field label="색상">
         <ColorSwatches colors={colors.data} value={colorId} onChange={(id) => set('colorId', id)} />
       </Field>
-      <Field label="이 목표를 시작한 이유">
+      <Field label={isWork ? `${motiveLabel(goal)} (선택)` : '이 목표를 시작한 이유'}>
         <textarea
           value={f.motive}
           onChange={(e) => set('motive', e.target.value)}
@@ -158,7 +177,7 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
         />
       </Field>
 
-      {showMetric && !clearMetric ? (
+      {isWork ? null : showMetric && !clearMetric ? (
         <div className="bg-subtle/60 space-y-2 rounded-xl p-3">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Field label="무엇을 재나요?">
@@ -291,8 +310,12 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
               {statusLabel(goal.goalCategoryStatus)}
             </Badge>
             {goal.temporary && <Badge tone="warning">임시 목표</Badge>}
-            {goal.goalMode === 'RECORD' && <Badge tone="neutral">기록형</Badge>}
-            {goal.goalKindName && <Badge tone="brand">{goal.goalKindName}</Badge>}
+            {goal.goalMode === 'RECORD' && (
+              <Badge tone="neutral">
+                업무형{goal.goalType === 'WORK' && goal.goalSubType ? ` · ${subOption(goal.goalSubType).label}` : ''}
+              </Badge>
+            )}
+            {goal.goalKindName && goal.goalType !== 'WORK' && <Badge tone="brand">{goal.goalKindName}</Badge>}
             <button
               type="button"
               onClick={edit.open}
@@ -315,6 +338,14 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
   )
 }
 
+/** motive 칸의 제목 — 업무형은 "시작한 이유" 대신 만들 때 받은 한 줄 설명 */
+export function motiveLabel(goal: Pick<GoalCategory, 'goalMode' | 'goalSubType'>) {
+  if (goal.goalMode !== 'RECORD') return '이 목표를 시작한 이유'
+  if (goal.goalSubType === 'COMPANY_WORK') return '내가 맡은 일'
+  if (goal.goalSubType === 'SIDE_PROJECT') return '무엇을 만드나요'
+  return '한 줄 설명'
+}
+
 /** 시작한 이유 · AI 노트 카드 (머리말 수정에서 함께 바뀌어요) */
 export function GoalNotes({ goal }: { goal: GoalCategory }) {
   const edit = useEditing('goal')
@@ -327,7 +358,7 @@ export function GoalNotes({ goal }: { goal: GoalCategory }) {
           onClick={edit.open}
           className="hover:bg-canvas -m-2 block w-[calc(100%+16px)] rounded-xl p-2 text-left"
         >
-          <p className="text-ink-3 text-[13px] font-medium">이 목표를 시작한 이유</p>
+          <p className="text-ink-3 text-[13px] font-medium">{motiveLabel(goal)}</p>
           <p className="mt-1 text-[15px] leading-relaxed whitespace-pre-wrap">{goal.motive}</p>
         </button>
       )}

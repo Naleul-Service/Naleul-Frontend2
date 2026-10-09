@@ -7,7 +7,7 @@
  *
  * AI 목표 설계는 고른 2단계에 맞는 가이드로 계획을 짜요 (운동이면 세션별 종목·세트, 다이어트면 운동+식단 원칙…).
  */
-export type GoalType = 'HEALTH' | 'LEARNING' | 'HABIT' | 'ETC'
+export type GoalType = 'HEALTH' | 'LEARNING' | 'HABIT' | 'ETC' | 'WORK'
 export type GoalSubType =
   | 'EXERCISE'
   | 'DIET'
@@ -26,6 +26,8 @@ export type GoalSubType =
   | 'CLEANING'
   | 'JOURNAL'
   | 'OTHER'
+  | 'COMPANY_WORK'
+  | 'SIDE_PROJECT'
 
 export interface GoalKindValue {
   goalType: GoalType
@@ -136,8 +138,25 @@ export const MUST_DO_SUGGESTIONS: Partial<Record<GoalSubType, string[]>> = {
   JOURNAL: ['일기 쓰기', '감사 일기'],
 }
 
-export const typeOption = (t: GoalType) => GOAL_TYPES.find((o) => o.value === t)!
-export const subOption = (s: GoalSubType) => GOAL_TYPES.flatMap((t) => t.subs).find((o) => o.value === s)!
+/**
+ * 업무형(기록형) 목표 전용 종류 — 생활형 카테고리 고르기(GOAL_TYPES)에는 넣지 않아요.
+ * 업무형은 AI 설계 없이 만들고, 완료한 Task 로 패턴·업무 일지를 쌓아요.
+ */
+export const WORK_TYPE: (typeof GOAL_TYPES)[number] = {
+  value: 'WORK',
+  label: '업무',
+  emoji: '💼',
+  hint: '회사 업무 · 사이드 프로젝트',
+  subs: [
+    { value: 'COMPANY_WORK', label: '회사 업무', emoji: '💼', examples: ['OO팀 업무', '나를 업무'] },
+    { value: 'SIDE_PROJECT', label: '사이드 프로젝트', emoji: '🚀', examples: ['포트폴리오 앱', '블로그 운영'] },
+  ],
+}
+
+const ALL_TYPES = [...GOAL_TYPES, WORK_TYPE]
+
+export const typeOption = (t: GoalType) => ALL_TYPES.find((o) => o.value === t)!
+export const subOption = (s: GoalSubType) => ALL_TYPES.flatMap((t) => t.subs).find((o) => o.value === s)!
 
 /** 입력이 끝났는지 (기타면 이름 1~10자) */
 export function isKindComplete(v: GoalKindValue | null): v is GoalKindValue {

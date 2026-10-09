@@ -3,7 +3,7 @@
 import { useState, type KeyboardEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, MessageCircle, NotebookPen, PenLine, Sparkles, X } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, MessageCircle, PenLine, Sprout, X } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
@@ -236,88 +236,101 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
   )
 }
 
+const WORK_EXAMPLES = ['OO팀 업무', '신규 서비스 기획', '포트폴리오 앱 만들기', '블로그 운영']
+const LIFE_EXAMPLES = ['주 3회 운동하기', '3개월에 5kg 감량', '토익 900점', '매일 6시 30분 기상', '한 달에 책 2권']
+
+function Examples({ items }: { items: string[] }) {
+  return (
+    <div className="mt-4">
+      <p className="text-ink-3 mb-1.5 text-[12px] font-medium">이런 목표를 만들 수 있어요</p>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((x) => (
+          <span key={x} className="bg-subtle text-ink-2 rounded-full px-2.5 py-1 text-[12px]">
+            {x}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 /**
- * /goal/add — 목표 추가 방법 고르기
- *  - AI로 설계: 대화로 기간·마일스톤·루틴까지 (기존 /goal/new) — 다이어트·자격증처럼 "이룰 것"이 분명할 때
- *  - 기록하며 쌓기: 회사 업무처럼 수치·마감 없이 "한 일"을 모으는 기록형 목표 — 이름만 적으면 끝
- *  - 직접 만들기: 이미 계획이 있을 때 이 화면에서 바로 입력
+ * /goal/add — 목적에 따라 두 가지
+ *  - 업무형: 회사 업무 · 사이드 프로젝트. 기한·수치 없이 만들고 완료한 Task 로 업무 일지·패턴을 쌓아요 (goal_mode = RECORD)
+ *  - 생활형: 건강 · 학습 · 생활습관. AI 가 대화로 기간·루틴까지 설계 (/goal/new), 계획이 있으면 직접 입력
  */
 export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | 'record' | null }) {
   const [open, setOpen] = useState<'manual' | 'record' | null>(initialMode)
-  const card =
-    'border-line bg-surface hover:border-line-strong group flex flex-col rounded-[20px] border p-5 text-left transition-colors sm:p-6'
+  const card = 'border-line bg-surface flex flex-col rounded-[20px] border p-5 text-left transition-colors sm:p-6'
 
   return (
     <>
-      <PageHeader breadcrumb={<Link href="/goal">목표</Link>} title="목표 추가" description="어떤 목표인가요?" />
+      <PageHeader
+        breadcrumb={<Link href="/goal">목표</Link>}
+        title="목표 추가"
+        description="어떤 일을 위한 목표인가요?"
+      />
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <Link href="/goal/new" className={card}>
-          <span className="bg-brand-soft text-brand grid size-11 place-items-center rounded-2xl">
-            <Sparkles className="size-5" />
-          </span>
-          <p className="mt-4 flex items-center gap-2 text-[17px] font-bold">
-            AI로 설계하기 <Badge tone="brand">이룰 목표</Badge>
-          </p>
-          <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
-            다이어트·자격증·독서처럼 이루고 싶은 게 분명할 때. 몇 가지 질문 후 꼭 필요한 루틴만 계획해 드려요.
-          </p>
-          <span className="text-brand mt-auto flex items-center gap-1 pt-4 text-sm font-semibold">
-            <MessageCircle className="size-4" />
-            대화 시작하기
-            <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-          </span>
-        </Link>
-
-        <button
-          type="button"
-          onClick={() => setOpen('record')}
-          aria-expanded={open === 'record'}
-          className={cn(card, open === 'record' && 'border-ink ring-ink ring-1')}
-        >
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        {/* 업무형 */}
+        <section className={cn(card, open === 'record' && 'border-ink ring-ink ring-1')} aria-labelledby="work-title">
           <span className="bg-ink grid size-11 place-items-center rounded-2xl text-white">
-            <NotebookPen className="size-5" />
+            <BriefcaseBusiness className="size-5" />
           </span>
-          <p className="mt-4 flex items-center gap-2 text-[17px] font-bold">
-            기록하며 쌓기 <Badge tone="neutral">업무·프로젝트</Badge>
+          <p id="work-title" className="mt-4 flex flex-wrap items-center gap-2 text-[18px] font-bold">
+            업무형 <Badge tone="neutral">회사 업무 · 사이드 프로젝트</Badge>
           </p>
           <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
-            회사 업무처럼 수치나 마감이 없는 일. 이름만 정하면 끝이고, &ldquo;오늘 한 일&rdquo;을 한 줄씩 쌓아요.
+            마감이나 수치보다 꾸준히 해 나가는 일이에요. Task를 완료할 때마다 업무 일지와 나의 패턴이 쌓여요.
           </p>
-          <span className="text-ink-2 mt-auto flex items-center gap-1 pt-4 text-sm font-semibold">
-            {open === 'record' ? '아래에서 이름을 정해 주세요' : '10초 만에 만들기'}
-            <ArrowRight
-              className={cn(
-                'size-4 transition-transform',
-                open === 'record' ? 'rotate-90' : 'group-hover:translate-x-0.5'
-              )}
-            />
-          </span>
-        </button>
+          <Examples items={WORK_EXAMPLES} />
+          <div className="mt-auto pt-5">
+            <button
+              type="button"
+              onClick={() => setOpen('record')}
+              aria-expanded={open === 'record'}
+              className="text-ink group flex items-center gap-1 text-sm font-semibold"
+            >
+              {open === 'record' ? '아래에서 정해 주세요' : '업무 목표 만들기'}
+              <ArrowRight
+                className={cn(
+                  'size-4 transition-transform',
+                  open === 'record' ? 'rotate-90' : 'group-hover:translate-x-0.5'
+                )}
+              />
+            </button>
+          </div>
+        </section>
 
-        <button
-          type="button"
-          onClick={() => setOpen('manual')}
-          aria-expanded={open === 'manual'}
-          className={cn(card, open === 'manual' && 'border-ink ring-ink ring-1')}
-        >
-          <span className="bg-subtle text-ink-2 grid size-11 place-items-center rounded-2xl">
-            <PenLine className="size-5" />
+        {/* 생활형 */}
+        <section className={cn(card, open === 'manual' && 'border-ink ring-ink ring-1')} aria-labelledby="life-title">
+          <span className="bg-brand-soft text-brand grid size-11 place-items-center rounded-2xl">
+            <Sprout className="size-5" />
           </span>
-          <p className="mt-4 text-[17px] font-bold">직접 만들기</p>
-          <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
-            이미 계획이 있다면 이름·기간·세부 목표를 직접 정해요. 나중에 AI로 구체화할 수도 있어요.
+          <p id="life-title" className="mt-4 flex flex-wrap items-center gap-2 text-[18px] font-bold">
+            생활형 <Badge tone="brand">건강 · 학습 · 생활습관</Badge>
           </p>
-          <span className="text-ink-2 mt-auto flex items-center gap-1 pt-4 text-sm font-semibold">
-            {open === 'manual' ? '아래에서 입력해 주세요' : '바로 입력하기'}
-            <ArrowRight
-              className={cn(
-                'size-4 transition-transform',
-                open === 'manual' ? 'rotate-90' : 'group-hover:translate-x-0.5'
-              )}
-            />
-          </span>
-        </button>
+          <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
+            이루고 싶은 모습이 분명한 목표예요. AI가 몇 가지 질문을 한 뒤 기간과 꼭 필요한 루틴까지 계획해 드려요.
+          </p>
+          <Examples items={LIFE_EXAMPLES} />
+          <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2 pt-5">
+            <Link href="/goal/new" className="text-brand group flex items-center gap-1 text-sm font-semibold">
+              <MessageCircle className="size-4" />
+              AI와 대화 시작하기
+              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => setOpen('manual')}
+              aria-expanded={open === 'manual'}
+              className="text-ink-3 hover:text-ink-2 flex items-center gap-1 text-[13px] font-medium"
+            >
+              <PenLine className="size-3.5" />
+              {open === 'manual' ? '아래에서 입력해 주세요' : '계획이 있다면 직접 입력하기'}
+            </button>
+          </div>
+        </section>
       </div>
 
       {open === 'record' && <RecordGoalForm onCancel={() => setOpen(null)} className="mt-4 max-w-2xl" />}

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Chip'
 import { ResumeCard } from '@/features/goal-creation/ui/ResumeCard'
 import { useGoalCategories, type GoalCategory } from '../api'
 import { dDayLabel, formatDot, goalColor, isOngoing, periodProgress, statusLabel } from '../format'
+import { subOption } from '../kind'
 import { refineHref } from './RefineWithAiCard'
 
 /** 임시 목표 카드 — 보기 / AI로 구체화하기 */
@@ -67,7 +68,7 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
         </Badge>
         {goal.goalMode === 'RECORD' && (
           <Badge tone="neutral" className="h-5 px-2 text-[11px]">
-            기록형
+            업무형
           </Badge>
         )}
         {period && isOngoing(goal.goalCategoryStatus) && (
@@ -98,7 +99,7 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
       )}
       <p className="text-ink-3 mt-3 text-xs">
         {goal.goalMode === 'RECORD'
-          ? `기록형 · 한 일을 쌓는 목표${routineCount ? ` · 루틴 ${routineCount}개` : ''}`
+          ? `${goal.goalType === 'WORK' && goal.goalSubType ? subOption(goal.goalSubType).label : '업무형'} · 완료한 Task를 쌓는 목표${routineCount ? ` · 루틴 ${routineCount}개` : ''}`
           : `세부 목표 ${goal.generalCategories.length}개 · 루틴 ${routineCount}개`}
       </p>
     </Link>
