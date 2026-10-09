@@ -522,7 +522,7 @@ export function TaskDetail({
           <p className="text-brand flex items-center gap-1 text-xs font-bold">
             <Sparkles className="size-3.5" />이 시간에 놓은 이유
           </p>
-          <p className="text-ink-2 mt-1 text-[13px] leading-relaxed">{t.placementReason}</p>
+          <PlacementReason text={t.placementReason} codes={t.placementReasonCodes ?? []} />
         </div>
       )}
       {t.locked && !done && (
@@ -655,5 +655,61 @@ function MenuItem({ danger, onClick, children }: { danger?: boolean; onClick: ()
     >
       {children}
     </button>
+  )
+}
+
+/** 배치 이유 코드 → 짧은 근거 꼬리표 */
+const REASON_TAG: Record<string, string> = {
+  OVERDUE: '⏰ 마감 지남',
+  DEADLINE_TODAY: '⏰ 오늘 마감',
+  DEADLINE_SOON: '⏰ 마감 임박',
+  CARRIED_OVER: '↩️ 어제 못 한 일',
+  MILESTONE_SOON: '🚩 마일스톤 임박',
+  HIGH_EFFICIENCY: '📈 잘 지키는 시간',
+  BEST_REMAINING: '📈 남은 시간 중 최선',
+  PREFERRED_TIME: '⭐ 고른 선호 시간',
+  LOW_LOAD_SLOT: '🪶 가벼운 일',
+  GOAL_TIME_FIT: '🎯 이 목표와 잘 맞는 시간',
+  MOVE_HABIT: '↔️ 자주 옮겨 온 시간',
+  DURATION_ADJUSTED: '⏱️ 실제 걸린 시간 반영',
+}
+
+/**
+ * 배치 이유: 첫 문장 = 왜 이 시간에, 뒤 문장들 = 내 기록 근거 ("최근 4주 … 12개 중 10개를 해냈어요").
+ * 근거가 눈에 들어오도록 문장을 나눠 보여주고, 이유 코드는 꼬리표로.
+ */
+function PlacementReason({ text, codes }: { text: string; codes: string[] }) {
+  // 문장 끝("요." · "요)." 등) 기준으로 나눠요
+  const sentences = text
+    .match(/[^.]+?(?:요\)?\.|$)/g)
+    ?.map((x) => x.trim())
+    .filter(Boolean) ?? [text]
+  const [head, ...evidence] = sentences
+  const tags = codes.map((c) => REASON_TAG[c]).filter(Boolean)
+  return (
+    <>
+      <p className="text-ink-2 mt-1 text-[13px] leading-relaxed">{head}</p>
+      {evidence.length > 0 && (
+        <ul className="text-ink-2 mt-1.5 space-y-0.5 text-[12px] leading-relaxed">
+          {evidence.map((e) => (
+            <li key={e} className="flex gap-1.5">
+              <span className="text-brand" aria-hidden>
+                •
+              </span>
+              <span>{e}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {tags.map((tag) => (
+            <span key={tag} className="bg-surface text-ink-2 rounded-full px-2 py-0.5 text-[11px] font-semibold">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+    </>
   )
 }
