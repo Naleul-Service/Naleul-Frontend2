@@ -8,9 +8,10 @@ import { buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
-import { usePatternReport } from '../api'
+import { RefreshCw } from 'lucide-react'
+import { usePatternReport, useRecalculatePattern } from '../api'
 import type { PatternPeriod } from '../types'
-import { rangeLabel } from '../format'
+import { rangeLabel, updatedLabel } from '../format'
 import { BlockKeeping } from './BlockKeeping'
 import { Heatmap } from './Heatmap'
 import { RoutineLists } from './RoutineLists'
@@ -35,6 +36,7 @@ export function PatternView() {
   const pathname = usePathname()
   const period: PatternPeriod = params.get('period') === 'ALL' ? 'ALL' : 'RECENT_4W'
   const { data, isPending, isError, error, refetch, isFetching } = usePatternReport(period)
+  const recalc = useRecalculatePattern(period)
   const reportRef = useRef<HTMLDivElement>(null)
 
   const setPeriod = (p: PatternPeriod) => {
@@ -48,7 +50,28 @@ export function PatternView() {
   const header = (
     <PageHeader
       title="나의 패턴"
-      description={data ? rangeLabel(data) : ' '}
+      description={
+        data ? (
+          <>
+            {rangeLabel(data)}
+            {/* 언제 계산한 결과인지 — 방금 한 일이 반영됐는지 알 수 있게 (오늘 완료한 일 · 시간이 지난 블록도 포함) */}
+            <span className="text-ink-3 mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px]" data-share-exclude>
+              최근 업데이트 {updatedLabel(data.generatedAt)} · 오늘 완료한 일까지 반영
+              <button
+                type="button"
+                onClick={() => recalc.mutate()}
+                disabled={recalc.isPending}
+                className="text-brand inline-flex items-center gap-1 font-semibold disabled:opacity-50"
+              >
+                <RefreshCw className={cn('size-3', recalc.isPending && 'animate-spin')} />
+                지금 다시 계산
+              </button>
+            </span>
+          </>
+        ) : (
+          ' '
+        )
+      }
       actions={
         <>
           <div
@@ -168,9 +191,12 @@ export function PatternView() {
         <SuggestionBar suggestion={data.suggestion} />
       </div>
 
-      {data.aiStatus === 'AI' && (
-        <p className="text-ink-4 mt-4 text-right text-[12px]">문장은 AI가 다듬었고, 숫자는 실제 기록으로 계산했어요.</p>
-      )}
+      {/* 숫자는 기록이 바뀔 때마다 바로, AI 문장 다듬기는 하루 한 번 (AI 비용 때문에) */}
+      <p className="text-ink-4 mt-4 text-right text-[12px]">
+        {data.aiStatus === 'AI'
+          ? '문장은 AI가 다듬었고, 숫자는 실제 기록으로 계산했어요.'
+          : '숫자는 실제 기록으로 바로 계산했어요. AI 문장 다듬기는 하루 한 번 해요.'}
+      </p>
     </div>
   )
 }

@@ -12,15 +12,28 @@ export const patternKeys = {
 
 /**
  * GET /patterns?period=
- * 서버가 하루 한 번만 계산하고 캐시해요 (분석 범위가 어제까지라 같은 날엔 바뀌지 않음).
- * 그래서 화면에서도 오래 신선하게 둬요.
+ * 서버가 캐시해 두지만 기록이 바뀌면(완료·취소·이동·삭제·시간이 지난 블록) 바로 다시 계산해요.
+ * 예전엔 화면에서 10분 동안 신선하다고 보고 다시 묻지 않아서, 방금 완료한 일이 늦게 반영됐어요 → 들어올 때마다 다시 확인.
  */
 export function usePatternReport(period: PatternPeriod) {
   return useQuery({
     queryKey: patternKeys.report(period),
     queryFn: () => api.get<PatternReport>(`/v1/patterns?period=${period}`),
-    staleTime: 10 * 60 * 1000,
+    staleTime: 0,
     placeholderData: (prev) => prev, // 기간을 바꿀 때 이전 화면 유지
+  })
+}
+
+/** "지금 다시 계산" — 캐시를 무시하고 새로 계산 */
+export function useRecalculatePattern(period: PatternPeriod) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.get<PatternReport>(`/v1/patterns?period=${period}&refresh=true`),
+    onSuccess: (data) => {
+      qc.setQueryData(patternKeys.report(period), data)
+      toast.success('최신 기록으로 다시 계산했어요. (AI 문장 다듬기는 하루 한 번)')
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : '다시 계산하지 못했어요.'),
   })
 }
 

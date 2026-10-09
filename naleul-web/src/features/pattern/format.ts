@@ -23,6 +23,13 @@ export function rangeLabel(r: PatternReport) {
   return `${dotDate(r.range.start)} – ${dotDate(r.range.end)} · ${r.range.days}일, TimeBlock ${r.timeBlockCount.toLocaleString()}개 기록 기반`
 }
 
+/** "10월 9일 13:42" — 서버가 준 한국 시간 문자열 그대로 */
+export function updatedLabel(iso: string) {
+  const [d, t] = iso.split('T')
+  if (!d || !t) return iso
+  return `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일 ${t.slice(0, 5)}`
+}
+
 /** 골든/취약 시간: "평일 19–22시" */
 export const windowLabel = (w: TimeWindow) => `${GROUP_LABEL[w.dayGroup]} ${pad(w.startHour)}–${pad(w.endHour)}시`
 

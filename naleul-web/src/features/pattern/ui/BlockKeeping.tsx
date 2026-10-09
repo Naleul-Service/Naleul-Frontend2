@@ -26,7 +26,10 @@ export function BlockKeeping({ block }: { block?: PatternBlockKeeping | null }) 
         </>
       )}
 
-      <h3 className="mt-6 text-[15px] font-bold">자주 옮기는 블록</h3>
+      <h3 className="mt-6 text-[15px] font-bold">자주 옮기는 루틴</h3>
+      <p className="text-ink-3 mt-0.5 text-[12px]">
+        반복되는 루틴만 봐요 — 늘 같은 방향으로 옮긴다면 루틴 시간을 바꾸는 게 나아요.
+      </p>
       {block?.frequentMoves.length ? (
         <ul className="divide-line mt-2 divide-y">
           {block.frequentMoves.map((m) => (
@@ -50,7 +53,7 @@ export function BlockKeeping({ block }: { block?: PatternBlockKeeping | null }) 
           ))}
         </ul>
       ) : (
-        <p className="text-ink-3 mt-2 text-[13px]">캘린더에서 블록을 옮긴 기록이 쌓이면 보여드려요</p>
+        <p className="text-ink-3 mt-2 text-[13px]">캘린더에서 루틴 블록을 옮긴 기록이 쌓이면 보여드려요</p>
       )}
     </Section>
   )

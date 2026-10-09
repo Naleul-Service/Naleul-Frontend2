@@ -14,8 +14,11 @@ export interface PatternReport {
   range: { start: string; end: string; days: number }
   timeBlockCount: number
   evaluatedCount: number
+  /** 이 리포트를 계산한 시각 */
   generatedAt: string
   aiStatus: 'AI' | 'TEMPLATE'
+  /** 계산에 쓴 기록의 버전 (서버 캐시 확인용) */
+  dataVersion?: string | null
   style?: PatternStyle | null
   summary?: PatternSummary | null
   heatmap?: PatternHeatmap | null
