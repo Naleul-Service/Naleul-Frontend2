@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { BarChart3, Bell, ChevronRight, Clock, FileText, type LucideIcon } from 'lucide-react'
+import { BarChart3, Bell, CalendarPlus, ChevronRight, Clock, FileText, type LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { LogoutButton } from '@/features/account/ui/LogoutButton'
@@ -18,6 +18,12 @@ const ITEMS: { href: string; icon: LucideIcon; title: string; description: strin
     icon: Clock,
     title: '기본 생활 패턴',
     description: '수면·점심·저녁·이동시간처럼 매주 반복되는 고정 시간',
+  },
+  {
+    href: '/settings/calendar-import',
+    icon: CalendarPlus,
+    title: '외부 캘린더 가져오기',
+    description: '구글 · 노션 · 아이폰 캘린더 일정을 골라서 Task로 가져와요',
   },
   {
     href: '/settings/notifications',
