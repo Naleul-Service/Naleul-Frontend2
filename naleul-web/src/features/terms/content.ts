@@ -3,29 +3,16 @@
  * ⚠️ 약관을 고칠 때는 iOS 와 웹 두 곳을 같이 바꿔야 해요.
  */
 
-export const TERMS_TYPES = ["service", "privacy", "marketing"] as const;
-export type TermsType = (typeof TERMS_TYPES)[number];
+export const TERMS_TYPES = ['service', 'privacy', 'marketing'] as const
+export type TermsType = (typeof TERMS_TYPES)[number]
 
-export const isTermsType = (v: string): v is TermsType =>
-  (TERMS_TYPES as readonly string[]).includes(v);
+export const isTermsType = (v: string): v is TermsType => (TERMS_TYPES as readonly string[]).includes(v)
 
-export const TERMS_META: Record<
-  TermsType,
-  { listTitle: string; detailTitle: string }
-> = {
-  service: {
-    listTitle: "서비스 이용약관 동의(필수)",
-    detailTitle: "서비스 이용약관",
-  },
-  privacy: {
-    listTitle: "개인 정보 수집 및 이용 동의(필수)",
-    detailTitle: "개인정보 수집 및 이용",
-  },
-  marketing: {
-    listTitle: "마케팅 정보 수신 동의(선택)",
-    detailTitle: "마케팅 정보 수신",
-  },
-};
+export const TERMS_META: Record<TermsType, { listTitle: string; detailTitle: string }> = {
+  service: { listTitle: '서비스 이용약관 동의(필수)', detailTitle: '서비스 이용약관' },
+  privacy: { listTitle: '개인 정보 수집 및 이용 동의(필수)', detailTitle: '개인정보 수집 및 이용' },
+  marketing: { listTitle: '마케팅 정보 수신 동의(선택)', detailTitle: '마케팅 정보 수신' },
+}
 
 const PRIVACY_BODY = `나를 서비스는 소셜 로그인을 통해 아래의 개인정보를 수집합니다.
 아래 정보의 수집 및 이용에 동의하셔야 서비스 가입 및 이용이 가능합니다.
@@ -67,7 +54,7 @@ const PRIVACY_BODY = `나를 서비스는 소셜 로그인을 통해 아래의 �
 - 직책: 대표
 - 이메일: hske3602@naver.com
 
-본 방침은 2026년 9월 7일부터 시행합니다.`;
+본 방침은 2026년 9월 7일부터 시행합니다.`
 
 const SERVICE_BODY = `제1조 (목적)
 본 약관은 나를(이하 "서비스")이 제공하는 목표 관리 및 자기계발 지원 플랫폼 서비스를 이용함에 있어 회사와 사용자 간의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.
@@ -110,7 +97,7 @@ const SERVICE_BODY = `제1조 (목적)
 부칙
 본 약관은 2026년 9월 7일부터 시행합니다.
 서비스 운영자: 황유림 (대표)
-문의: hske3602@naver.com`;
+문의: hske3602@naver.com`
 
 const MARKETING_INTRO = `나를은 서비스 개선, 신기능 안내, 이벤트 정보, 맞춤형 콘텐츠 추천 등의 마케팅 목적으로 개인정보를 이용할 수 있습니다.
 해당 동의는 서비스 이용에 필수가 아니며, 언제든 철회할 수 있습니다.
@@ -120,29 +107,18 @@ const MARKETING_INTRO = `나를은 서비스 개선, 신기능 안내, 이벤트
 - 마케팅 정보 수신 동의는 언제든 앱 내 설정에서 철회할 수 있습니다.
 - 철회 후 즉시 마케팅 정보 수신이 중단됩니다.
 
-수집 정보`;
+수집 정보`
 
 export const TERMS_BODY: Record<TermsType, string> = {
   service: SERVICE_BODY,
   privacy: PRIVACY_BODY,
   marketing: MARKETING_INTRO,
-};
+}
 
 /** 마케팅 동의 상세의 "수집 정보" 표 */
 export const MARKETING_INFO_ROWS = [
-  {
-    label: "이용목적",
-    content:
-      "신기능 안내, 이벤트 정보, 서비스 관련 공지사항, 프로모션 및 마케팅",
-  },
-  {
-    label: "이용 정보",
-    content:
-      "사용자 성명, 사용자 활동 통계(목표·루틴 달성 통계 등), 앱 내 알림",
-  },
-  {
-    label: "제공 수단",
-    content: "앱 내 알림, 이메일(해당하는 경우), 푸시 알림",
-  },
-  { label: "보유 기간", content: "동의 철회 시까지" },
-] as const;
+  { label: '이용목적', content: '신기능 안내, 이벤트 정보, 서비스 관련 공지사항, 프로모션 및 마케팅' },
+  { label: '이용 정보', content: '사용자 성명, 사용자 활동 통계(목표·루틴 달성 통계 등), 앱 내 알림' },
+  { label: '제공 수단', content: '앱 내 알림, 이메일(해당하는 경우), 푸시 알림' },
+  { label: '보유 기간', content: '동의 철회 시까지' },
+] as const

@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { isApiError } from '@/lib/client/api'
-import { RecordHero } from '@/features/record/ui/RecordHero'
 import { RecordQuickLog } from '@/features/record/ui/RecordQuickLog'
 import { RecordTimeline } from '@/features/record/ui/RecordTimeline'
+import { RecordPatternSection } from '@/features/record/ui/pattern/RecordPatternSection'
 import { useGoalActivities } from '@/features/record/api'
 import { isRecordGoal, useGoalCategory, type GoalCategory } from '../api'
 import { EditingContext } from '../edit/inline'
@@ -106,9 +106,9 @@ function Hero({ goal }: { goal: GoalCategory }) {
 
 /**
  * 기록형 목표 (회사 업무 등) — 진행률·마일스톤 대신 "한 일"을 쌓아 보여줘요.
- *  - 상단: 이번 주 쌓인 시간
- *  - 왼쪽: 오늘 한 일 한 줄 기록 + 날짜별 타임라인
- *  - 오른쪽: (선택) 반복 루틴 · Task — 주간 회의처럼 반복되는 일만 필요할 때 붙여요
+ *  - 맨 위: 오늘 한 일 한 줄 기록 (매일 하는 동작이라 가장 먼저)
+ *  - 가운데: 이 목표에 대한 나의 패턴 — 스타일 · 요약 · 주차별 누적 · 잔디 · 언제 · 무엇에
+ *  - 아래 왼쪽: 날짜별 타임라인 / 오른쪽: (선택) 메모 · 반복 루틴 · Task
  */
 function RecordGoalBody({ goal }: { goal: GoalCategory }) {
   const activities = useGoalActivities(goal.goalCategoryId)
@@ -116,13 +116,16 @@ function RecordGoalBody({ goal }: { goal: GoalCategory }) {
   return (
     <>
       <div className="mt-6">
-        <RecordHero activities={list} />
+        <RecordQuickLog goal={goal} />
       </div>
-      <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="space-y-5">
-          <RecordQuickLog goal={goal} />
-          <RecordTimeline activities={list} loading={activities.isPending} />
-        </div>
+      <section className="mt-6" aria-labelledby="record-pattern-heading">
+        <h2 id="record-pattern-heading" className="mb-3 text-[19px] font-bold">
+          이 목표에 대한 나의 패턴
+        </h2>
+        <RecordPatternSection goalId={goal.goalCategoryId} />
+      </section>
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <RecordTimeline activities={list} loading={activities.isPending} />
         <div className="space-y-5">
           <GoalNotes goal={goal} />
           <RoutinesSection goal={goal} />

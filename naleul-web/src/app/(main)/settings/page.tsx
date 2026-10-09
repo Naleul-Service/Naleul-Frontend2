@@ -1,57 +1,46 @@
-import type { Metadata } from "next";
-import Link from "next/link";
-import { cookies } from "next/headers";
-import {
-  Bell,
-  ChevronRight,
-  Clock,
-  FileText,
-  type LucideIcon,
-} from "lucide-react";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { Card } from "@/components/ui/Card";
-import { LogoutButton } from "@/features/account/ui/LogoutButton";
-import { ProfileSummaryCard } from "@/features/account/ui/ProfileSummaryCard";
-import { UsageCard } from "@/features/usage/ui/UsageCard";
-import { COOKIE, type UserRole } from "@/lib/server/session";
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { cookies } from 'next/headers'
+import { Bell, ChevronRight, Clock, FileText, type LucideIcon } from 'lucide-react'
+import { PageHeader } from '@/components/layout/PageHeader'
+import { Card } from '@/components/ui/Card'
+import { LogoutButton } from '@/features/account/ui/LogoutButton'
+import { ProfileSummaryCard } from '@/features/account/ui/ProfileSummaryCard'
+import { UsageCard } from '@/features/usage/ui/UsageCard'
+import { COOKIE, type UserRole } from '@/lib/server/session'
 
-export const metadata: Metadata = { title: "설정" };
+export const metadata: Metadata = { title: '설정' }
 
-const ITEMS: {
-  href: string;
-  icon: LucideIcon;
-  title: string;
-  description: string;
-}[] = [
+const ITEMS: { href: string; icon: LucideIcon; title: string; description: string }[] = [
   {
-    href: "/settings/life-pattern",
+    href: '/settings/life-pattern',
     icon: Clock,
-    title: "기본 생활 패턴",
-    description: "수면·점심·저녁·이동시간처럼 매주 반복되는 고정 시간",
+    title: '기본 생활 패턴',
+    description: '수면·점심·저녁·이동시간처럼 매주 반복되는 고정 시간',
   },
   {
-    href: "/settings/notifications",
+    href: '/settings/notifications',
     icon: Bell,
-    title: "알림 설정",
-    description: "Task·미션 푸시 알림을 종류별로 켜고 꺼요 (나를 앱에 적용)",
+    title: '알림 설정',
+    description: 'Task·미션 푸시 알림을 종류별로 켜고 꺼요 (나를 앱에 적용)',
   },
   {
-    href: "/settings/terms",
+    href: '/settings/terms',
     icon: FileText,
-    title: "약관 동의",
-    description: "서비스 이용약관 · 개인정보 수집 및 이용 · 마케팅 정보 수신",
+    title: '약관 동의',
+    description: '서비스 이용약관 · 개인정보 수집 및 이용 · 마케팅 정보 수신',
   },
-];
+]
 
 const rowClass =
-  "hover:bg-subtle/60 first:rounded-t-card last:rounded-b-card flex w-full items-center gap-3 px-5 py-4 text-left";
+  'hover:bg-subtle/60 first:rounded-t-card last:rounded-b-card flex w-full items-center gap-3 px-5 py-4 text-left'
 
 export default async function SettingsPage() {
-  const store = await cookies();
+  const store = await cookies()
   const user = {
-    name: store.get(COOKIE.userName)?.value || "나를 사용자",
+    name: store.get(COOKIE.userName)?.value || '나를 사용자',
     role: store.get(COOKIE.userRole)?.value as UserRole | undefined,
-  };
+  }
 
   return (
     <>
@@ -81,12 +70,10 @@ export default async function SettingsPage() {
         <Card className="divide-line divide-y">
           <LogoutButton className={rowClass} />
           <Link href="/settings/withdraw" className={rowClass}>
-            <span className="text-danger flex-1 text-[15px] font-semibold">
-              탈퇴하기
-            </span>
+            <span className="text-danger flex-1 text-[15px] font-semibold">탈퇴하기</span>
           </Link>
         </Card>
       </div>
     </>
-  );
+  )
 }

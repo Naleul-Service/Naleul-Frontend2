@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
-import { goalKeys, type GoalCategory } from '@/features/goal/api'
+import { goalKeys, type GoalCategory, type JavaDayOfWeek } from '@/features/goal/api'
 import { activityKeys } from '@/features/timetable/api'
 import type { ActualActivity } from '@/features/timetable/types'
 import type { GoalSubType, GoalType } from '@/features/goal/kind'
@@ -18,6 +18,7 @@ const errorMessage = (e: unknown) => (isApiError(e) ? e.message : '문제가 생
 export const recordKeys = {
   all: ['record'] as const,
   goal: (goalId: number) => [...recordKeys.all, 'goal', goalId] as const,
+  pattern: (goalId: number) => [...recordKeys.all, 'pattern', goalId] as const,
 }
 
 // ── 기록형 목표 만들기 ──────────────────────────────────────────
@@ -126,3 +127,78 @@ export function useDeleteRecord() {
 
 let seq = 0
 export const newClientKey = () => `r${Date.now().toString(36)}${(seq++).toString(36)}`
+
+// ── 이 목표에 대한 나의 패턴 (GET /activities/goals/{id}/pattern) ──
+
+export type TimeBand = 'DAWN' | 'MORNING' | 'AFTERNOON' | 'EVENING'
+
+export interface RecordPeriodStat {
+  start: string
+  end: string
+  minutes: number
+  records: number
+  activeDays: number
+  /** 한 번 기록에 평균 몇 분 (기록이 없으면 null) */
+  avgSessionMinutes: number | null
+}
+
+export interface RecordPattern {
+  summary: {
+    totalMinutes: number
+    totalRecords: number
+    activeDays: number
+    firstRecordDate: string | null
+    /** 최근 4주 (오늘 포함 28일) */
+    recent: RecordPeriodStat
+    /** 그 전 4주 */
+    previous: RecordPeriodStat
+    /** 기록이 있는 주가 몇 주째 이어지는지 (이번 주가 비었으면 지난주까지) */
+    weekStreak: number
+    thisWeekRecorded: boolean
+  }
+  rhythm: {
+    /** 잔디 시작일 (월요일) */
+    heatmapStart: string
+    /** 기록이 있는 날만 */
+    days: { date: string; minutes: number; count: number }[]
+    /** 최근 12주, 오래된 것부터 (빈 주 포함) */
+    weeks: { weekStart: string; minutes: number; count: number; cumulativeMinutes: number }[]
+  }
+  when: {
+    cells: { dayOfWeek: JavaDayOfWeek; band: TimeBand; minutes: number; count: number }[]
+    weekdays: { dayOfWeek: JavaDayOfWeek; minutes: number; count: number }[]
+    bands: { band: TimeBand; minutes: number; count: number }[]
+    peakDay: JavaDayOfWeek | null
+    peakBand: TimeBand | null
+  }
+  /** 목표에 루틴이 없으면 items 가 비어 있어요 → 카드를 숨겨요 */
+  routines: {
+    /** 쌓인 시간이 많은 순 (완료가 없는 루틴도 포함) */
+    items: RecordRoutineStat[]
+    /** 최근 4주에 그 전 4주보다 눈에 띄게 더 한 루틴 */
+    risingRoutineId: number | null
+  }
+}
+
+/** 완료한 루틴 Task 기준. 시간은 실제 시각 → 계획 시간 → 루틴 기본 시간 순 */
+export interface RecordRoutineStat {
+  routineId: number
+  routineName: string
+  emoji: string | null
+  minutes: number
+  completedCount: number
+  /** 최근 4주 */
+  recentMinutes: number
+  recentCount: number
+  /** 그 전 4주 */
+  previousMinutes: number
+  previousCount: number
+}
+
+/** 기록을 남기거나 지우면 recordKeys.all 이 무효화돼서 같이 다시 불러와요 */
+export function useRecordPattern(goalId: number) {
+  return useQuery({
+    queryKey: recordKeys.pattern(goalId),
+    queryFn: () => api.get<RecordPattern>(`/v1/activities/goals/${goalId}/pattern`),
+  })
+}
