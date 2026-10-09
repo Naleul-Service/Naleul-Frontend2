@@ -2,10 +2,13 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { BarChart3, NotebookPen } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { isApiError } from '@/lib/client/api'
+import { cn } from '@/lib/cn'
 import { RecordQuickLog } from '@/features/record/ui/RecordQuickLog'
 import { RecordJournal } from '@/features/record/ui/RecordJournal'
 import { RecordPatternSection } from '@/features/record/ui/pattern/RecordPatternSection'
@@ -103,33 +106,80 @@ function Hero({ goal }: { goal: GoalCategory }) {
 
 // ─── 기록형 목표 ───────────────────────────────────────────────
 
+type RecordTab = 'journal' | 'stats'
+
+const RECORD_TABS: { value: RecordTab; label: string; icon: typeof NotebookPen }[] = [
+  { value: 'journal', label: '업무 일지', icon: NotebookPen },
+  { value: 'stats', label: '통계', icon: BarChart3 },
+]
+
 /**
- * 업무형(기록형) 목표 — 매일 쓰는 것을 위에, 돌아보는 통계는 아래에.
- *  - 위 왼쪽: 오늘 한 일 한 줄 기록 + 업무 일지 (완료한 Task + 직접 남긴 기록, 날짜별 · 복사)
- *  - 위 오른쪽: (선택) 메모 · 반복 루틴 · Task
- *  - 아래: 이 목표에 대한 나의 패턴 (완료한 Task 기준 그래프)
+ * 업무형(기록형) 목표 — 탭 두 개.
+ *  - 업무 일지: 오늘 한 일 한 줄 기록 + 업무 일지 | (선택) 메모 · 반복 루틴 · Task
+ *  - 통계: 이 목표에 대한 나의 패턴 (완료한 Task 기준 그래프, 넓게)
+ * 고른 탭은 주소(?tab=stats)에 남겨서 새로고침·공유해도 그대로예요.
  */
 function RecordGoalBody({ goal }: { goal: GoalCategory }) {
+  const params = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const tab: RecordTab = params.get('tab') === 'stats' ? 'stats' : 'journal'
+
+  const setTab = (t: RecordTab) => {
+    const next = new URLSearchParams(params)
+    if (t === 'journal') next.delete('tab')
+    else next.set('tab', t)
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }
+
   return (
     <>
-      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="space-y-5">
-          <RecordQuickLog goal={goal} />
-          <RecordJournal goalId={goal.goalCategoryId} goalName={goal.goalCategoryName} />
-        </div>
-        <div className="space-y-5">
-          <GoalNotes goal={goal} />
-          <RoutinesSection goal={goal} />
-          <RoutineHeatmapSection goal={goal} />
-          <GoalTaskList goal={goal} />
-        </div>
+      <div className="bg-surface border-line mt-6 inline-flex rounded-xl border p-1" role="tablist" aria-label="보기">
+        {RECORD_TABS.map(({ value, label, icon: Icon }) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            id={`record-tab-${value}`}
+            aria-selected={tab === value}
+            aria-controls={`record-panel-${value}`}
+            onClick={() => setTab(value)}
+            className={cn(
+              'flex h-9 items-center gap-1.5 rounded-lg px-4 text-[14px] font-semibold transition-colors',
+              tab === value ? 'bg-ink text-white' : 'text-ink-2 hover:text-ink'
+            )}
+          >
+            <Icon className="size-4" />
+            {label}
+          </button>
+        ))}
       </div>
-      <section className="mt-10" aria-labelledby="record-pattern-heading">
-        <h2 id="record-pattern-heading" className="mb-3 text-[19px] font-bold">
-          이 목표에 대한 나의 패턴
-        </h2>
-        <RecordPatternSection goalId={goal.goalCategoryId} />
-      </section>
+
+      {tab === 'journal' ? (
+        <div
+          id="record-panel-journal"
+          role="tabpanel"
+          aria-labelledby="record-tab-journal"
+          className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]"
+        >
+          <div className="space-y-5">
+            <RecordQuickLog goal={goal} />
+            <RecordJournal goalId={goal.goalCategoryId} goalName={goal.goalCategoryName} />
+          </div>
+          <div className="space-y-5">
+            <GoalNotes goal={goal} />
+            <RoutinesSection goal={goal} />
+            <RoutineHeatmapSection goal={goal} />
+            <GoalTaskList goal={goal} />
+          </div>
+        </div>
+      ) : (
+        <section id="record-panel-stats" role="tabpanel" aria-labelledby="record-tab-stats" className="mt-5">
+          <h2 className="sr-only">이 목표에 대한 나의 패턴</h2>
+          <RecordPatternSection goalId={goal.goalCategoryId} />
+        </section>
+      )}
     </>
   )
 }
