@@ -31,6 +31,14 @@ export function shownTime(t: TimeBlockTask): ShownTime | null {
   return { startAt: t.plannedStartAt, endAt: t.plannedEndAt ?? null, actual: false }
 }
 
+/** 계획 시각 기준 구간 (완료했어도 원래 계획한 자리) */
+function plannedMinutes(dayYmd: string, t: TimeBlockTask) {
+  if (!t.plannedStartAt) return null
+  const start = minutesFrom(dayYmd, t.plannedStartAt)
+  const end = t.plannedEndAt ? minutesFrom(dayYmd, t.plannedEndAt) : start + (t.plannedDurationMinutes ?? 30)
+  return { start, end }
+}
+
 /** 그날(dayYmd) 0시 기준 분으로 바꾼 블록 구간. 끝이 없으면 소요 시간(없으면 30분)으로 */
 function shownMinutes(dayYmd: string, t: TimeBlockTask, fallbackMinutes = t.plannedDurationMinutes ?? 30) {
   const st = shownTime(t)
@@ -134,11 +142,21 @@ export function placeSleep(day: TimetableDay, from: number, to: number): PlacedS
  * Task 블록 배치. 백엔드 규칙상 Task 끼리는 겹치지 않지만,
  * 예전 데이터(iOS 에서 만든 겹친 일정)가 있을 수 있어 겹치면 나란히 그려요.
  */
-export function placeTasks(day: TimetableDay, from: number, to: number): Placed<TimeBlockTask>[] {
+/**
+ * @param basis shown   = 화면 기본 (완료 전엔 계획 시각, 완료 후엔 실제 시각)
+ *              planned = 모두 계획 시각 (일간 "계획" 칸 — 완료한 일도 원래 계획한 자리에)
+ *              done    = 완료한 Task 만, 실제 시각(없으면 계획 시각) (일간 "실제" 칸)
+ */
+export function placeTasks(
+  day: TimetableDay,
+  from: number,
+  to: number,
+  basis: 'shown' | 'planned' | 'done' = 'shown'
+): Placed<TimeBlockTask>[] {
   const items = day.tasks
+    .filter((t) => basis !== 'done' || t.taskStatus === 'COMPLETED')
     .map((t) => {
-      // 완료 전엔 계획 시각, 완료 후엔 실제 시각 (shownTime)
-      const m = shownMinutes(day.date, t)
+      const m = basis === 'planned' ? plannedMinutes(day.date, t) : shownMinutes(day.date, t)
       if (!m) return { t, c: null }
       const c = clip(m.start, Math.max(m.end, m.start + MIN_TASK_MINUTES), from, to)
       return { t, c: c && { ...c, end: m.end } }

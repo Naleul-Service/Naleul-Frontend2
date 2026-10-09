@@ -68,6 +68,11 @@ interface Props {
   /** 실제로 한 일 — 있으면 그날 칸 오른쪽에 "실제" 칸이 생겨요 */
   activities?: ActualActivity[]
   onSelectActivity?: (a: ActualActivity, e: MouseEvent<HTMLElement>) => void
+  /**
+   * 일간: 칸을 "계획 | 실제"로 늘 나눠요. 왼쪽은 계획한 시각(완료한 일도 원래 자리), 오른쪽은 실제로 한 시각
+   * (완료한 Task + 실제로 한 일 기록). 없으면 실제 기록이 있을 때만 나눠요.
+   */
+  planVsActual?: boolean
   /** 빈 칸(지난 시간)을 눌렀을 때 — 그 시각으로 "실제로 한 일" 기록 열기 */
   onEmptyClick?: (date: string, minutes: number, e: MouseEvent<HTMLElement>) => void
 }
@@ -122,6 +127,7 @@ export function TimeGrid({
   activities = [],
   onSelectActivity,
   onEmptyClick,
+  planVsActual = false,
 }: Props) {
   const now = useNowKst()
   const from = startHour * 60
@@ -240,13 +246,15 @@ export function TimeGrid({
           const isToday = d.date === now.date
           const wd = weekdayIndex(d.date)
           const Head = onDayClick && !single ? 'button' : 'div'
+          const compareHead = single && planVsActual
           return (
             <Head
               key={d.date}
               {...(Head === 'button' ? { type: 'button' as const, onClick: () => onDayClick?.(d.date) } : {})}
               className={cn(
                 'bg-surface border-line sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-l px-3 text-left',
-                Head === 'button' && 'hover:bg-subtle/60'
+                Head === 'button' && 'hover:bg-subtle/60',
+                compareHead && 'pb-4'
               )}
               aria-label={Head === 'button' ? `${d.date} 일간 보기` : undefined}
             >
@@ -278,6 +286,13 @@ export function TimeGrid({
                       : `실행률 ${d.stats.rate ?? 0}%`}
                 </span>
               </span>
+              {/* 일간 "계획 | 실제" 칸 이름 — 아래 격자의 60% · 40% 와 맞춰요 */}
+              {compareHead && (
+                <span className="text-ink-3 absolute inset-x-0 bottom-0 flex text-[11px] font-semibold" aria-hidden>
+                  <span className="w-[60%] px-3">📋 계획한 일</span>
+                  <span className="border-line w-[40%] border-l border-dashed px-2">✅ 실제로 한 일</span>
+                </span>
+              )}
             </Head>
           )
         })}
@@ -329,8 +344,12 @@ export function TimeGrid({
           const acts = placeActivities(d.date, activities, from, to)
           // 일간: 실제 기록이 있으면 "계획 | 실제"로 나눠서 나란히 보여줘요
           // 주간: 칸이 좁아서 나누지 않고 한 열에 같이 그려요 (겹칠 때만 나란히)
-          const split = single && acts.length > 0
-          const tasks = placeTasks(d, from, to)
+          const compare = single && planVsActual
+          const split = compare || (single && acts.length > 0)
+          const tasks = placeTasks(d, from, to, compare ? 'planned' : 'shown')
+          // 계획 | 실제 비교: 실제 칸에는 완료한 Task(실제 시각)와 실제로 한 일 기록을 같이, 겹치면 나란히
+          const doneTasks = compare ? placeTasks(d, from, to, 'done') : []
+          if (compare) layoutColumns<Placed<unknown>>([...doneTasks, ...acts])
           // 한 열로 그릴 땐 Task 와 실제 기록을 같이 놓고 겹치는 것끼리만 나란히 (col/cols 를 다시 정해요)
           if (!split && acts.length) layoutColumns<Placed<unknown>>([...tasks, ...acts])
           const isToday = d.date === now.date
@@ -412,6 +431,7 @@ export function TimeGrid({
                       dimmed={isDragging('task', p.item.taskId)}
                       isNew={highlightIds?.has(p.item.taskId)}
                       grouped={grouped}
+                      planned={compare}
                       drag={
                         enabled && canDragTask(p.item)
                           ? (e, mode) =>
@@ -448,6 +468,15 @@ export function TimeGrid({
               )}
               {split && (
                 <div className="border-line/70 pointer-events-none absolute inset-y-0 right-0 w-[40%] border-l border-dashed *:pointer-events-auto">
+                  {doneTasks.map((p) => (
+                    <TaskBlock
+                      key={`done-${p.item.taskId}`}
+                      placed={p}
+                      geometry={geometry}
+                      selected={selection?.kind === 'task' && selection.id === p.item.taskId}
+                      onSelect={selectTask}
+                    />
+                  ))}
                   {acts.map((p) => (
                     <ActivityBlock
                       key={p.item.activityId}

@@ -16,6 +16,7 @@ import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst }
 import { HATCH } from './Blocks'
 import { MonthView } from './MonthView'
 import { AutoPlaceBar } from './AutoPlaceBar'
+import { DayTaskList } from './DayTaskList'
 import { TimeGrid } from './TimeGrid'
 import { useTimetableInteractions } from './useTimetableInteractions'
 
@@ -223,25 +224,40 @@ export function CalendarView() {
       ) : (
         <>
           <AutoPlaceBar days={rawDays} today={today} />
-          <TimeGrid
-            days={days}
-            startHour={startHour}
-            endHour={endHour}
-            selection={selection}
-            onSelectTask={onSelectTask}
-            onSelectFixed={onSelectFixed}
-            activities={acts}
-            onSelectActivity={onSelectActivity}
-            onEmptyClick={onEmptyClick}
-            onDrop={onDrop}
-            onDragStart={close}
-            groupIds={groupIds}
-            highlightIds={newIds}
-            onDayClick={(d) => {
-              close()
-              go({ view: 'day', date: d })
-            }}
-          />
+          {/* 일간: TimeTable(계획 | 실제) 오른쪽에 그날 할 일 목록 — Task 추가 패널이 열려 있으면 자리가 좁아 숨겨요 */}
+          <div className={cn(view === 'day' && !add && 'grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]')}>
+            <TimeGrid
+              days={days}
+              startHour={startHour}
+              endHour={endHour}
+              selection={selection}
+              onSelectTask={onSelectTask}
+              onSelectFixed={onSelectFixed}
+              activities={acts}
+              onSelectActivity={onSelectActivity}
+              onEmptyClick={onEmptyClick}
+              onDrop={onDrop}
+              onDragStart={close}
+              groupIds={groupIds}
+              highlightIds={newIds}
+              onDayClick={(d) => {
+                close()
+                go({ view: 'day', date: d })
+              }}
+              planVsActual={view === 'day'}
+            />
+            {view === 'day' && !add && (
+              <div className="lg:sticky lg:top-4">
+                <DayTaskList
+                  day={days.find((d) => d.date === date)}
+                  today={today}
+                  onSelect={onSelectTask}
+                  onToggle={(t) => toggleComplete.mutate(t)}
+                  togglingId={toggleComplete.isPending ? (toggleComplete.variables?.taskId ?? null) : null}
+                />
+              </div>
+            )}
+          </div>
         </>
       )}
 

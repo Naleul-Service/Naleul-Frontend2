@@ -96,6 +96,7 @@ export function TaskBlock({
   dimmed,
   isNew,
   grouped,
+  planned,
 }: {
   placed: Placed<TimeBlockTask>
   geometry: Geometry
@@ -108,13 +109,15 @@ export function TaskBlock({
   isNew?: boolean
   /** 묶음 드래그로 같이 옮길 Task (점선 테두리) */
   grouped?: boolean
+  /** 일간 "계획" 칸: 완료했어도 계획한 시각으로 그렸으니 "실제" 표시를 하지 않아요 */
+  planned?: boolean
 }) {
   const t = placed.item
   const heightPx = (placed.bottom - placed.top) * geometry.ppm
   const short = heightPx < 26 // 10~20분 블록: 한 줄로 가운데 정렬
   const done = t.taskStatus === 'COMPLETED'
   // 완료 후 실제 시각에 그려진 블록 ("실제" 표시)
-  const actual = shownTime(t)?.actual ?? false
+  const actual = !planned && (shownTime(t)?.actual ?? false)
   const solid = t.sourceType !== 'ROUTINE'
   const width = 100 / placed.cols
   const style: CSSProperties = {
