@@ -7,6 +7,7 @@ import { Button, buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Chip'
 import { ResumeCard } from '@/features/goal-creation/ui/ResumeCard'
+import { useRecordPattern } from '@/features/record/api'
 import { useGoalCategories, type GoalCategory } from '../api'
 import { dDayLabel, formatDot, goalColor, isOngoing, periodProgress, statusLabel } from '../format'
 import { subOption } from '../kind'
@@ -38,6 +39,108 @@ function TempGoalCard({ goal }: { goal: GoalCategory }) {
         AI로 구체화하기
         <ArrowRight className="size-3.5" />
       </Link>
+    </div>
+  )
+}
+
+const fmtValue = (v: number, unit: string | null | undefined) => `${Number(v.toFixed(2))}${unit ?? ''}`
+
+/** 생활형 수치 목표 — 시작 → 목표 사이 지금 위치 + 남은 수치 */
+function metricProgress(goal: GoalCategory) {
+  const { startValue: start, currentValue, targetValue: target } = goal
+  if (start == null || target == null || start === target) return null
+  const current = currentValue ?? start
+  const ratio = Math.min(Math.max((current - start) / (target - start), 0), 1)
+  return {
+    current,
+    target,
+    ratio,
+    remain: Math.abs(target - current),
+    done: ratio >= 1,
+  }
+}
+
+function ProgressBar({ ratio, color }: { ratio: number; color: string }) {
+  return (
+    <div className="bg-subtle h-1.5 rounded-full">
+      <div className="h-full rounded-full" style={{ width: `${ratio * 100}%`, backgroundColor: color }} />
+    </div>
+  )
+}
+
+/** 생활형: 수치가 있으면 목표까지 남은 수치, 없으면 기간 경과 */
+function LifeProgress({ goal, color }: { goal: GoalCategory; color: string }) {
+  const metric = metricProgress(goal)
+  const period = periodProgress(goal.goalCategoryStartDate, goal.goalCategoryEndDate)
+  const unit = goal.metricUnit
+
+  if (metric) {
+    return (
+      <div className="mt-auto pt-5">
+        <div className="mb-1.5 flex items-end justify-between gap-2 text-xs">
+          <span className="text-ink-3">
+            {goal.metricName ? `${goal.metricName} ` : ''}
+            <b className="text-ink">{fmtValue(metric.current, unit)}</b> → {fmtValue(metric.target, unit)}
+          </span>
+          <span className="font-semibold tabular-nums">{Math.round(metric.ratio * 100)}%</span>
+        </div>
+        <ProgressBar ratio={metric.ratio} color={color} />
+        <p className="mt-1.5 text-xs font-semibold" style={{ color: metric.done ? undefined : color }}>
+          {metric.done ? '목표 달성 🎉' : `목표까지 ${fmtValue(metric.remain, unit)} 남았어요`}
+        </p>
+      </div>
+    )
+  }
+
+  if (!period) return null
+  return (
+    <div className="mt-auto pt-5">
+      <div className="text-ink-3 mb-1.5 flex justify-between text-xs">
+        <span>기간 경과</span>
+        <span className="tabular-nums">{Math.round(period.ratio * 100)}%</span>
+      </div>
+      <ProgressBar ratio={period.ratio} color={color} />
+    </div>
+  )
+}
+
+/** 업무형: 완료한 Task 가 있는 주가 몇 주째 이어지는지 + 최근 8주 칸 */
+function WorkStreak({ goalId, color }: { goalId: number; color: string }) {
+  const { data } = useRecordPattern(goalId)
+  if (!data)
+    return (
+      <div className="mt-auto pt-5">
+        <div className="bg-subtle h-12 animate-pulse rounded-lg" />
+      </div>
+    )
+
+  const { weekStreak, thisWeekDone } = data.summary
+  const weeks = data.rhythm.weeks.slice(-8)
+  return (
+    <div className="mt-auto pt-5">
+      <div className="mb-1.5 flex items-end justify-between gap-2 text-xs">
+        <span className="text-ink-3">연속 완료</span>
+        <span className="font-semibold tabular-nums">
+          {weekStreak > 0 && <span aria-hidden>🔥 </span>}
+          {weekStreak}주
+        </span>
+      </div>
+      <div className="flex gap-1" aria-hidden>
+        {weeks.map((w) => (
+          <span
+            key={w.weekStart}
+            className="bg-subtle h-1.5 flex-1 rounded-full"
+            style={w.count > 0 ? { backgroundColor: color } : undefined}
+          />
+        ))}
+      </div>
+      <p className="text-ink-3 mt-1.5 text-xs">
+        {thisWeekDone
+          ? '이번 주도 완료했어요'
+          : weekStreak > 0
+            ? `이번 주에 하나 끝내면 ${weekStreak + 1}주째예요`
+            : '이번 주에 첫 칸을 채워보세요'}
+      </p>
     </div>
   )
 }
@@ -86,16 +189,10 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
         </p>
       )}
 
-      {period && (
-        <div className="mt-auto pt-5">
-          <div className="text-ink-3 mb-1.5 flex justify-between text-xs">
-            <span>기간 경과</span>
-            <span className="tabular-nums">{Math.round(period.ratio * 100)}%</span>
-          </div>
-          <div className="bg-subtle h-1.5 rounded-full">
-            <div className="h-full rounded-full" style={{ width: `${period.ratio * 100}%`, backgroundColor: color }} />
-          </div>
-        </div>
+      {goal.goalMode === 'RECORD' ? (
+        <WorkStreak goalId={goal.goalCategoryId} color={color} />
+      ) : (
+        <LifeProgress goal={goal} color={color} />
       )}
       <p className="text-ink-3 mt-3 text-xs">
         {goal.goalMode === 'RECORD'
