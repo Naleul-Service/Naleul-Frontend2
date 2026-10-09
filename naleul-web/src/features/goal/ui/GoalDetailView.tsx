@@ -17,6 +17,7 @@ import { GoalAiEditBar } from './GoalAiEditBar'
 import { GoalHeader, GoalNotes } from './GoalHeader'
 import { GoalTaskList } from './GoalTaskList'
 import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
+import { DailyCheckInCard } from './progress/DailyCheckInCard'
 import { ProgressSection } from './progress/ProgressSection'
 import { RefineWithAiCard } from './RefineWithAiCard'
 import { RoutineHeatmapSection } from './RoutineHeatmapSection'
@@ -184,7 +185,7 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
 
 /**
  * 달성형 목표.
- *  - 위: 진행 요약 → "말로 고치기" → 이 목표를 시작한 이유 (가장 먼저 다시 보게)
+ *  - 위: 진행 요약 → 오늘 기록(수치 + 회고) → "말로 고치기" → 이 목표를 시작한 이유
  *  - 왼쪽: 매일 보는 "할 것" — 루틴 · 루틴 실천 히트맵 · Task (세부 목표는 각 줄의 라벨)
  *  - 오른쪽: 수치 기록 · Task 실천률 · 접어 둔 "세부 구조"(마일스톤 · 세부 목표)
  */
@@ -195,6 +196,12 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
       {!goal.temporary && (
         <div className="mt-6">
           <Hero goal={goal} />
+        </div>
+      )}
+      {/* 사용자가 매일 채우는 칸 — 진행 요약 바로 아래에 크게 (수치 · 오늘 어땠는지 · 무엇을 했는지) */}
+      {goal.goalCategoryStatus !== 'COMPLETED' && (
+        <div className="mt-4">
+          <DailyCheckInCard goal={goal} />
         </div>
       )}
       {!goal.temporary && goal.goalCategoryStatus !== 'COMPLETED' && (

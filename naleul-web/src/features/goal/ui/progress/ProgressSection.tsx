@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { Target, TrendingDown, TrendingUp } from 'lucide-react'
+import { TrendingDown, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
@@ -11,12 +11,14 @@ import {
   useRecordMetric,
   type GoalCategory,
   type GoalProgress,
+  type GoalReflection,
   type MetricProgress,
   type ProgressStatus,
   type TaskProgress,
 } from '../../api'
 import { InlineConfirm, RowActions, inlineInput, useEditing } from '../../edit/inline'
 import { Section } from '../sections'
+import { moodOf } from './DailyCheckInCard'
 import { ProgressChart, dayNum, type ChartSeries } from './ProgressChart'
 
 /**
@@ -32,12 +34,6 @@ export const fmtNum = (v: number) => String(Number(v.toFixed(2)))
 const withUnit = (v: number, unit: string | null) => `${fmtNum(v)}${unit ?? ''}`
 /** 계산으로 나온 값(계획값 · 차이)은 소수 1자리까지만 */
 const withUnit1 = (v: number, unit: string | null) => `${String(Number(v.toFixed(1)))}${unit ?? ''}`
-/** 받침에 맞는 조사: 체중은 / 점수는 */
-const josa = (word: string, withFinal: string, without: string) => {
-  const c = word.charCodeAt(word.length - 1)
-  if (c < 0xac00 || c > 0xd7a3) return `${word}${without}`
-  return `${word}${(c - 0xac00) % 28 ? withFinal : without}`
-}
 const md = (iso: string) => {
   const [, m, d] = iso.split('-').map(Number)
   return `${m}월 ${d}일`
@@ -156,137 +152,18 @@ function Insight({ m, endDate }: { m: MetricProgress; endDate: string | null }) 
   )
 }
 
-// ─── 오늘 기록 ────────────────────────────────────────────────
-
-function CheckIn({ goalId, m, today }: { goalId: number; m: MetricProgress; today: string }) {
-  const record = useRecordMetric(goalId)
-  const todayLog = m.logs.find((l) => l.date === today)
-  const [editing, setEditing] = useState(!todayLog)
-  const [date, setDate] = useState(today)
-  const [value, setValue] = useState('')
-  const name = m.name || '수치'
-
-  const reset = () => {
-    setValue('')
-    setDate(today)
-  }
-
-  const submit = (e?: FormEvent) => {
-    e?.preventDefault()
-    if (record.isPending) return
-    const v = Number(value)
-    if (value.trim() === '' || !Number.isFinite(v)) return
-    record.mutate(
-      { date, value: v },
-      {
-        onSuccess: () => {
-          reset()
-          setEditing(false)
-        },
-      }
-    )
-  }
-
-  if (!editing && todayLog) {
-    return (
-      <div className="border-line mt-4 flex items-center gap-3 rounded-2xl border px-4 py-3">
-        <span className="bg-success-soft text-success grid size-8 shrink-0 place-items-center rounded-full">
-          <Target className="size-4" />
-        </span>
-        <p className="min-w-0 flex-1 text-[14px]">
-          오늘 {name} <b>{withUnit(todayLog.value, m.unit)}</b> 기록했어요
-        </p>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            setDate(today)
-            setValue(fmtNum(todayLog.value))
-            setEditing(true)
-          }}
-        >
-          수정
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <form
-      onSubmit={submit}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          e.preventDefault()
-          reset()
-          if (todayLog) setEditing(false)
-          ;(e.target as HTMLElement).blur?.()
-        }
-      }}
-      className="border-brand/30 bg-brand-soft/50 mt-4 rounded-2xl border px-4 py-3"
-    >
-      <p className="text-[14px] font-semibold">
-        {date === today ? `오늘 ${josa(name, '은', '는')} 얼마예요?` : `${md(date)} ${name} 기록`}
-      </p>
-      <p className="text-ink-3 mt-0.5 text-[12px]">
-        기록할수록 그래프에 내 위치가 찍혀요. Enter로 저장, Esc로 취소
-        {m.lastLoggedDate && m.lastLoggedDate !== today && ` · 마지막 기록 ${md(m.lastLoggedDate)}`}
-      </p>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <input
-          type="date"
-          value={date}
-          max={today}
-          onChange={(e) => setDate(e.target.value || today)}
-          aria-label="기록 날짜"
-          className={cn(inlineInput, 'w-[150px] shrink-0')}
-        />
-        <div className="relative min-w-[120px] flex-1">
-          <input
-            // 기록하러 들어온 사람이 바로 칠 수 있게
-            autoFocus={!!todayLog}
-            inputMode="decimal"
-            value={value}
-            onChange={(e) => setValue(e.target.value.replace(/[^0-9.-]/g, ''))}
-            placeholder={fmtNum(m.currentValue)}
-            aria-label={`${name} 값`}
-            className={cn(inlineInput, 'pr-12 text-[15px] font-semibold')}
-          />
-          {m.unit && (
-            <span className="text-ink-3 pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[13px]">
-              {m.unit}
-            </span>
-          )}
-        </div>
-        <Button type="submit" size="sm" loading={record.isPending} disabled={value.trim() === ''}>
-          기록
-        </Button>
-        {todayLog && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              reset()
-              setEditing(false)
-            }}
-          >
-            취소
-          </Button>
-        )}
-      </div>
-    </form>
-  )
-}
-
 // ─── 지난 기록 ────────────────────────────────────────────────
 
 function RecentLogs({
   goalId,
   m,
+  notes,
   onEdit,
 }: {
   goalId: number
   m: MetricProgress
+  /** 날짜별 회고 — 수치 옆에 그날 무엇을 했는지 같이 보여줘요 */
+  notes: Record<string, GoalReflection>
   onEdit: (date: string, value: number) => void
 }) {
   const [showAll, setShowAll] = useState(false)
@@ -336,7 +213,11 @@ function RecentLogs({
                   {fmtNum(Math.abs(delta))}
                 </span>
               )}
-              <span className="text-ink-3 min-w-0 flex-1 truncate text-[13px]">{l.memo}</span>
+              <span className="text-ink-3 min-w-0 flex-1 truncate text-[13px]" title={notes[l.date]?.note ?? undefined}>
+                {moodOf(notes[l.date]?.mood)?.emoji}
+                {notes[l.date]?.mood ? ' ' : ''}
+                {notes[l.date]?.note ?? l.memo}
+              </span>
               <RowActions
                 label={`${md(l.date)} 기록`}
                 onEdit={() => onEdit(l.date, l.value)}
@@ -388,7 +269,8 @@ function MetricView({ goalId, p, m }: { goalId: number; p: GoalProgress; m: Metr
       <TrackBar m={m} />
       <Insight m={m} endDate={p.endDate} />
 
-      {loaded ? (
+      {/* 오늘 기록은 화면 위 "오늘 기록" 카드에서 해요. 여기서는 지난 기록을 고칠 때만 입력창을 열어요 */}
+      {loaded && (
         <CheckInPrefilled
           key={loaded.n}
           goalId={goalId}
@@ -398,8 +280,6 @@ function MetricView({ goalId, p, m }: { goalId: number; p: GoalProgress; m: Metr
           value={loaded.value}
           onDone={() => setLoaded(null)}
         />
-      ) : (
-        <CheckIn key={`${m.loggedToday}`} goalId={goalId} m={m} today={p.today} />
       )}
 
       <ProgressChart
@@ -419,7 +299,12 @@ function MetricView({ goalId, p, m }: { goalId: number; p: GoalProgress; m: Metr
         ]}
       />
 
-      <RecentLogs goalId={goalId} m={m} onEdit={(date, value) => setLoaded({ date, value, n: Date.now() })} />
+      <RecentLogs
+        goalId={goalId}
+        m={m}
+        notes={Object.fromEntries((p.reflections ?? []).map((r) => [r.date, r]))}
+        onEdit={(date, value) => setLoaded({ date, value, n: Date.now() })}
+      />
       <TaskLine t={p.tasks} />
     </>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CornerDownLeft, MessageSquareText } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Chip'
@@ -8,9 +8,15 @@ import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/cn'
 import type { GoalCategory } from '../api'
 import { useGoalEditApply, useGoalEditPreview, type GoalEditPreview } from '../edit/mutations'
+import { AI_EDIT_PREFILL_EVENT } from './progress/DailyCheckInCard'
 
 const MAX = 200
-const EXAMPLES = ['운동은 주 2회로 줄여줘', '종료일 2주 늦춰줘', '아침 7시에 스트레칭 10분 추가해줘']
+const EXAMPLES = [
+  '최근 기록 보고 계획 조정해줘',
+  '운동은 주 2회로 줄여줘',
+  '종료일 2주 늦춰줘',
+  '아침 7시에 스트레칭 10분 추가해줘',
+]
 const ACTION_TONE: Record<string, 'brand' | 'neutral' | 'danger'> = { 추가: 'brand', 변경: 'neutral', 삭제: 'danger' }
 
 /**
@@ -26,6 +32,20 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
   const [picked, setPicked] = useState<boolean[]>([])
   const ask = useGoalEditPreview(goal.goalCategoryId)
   const apply = useGoalEditApply(goal.goalCategoryId)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // "오늘 기록" 카드의 "최근 기록 보고 계획 조정받기" → 문장을 채우고 이 칸으로 이동
+  useEffect(() => {
+    const onPrefill = (e: Event) => {
+      const v = (e as CustomEvent<string>).detail
+      if (!v) return
+      setText(v.slice(0, MAX))
+      inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      inputRef.current?.focus()
+    }
+    window.addEventListener(AI_EDIT_PREFILL_EVENT, onPrefill)
+    return () => window.removeEventListener(AI_EDIT_PREFILL_EVENT, onPrefill)
+  }, [])
 
   const submit = () => {
     const value = text.trim()
@@ -57,6 +77,7 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
       <div className="flex items-center gap-2">
         <MessageSquareText className="text-brand size-5 shrink-0" />
         <input
+          ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, MAX))}
           onKeyDown={(e) => {

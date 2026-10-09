@@ -249,6 +249,18 @@ export interface GoalProgress {
   totalDays: number | null
   metric: MetricProgress | null
   tasks: TaskProgress
+  /** 최근 하루 회고 (최신순) */
+  reflections?: GoalReflection[]
+}
+
+/** 그날 목표를 돌아본 느낌 */
+export type ReflectionMood = 'GOOD' | 'OK' | 'BAD'
+
+/** 하루 회고: 무엇을 했는지 · 어땠는지 (예: "점심에 마라탕 먹음" · 아쉬워요) */
+export interface GoalReflection {
+  date: string
+  mood: ReflectionMood | null
+  note: string | null
 }
 
 export function useGoalProgress(goalId: number, enabled = true) {
@@ -271,6 +283,27 @@ export function useRecordMetric(goalId: number) {
     onSuccess: (data) => {
       qc.setQueryData(goalKeys.progress(goalId), data)
       toast.success('기록했어요.')
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : '기록하지 못했어요. 다시 시도해 주세요.'),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: goalKeys.detail(goalId) })
+      qc.invalidateQueries({ queryKey: goalKeys.list() })
+    },
+  })
+}
+
+/**
+ * 오늘 기록 + 회고 한 번에 (수치는 수치 목표일 때만 저장돼요).
+ * mood·note 를 모두 비우면 그날 회고를 지워요.
+ */
+export function useCheckIn(goalId: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: { date?: string; value?: number | null; mood?: ReflectionMood | null; note?: string | null }) =>
+      api.put<GoalProgress>(`/v1/goal-categories/${goalId}/check-in`, body),
+    onSuccess: (data) => {
+      qc.setQueryData(goalKeys.progress(goalId), data)
+      toast.success('오늘 기록을 남겼어요.')
     },
     onError: (e) => toast.error(isApiError(e) ? e.message : '기록하지 못했어요. 다시 시도해 주세요.'),
     onSettled: () => {
