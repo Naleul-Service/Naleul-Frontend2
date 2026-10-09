@@ -40,9 +40,12 @@ function shownMinutes(dayYmd: string, t: TimeBlockTask, fallbackMinutes = t.plan
   return { start, end }
 }
 
+/** 기상 전 · 취침 후로 더 보여줄 시간 — 기상·취침을 끌어서 바꿀 수 있게 (분) */
+export const SLEEP_MARGIN_MINUTES = 120
+
 /**
  * 격자에 보여줄 시간 범위 (시 단위).
- * 기본은 하루 범위(기상 ~ 취침)이고, 그 밖에 Task 가 있으면 넓혀요.
+ * 기본은 하루 범위(기상 ~ 취침) + 앞뒤 2시간이고, 그 밖에 Task 가 있으면 넓혀요.
  * 수면 패턴이 없으면 백엔드가 00:00~24:00 을 주므로 그대로 0~24시.
  */
 export function visibleHours(days: TimetableDay[], activities: ActualActivity[] = []) {
@@ -50,8 +53,9 @@ export function visibleHours(days: TimetableDay[], activities: ActualActivity[] 
   let start = Infinity
   let end = -Infinity
   for (const d of days) {
-    start = Math.min(start, minutesFrom(d.date, d.dayRange.start))
-    end = Math.max(end, minutesFrom(d.date, d.dayRange.end))
+    // 수면 블록이 있으면 기상 2시간 전부터 취침 2시간 뒤까지 (수면 블록 일부가 보여서 가장자리를 끌 수 있어요)
+    start = Math.min(start, minutesFrom(d.date, d.dayRange.start) - (d.sleep?.wake ? SLEEP_MARGIN_MINUTES : 0))
+    end = Math.max(end, minutesFrom(d.date, d.dayRange.end) + (d.sleep?.bed ? SLEEP_MARGIN_MINUTES : 0))
     for (const t of d.tasks) {
       const m = shownMinutes(d.date, t, 30)
       if (!m) continue
@@ -99,9 +103,29 @@ function clip(start: number, end: number, from: number, to: number) {
 
 export function placeFixed(day: TimetableDay, from: number, to: number): Placed<FixedBlock>[] {
   const out: Placed<FixedBlock>[] = []
+  // 수면은 placeSleep 이 자르지 않은 원본으로 따로 그려요 (기상·취침 가장자리를 끌 수 있게)
+  const sleepSeparately = !!day.sleep
   for (const b of day.fixedBlocks) {
+    if (sleepSeparately && b.patternType === 'SLEEP') continue
     const c = clip(minutesFrom(day.date, b.start), minutesFrom(day.date, b.end), from, to)
     if (c) out.push({ item: b, ...c, col: 0, cols: 1 })
+  }
+  return out
+}
+
+export interface PlacedSleep extends Placed<FixedBlock> {
+  /** wake = 아침에 끝나는 수면 (아래 가장자리 = 기상), bed = 밤에 시작하는 수면 (위 가장자리 = 취침) */
+  edge: 'wake' | 'bed'
+}
+
+/** 그날 칸에 그릴 수면 블록 (기상 전 · 취침 후). start/end 는 자르기 전 원래 시각(그날 0시 기준 분, 음수·1440 이상 가능) */
+export function placeSleep(day: TimetableDay, from: number, to: number): PlacedSleep[] {
+  const out: PlacedSleep[] = []
+  for (const edge of ['wake', 'bed'] as const) {
+    const b = day.sleep?.[edge]
+    if (!b) continue
+    const c = clip(minutesFrom(day.date, b.start), minutesFrom(day.date, b.end), from, to)
+    if (c) out.push({ item: b, ...c, col: 0, cols: 1, edge })
   }
   return out
 }
@@ -229,7 +253,13 @@ export function applyPending(
         ? { ...b, start: toDateTime(d.date, p.start), end: toDateTime(d.date, p.end), overridden: true }
         : b
     })
-    return { ...d, tasks, unscheduledTasks, fixedBlocks }
+    // 수면 블록은 이틀(전날 밤 → 이날 아침) 칸에 걸쳐 보여서, 끌어놓은 칸의 날짜 기준으로 바꾼 시각을 양쪽에 반영해요
+    const moveSleep = (b: FixedBlock | null) => {
+      const p = b && fixedMoves.get(keyOf(b))
+      return b && p ? { ...b, start: toDateTime(p.date, p.start), end: toDateTime(p.date, p.end), overridden: true } : b
+    }
+    const sleep = d.sleep ? { wake: moveSleep(d.sleep.wake), bed: moveSleep(d.sleep.bed) } : d.sleep
+    return { ...d, tasks, unscheduledTasks, fixedBlocks, sleep }
   })
 }
 

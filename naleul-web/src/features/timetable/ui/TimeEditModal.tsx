@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import type { ChangeScope } from '../api'
-import { formatDuration, isYmd, minutesToTime, timeToMinutes } from '../time'
+import { WEEKDAY_LABEL, formatDuration, isYmd, minutesToTime, timeToMinutes, weekdayIndex } from '../time'
 import { ScopeChips, scopeOptions } from './ScopeChooser'
 
 export interface TimeValue {
@@ -52,6 +52,7 @@ export function TimeEditModal({ title, description, initial, dateEditable, loadi
         isToday: date === scope.today,
         sameDay: date === initial.date,
         crossesMidnight: crosses,
+        weekdayLabel: scope.kind === 'fixed' && isYmd(date) ? `${WEEKDAY_LABEL[weekdayIndex(date)]}요일` : undefined,
       })
     : null
   // 고를 수 없게 된 범위를 골라 둔 상태면 이날만으로

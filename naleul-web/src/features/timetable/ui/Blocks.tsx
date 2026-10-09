@@ -1,10 +1,10 @@
 'use client'
 
 import type { CSSProperties, MouseEvent, PointerEvent } from 'react'
-import { Check, Pin, X } from 'lucide-react'
+import { Check, GripHorizontal, Pin, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { hexOf, shownTime, withAlpha, type Placed } from '../layout'
-import { formatMinutes, todayKst } from '../time'
+import { hexOf, shownTime, withAlpha, type Placed, type PlacedSleep } from '../layout'
+import { formatMinutes, minutesToTime, todayKst } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask } from '../types'
 
 /** 빗금 배경 (고정 시간) */
@@ -233,6 +233,70 @@ export function FixedBlockView({
       )}
       {drag && !placed.clippedTop && heightPx >= TOP_HANDLE_MIN_PX && <ResizeHandle onDrag={drag} edge="top" />}
       {drag && !placed.clippedBottom && <ResizeHandle onDrag={drag} />}
+    </button>
+  )
+}
+
+/** 수면 배경 (고정 시간 빗금보다 진한 남색 톤) */
+const SLEEP_BG: CSSProperties = {
+  backgroundColor: '#EEF1FB',
+  backgroundImage: 'repeating-linear-gradient(135deg, #DFE4F6 0 1.5px, transparent 1.5px 9px)',
+}
+
+/**
+ * 수면 블록 — 기상 전(아침)·취침 후(밤) 2시간만큼 보여요.
+ * 아침 블록은 아래 가장자리(= 기상), 밤 블록은 위 가장자리(= 취침)를 끌어서 시간을 바꿔요.
+ * 블록 전체를 옮기는 드래그는 없어요 (기상·취침 중 하나만 바꾸는 게 보통이라서).
+ */
+export function SleepBlockView({
+  placed,
+  geometry,
+  selected,
+  onSelect,
+  drag,
+  dimmed,
+}: {
+  placed: PlacedSleep
+  geometry: Geometry
+  selected: boolean
+  onSelect: (b: FixedBlock, e: MouseEvent<HTMLButtonElement>) => void
+  drag?: BlockDrag
+  dimmed?: boolean
+}) {
+  const b = placed.item
+  const wake = placed.edge === 'wake'
+  const time = minutesToTime(wake ? placed.end : placed.start)
+  const label = wake ? `기상 ${time}` : `취침 ${time}`
+  return (
+    <button
+      type="button"
+      data-fixed-id={`${b.lifePatternId}-${b.targetDate}`}
+      data-sleep-edge={placed.edge}
+      onClick={(e) => onSelect(b, e)}
+      style={{ ...pos(placed, geometry), ...SLEEP_BG, ...NO_CALLOUT }}
+      aria-label={`수면 · ${label}`}
+      className={cn(
+        'text-ink-3 absolute inset-x-0 z-0 flex flex-col overflow-hidden text-left text-[11px] leading-tight',
+        wake ? 'justify-end' : 'justify-start',
+        dimmed && 'opacity-40',
+        selected && 'ring-ink-3 ring-2'
+      )}
+    >
+      {/* 끌 수 있는 가장자리 — 늘 보이는 손잡이 (마우스를 올려야 보이는 다른 블록과 달리 처음 보는 사람도 알 수 있게) */}
+      <span
+        aria-hidden
+        onPointerDown={drag ? (e) => drag(e, wake ? 'resize' : 'resize-top') : undefined}
+        className={cn(
+          'flex h-6 shrink-0 items-center gap-1 border-[#8EA2FF] px-2 font-semibold text-[#4B5BB8]',
+          wake ? 'border-b-2' : 'border-t-2',
+          drag && 'cursor-ns-resize hover:bg-[#DFE4F6]'
+        )}
+      >
+        <span className="truncate">
+          {wake ? '☀️' : '🌙'} {label}
+        </span>
+        {drag && <GripHorizontal className="ml-auto size-3.5 shrink-0 opacity-70" />}
+      </span>
     </button>
   )
 }

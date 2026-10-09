@@ -9,8 +9,9 @@ import { cn } from '@/lib/cn'
 import type { JavaDayOfWeek } from '@/features/goal/api'
 import { Field, inputClass } from '@/features/goal-creation/ui/formParts'
 import { formatDuration, timeToMinutes } from '@/features/timetable/time'
-import type { LifePattern, LifePatternType } from '@/features/timetable/types'
+import type { LifePattern, LifePatternDayTime, LifePatternType } from '@/features/timetable/types'
 import type { LifePatternCreateInput } from '../api'
+import { nightsToDayTimes, sleepConflictDay, sleepNights, type SleepNight } from '../dayTimes'
 import {
   ALL_DAYS,
   TYPE_LABEL,
@@ -73,6 +74,14 @@ const fromPattern = (p: LifePattern): LifePatternFormValue => ({
   days: p.days.length ? [...p.days] : ALL_DAYS,
 })
 
+/** 요일별 시간 한 칸 (일반 고정 시간) */
+type DayTimeMap = Partial<Record<JavaDayOfWeek, { start: string; end: string; offset: number }>>
+
+const toDayTimeMap = (list?: LifePatternDayTime[]): DayTimeMap =>
+  Object.fromEntries(
+    (list ?? []).map((t) => [t.day, { start: toHm(t.startTime), end: toHm(t.endTime), offset: t.startDayOffset }])
+  )
+
 /**
  * 고정 시간 추가·수정 모달.
  * 제목 · 이모지 · 시작/종료 시각 · 반복 요일을 받아요.
@@ -93,6 +102,37 @@ export function LifePatternFormModal({
   const set = <K extends keyof LifePatternFormValue>(k: K, v: LifePatternFormValue[K]) =>
     setForm((f) => ({ ...f, [k]: v }))
 
+  // ── 요일별 시간 (기본은 모든 요일 같은 시간, 필요할 때만 펼쳐요) ──
+  const isSleep = form.patternType === 'SLEEP'
+  const [perDay, setPerDay] = useState(!!editing?.dayTimes?.length)
+  const [dayMap, setDayMap] = useState<DayTimeMap>(() => toDayTimeMap(editing?.dayTimes))
+  // 수면은 "밤" 단위 (월요일 밤 취침 → 화요일 아침 기상). 블록 소속 요일과 헷갈리지 않게 화면에선 밤으로 보여줘요
+  const [nights, setNights] = useState<(SleepNight | null)[]>(() =>
+    editing?.dayTimes?.length ? sleepNights(editing) : []
+  )
+  const defaultNight: SleepNight = { bed: form.startTime, wake: form.endTime }
+  /** 밤 w 에 수면이 있는지 (기본 취침이 자정 이후면 다음 날 소속이라 그 요일 기준으로 봐요) */
+  const nightShift = form.startTime && timeToMinutes(form.startTime) < 720 ? 1 : 0
+  const hasNight = (w: number) => form.days.includes(ALL_DAYS[(w + nightShift) % 7])
+  const nightAt = (w: number) => (hasNight(w) ? (nights[w] ?? defaultNight) : null)
+  const allNights = ALL_DAYS.map((_, w) => nightAt(w))
+  const sleepConflict = perDay && isSleep ? sleepConflictDay(allNights) : -1
+  const setNight = (w: number, k: keyof SleepNight, v: string) =>
+    setNights((list) => {
+      const next = ALL_DAYS.map((_, i) => list[i] ?? null)
+      next[w] = { ...(next[w] ?? defaultNight), [k]: v }
+      return next
+    })
+  const dayTimeOf = (d: JavaDayOfWeek) => dayMap[d] ?? { start: form.startTime, end: form.endTime, offset: 0 }
+  const setDayTime = (d: JavaDayOfWeek, k: 'start' | 'end', v: string) =>
+    setDayMap((m) => ({ ...m, [d]: { ...dayTimeOf(d), [k]: v } }))
+  const genericDayTimes = (): LifePatternDayTime[] =>
+    form.days
+      .map((d) => ({ d, t: dayTimeOf(d) }))
+      .filter(({ t }) => t.offset !== 0 || t.start !== form.startTime || t.end !== form.endTime)
+      .map(({ d, t }) => ({ day: d, startTime: t.start, endTime: t.end, startDayOffset: t.offset }))
+  const badGenericDay = perDay && !isSleep ? form.days.find((d) => dayTimeOf(d).start === dayTimeOf(d).end) : undefined
+
   // 시간 계산: 종료가 시작보다 이르면 다음 날까지 (수면 23:00 ~ 07:00)
   const s = form.startTime ? timeToMinutes(form.startTime) : NaN
   const rawEnd = form.endTime ? timeToMinutes(form.endTime) : NaN
@@ -101,7 +141,8 @@ export function LifePatternFormModal({
   const e = crosses ? rawEnd + 1440 : rawEnd
 
   const title = form.title.trim()
-  const valid = title.length > 0 && title.length <= 30 && timeValid && form.days.length > 0
+  const valid =
+    title.length > 0 && title.length <= 30 && timeValid && form.days.length > 0 && sleepConflict < 0 && !badGenericDay
 
   // 추천: 추가할 때만, 입력한 제목과 맞는 것
   const suggestions = isEdit ? [] : matchPresets(form.title)
@@ -145,6 +186,8 @@ export function LifePatternFormModal({
       endTime: form.endTime,
       // 7개 다 고르면 매일 (백엔드는 빈 배열도 매일로 봐요)
       days: form.days.length === 7 ? [] : form.days,
+      // 요일별을 끄면 [] → 모든 요일이 기본 시간으로 돌아가요
+      dayTimes: perDay ? (isSleep ? nightsToDayTimes(form.startTime, form.endTime, allNights) : genericDayTimes()) : [],
     })
   }
 
@@ -240,7 +283,7 @@ export function LifePatternFormModal({
         {/* 시간 */}
         <div>
           <div className="grid grid-cols-2 gap-2">
-            <Field label="시작 시간">
+            <Field label={isSleep ? (perDay ? '기본 취침' : '취침 시간') : perDay ? '기본 시작 시간' : '시작 시간'}>
               <input
                 type="time"
                 step={600}
@@ -250,7 +293,7 @@ export function LifePatternFormModal({
                 required
               />
             </Field>
-            <Field label="종료 시간">
+            <Field label={isSleep ? (perDay ? '기본 기상' : '기상 시간') : perDay ? '기본 종료 시간' : '종료 시간'}>
               <input
                 type="time"
                 step={600}
@@ -300,6 +343,150 @@ export function LifePatternFormModal({
           </div>
           {form.days.length === 0 && <p className="text-danger mt-1.5 text-xs">요일을 하나 이상 골라 주세요.</p>}
         </div>
+
+        {/* 요일별 시간 — 예: 주말에는 늦게 일어나기 */}
+        {timeValid &&
+          form.days.length > 0 &&
+          (perDay ? (
+            <div className="bg-subtle/60 space-y-2 rounded-xl p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[13px] font-semibold">요일별 시간</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPerDay(false)
+                    setDayMap({})
+                    setNights([])
+                  }}
+                  className="text-ink-3 hover:text-ink text-[12px] font-semibold underline"
+                >
+                  모든 요일 같은 시간으로
+                </button>
+              </div>
+              {isSleep ? (
+                <ul className="space-y-1.5">
+                  {ALL_DAYS.map((d, w) => {
+                    const prev = (w + 6) % 7
+                    const morning = nightAt(prev) // 전날 밤 → 이날 아침 기상
+                    const night = nightAt(w) // 이날 밤 취침
+                    const custom =
+                      (!!morning && morning.wake !== defaultNight.wake) || (!!night && night.bed !== defaultNight.bed)
+                    return (
+                      <li key={d} className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'grid size-8 shrink-0 place-items-center rounded-lg text-[13px] font-bold',
+                            custom ? 'bg-brand text-white' : 'bg-surface text-ink-2',
+                            sleepConflict === w && 'ring-danger ring-2'
+                          )}
+                        >
+                          {dayShort(d)}
+                        </span>
+                        <label className="flex min-w-0 flex-1 items-center gap-1.5">
+                          <span className="text-ink-3 shrink-0 text-[11px]">☀️ 기상</span>
+                          <input
+                            type="time"
+                            step={600}
+                            value={morning?.wake ?? ''}
+                            disabled={!morning}
+                            onChange={(ev) => setNight(prev, 'wake', ev.target.value)}
+                            aria-label={`${dayShort(d)}요일 기상`}
+                            className={cn(inputClass, 'h-9 min-w-0 flex-1 px-2')}
+                          />
+                        </label>
+                        <label className="flex min-w-0 flex-1 items-center gap-1.5">
+                          <span className="text-ink-3 shrink-0 text-[11px]">🌙 취침</span>
+                          <input
+                            type="time"
+                            step={600}
+                            value={night?.bed ?? ''}
+                            disabled={!night}
+                            onChange={(ev) => setNight(w, 'bed', ev.target.value)}
+                            aria-label={`${dayShort(d)}요일 밤 취침`}
+                            className={cn(inputClass, 'h-9 min-w-0 flex-1 px-2')}
+                          />
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
+              ) : (
+                <ul className="space-y-1.5">
+                  {ALL_DAYS.filter((d) => form.days.includes(d)).map((d) => {
+                    const t = dayTimeOf(d)
+                    const custom = t.offset !== 0 || t.start !== form.startTime || t.end !== form.endTime
+                    return (
+                      <li key={d} className="flex items-center gap-2">
+                        <span
+                          className={cn(
+                            'grid size-8 shrink-0 place-items-center rounded-lg text-[13px] font-bold',
+                            custom ? 'bg-brand text-white' : 'bg-surface text-ink-2'
+                          )}
+                        >
+                          {dayShort(d)}
+                        </span>
+                        <input
+                          type="time"
+                          step={600}
+                          value={t.start}
+                          onChange={(ev) => setDayTime(d, 'start', ev.target.value)}
+                          aria-label={`${dayShort(d)}요일 시작`}
+                          className={cn(inputClass, 'h-9 min-w-0 flex-1 px-2')}
+                        />
+                        <span className="text-ink-4">~</span>
+                        <input
+                          type="time"
+                          step={600}
+                          value={t.end}
+                          onChange={(ev) => setDayTime(d, 'end', ev.target.value)}
+                          aria-label={`${dayShort(d)}요일 종료`}
+                          className={cn(inputClass, 'h-9 min-w-0 flex-1 px-2')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setDayMap((m) => {
+                              const next = { ...m }
+                              delete next[d]
+                              return next
+                            })
+                          }
+                          disabled={!custom}
+                          className="text-ink-3 hover:text-ink w-12 shrink-0 text-[12px] font-semibold disabled:invisible"
+                        >
+                          기본으로
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+              <p className={cn('text-xs', sleepConflict >= 0 || badGenericDay ? 'text-danger' : 'text-ink-3')}>
+                {sleepConflict >= 0
+                  ? `${dayShort(ALL_DAYS[sleepConflict])}요일 기상이 그날 취침보다 늦어요.`
+                  : badGenericDay
+                    ? `${dayShort(badGenericDay)}요일 시작과 종료를 다르게 입력해 주세요.`
+                    : isSleep
+                      ? '파란 요일만 기본과 달라요. 예: 토·일 기상을 늦추면 주말 아침이 그만큼 비워져요.'
+                      : `파란 요일만 기본 시간(${form.startTime}~${form.endTime})과 달라요.`}
+              </p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setPerDay(true)
+                // 처음 펼치면 지금 기본 시간으로 채워요 (이미 요일별 시간이 있던 패턴은 그대로)
+                if (!editing?.dayTimes?.length) {
+                  setNights([])
+                  setDayMap({})
+                }
+              }}
+              className="text-brand self-start text-[13px] font-semibold"
+            >
+              + 요일마다 시간을 다르게 하기{isSleep ? ' (예: 주말엔 늦게 일어나기)' : ''}
+            </button>
+          ))}
 
         <button type="submit" hidden />
       </form>

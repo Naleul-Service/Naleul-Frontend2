@@ -160,7 +160,8 @@ export const lifePatternKeys = { list: ['life-patterns'] as const }
 
 // ─── 범위 골라 바꾸기 (이날만 / 이번 주 / 앞으로) ───────────────────
 
-export type ChangeScope = 'DAY' | 'WEEK' | 'FOLLOWING'
+/** DAY 이날만 · WEEK 이번 주 · FOLLOWING 앞으로 계속(고정 시간은 "매일") · WEEKDAY 앞으로 이 요일마다 (고정 시간 전용) */
+export type ChangeScope = 'DAY' | 'WEEK' | 'FOLLOWING' | 'WEEKDAY'
 
 export interface RoutineScheduleResponse {
   scope: ChangeScope
@@ -206,14 +207,17 @@ export function usePatternScopedChange() {
       startTime: string
       endTime: string
       scope: ChangeScope
+      /** 블록이 targetDate 하루 앞(-1)·뒤(+1)에 시작 (기상·취침 드래그) */
+      startDayOffset?: number
     }) => {
       const r = await api.put(`/v1/life-patterns/${v.lifePatternId}/scoped-change`, {
         targetDate: v.targetDate,
         startTime: v.startTime,
         endTime: v.endTime,
         scope: v.scope,
+        startDayOffset: v.startDayOffset ?? 0,
       })
-      if (v.scope === 'FOLLOWING') qc.invalidateQueries({ queryKey: lifePatternKeys.list })
+      if (v.scope === 'FOLLOWING' || v.scope === 'WEEKDAY') qc.invalidateQueries({ queryKey: lifePatternKeys.list })
       return r
     },
     {
@@ -222,7 +226,9 @@ export function usePatternScopedChange() {
           ? '이날만 시간을 바꿨어요.'
           : v.scope === 'WEEK'
             ? '이번 주 시간을 바꿨어요.'
-            : '앞으로의 기본 시간을 바꿨어요. 지난 기록은 그대로예요.',
+            : v.scope === 'WEEKDAY'
+              ? '앞으로 이 요일의 시간을 바꿨어요. 지난 기록은 그대로예요.'
+              : '앞으로 매일의 시간을 바꿨어요. 지난 기록은 그대로예요.',
     }
   )
 }

@@ -3,7 +3,7 @@ import { api, isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
 import type { JavaDayOfWeek } from '@/features/goal/api'
 import { lifePatternKeys, timetableKeys } from '@/features/timetable/api'
-import type { LifePattern, LifePatternType } from '@/features/timetable/types'
+import type { LifePattern, LifePatternDayTime, LifePatternType } from '@/features/timetable/types'
 
 /**
  * 기본 생활 패턴(고정 시간) 추가·수정·삭제 — 설정 화면용.
@@ -22,6 +22,8 @@ export interface LifePatternInput {
   startTime: string
   endTime: string
   days: JavaDayOfWeek[]
+  /** 요일별로 다른 시간. 빈 배열이면 모든 요일 기본 시간 */
+  dayTimes?: LifePatternDayTime[]
 }
 
 export interface LifePatternCreateInput extends LifePatternInput {

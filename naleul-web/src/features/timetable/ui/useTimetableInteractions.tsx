@@ -21,6 +21,8 @@ import {
 import { applyPending, type Pending } from '../layout'
 import {
   SNAP_MINUTES,
+  WEEKDAY_LABEL,
+  addDays,
   formatMinutes,
   formatMonthDay,
   minutesFrom,
@@ -29,6 +31,7 @@ import {
   timeToMinutes,
   toDateTime,
   todayKst,
+  weekdayIndex,
 } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityForm, draftOf, type ActivityDraft } from './ActivityForm'
@@ -55,7 +58,17 @@ type Editing =
 /** 드래그 직후 "어디까지 바꿀까요?"를 묻는 중인 변경 (그동안 새 자리에 임시로 그려 둬요) */
 type ScopeAsk =
   | { kind: 'routine'; task: TimeBlockTask; date: string; start: number; end: number; pending: Pending }
-  | { kind: 'fixed'; block: FixedBlock; date: string; start: number; end: number; pending: Pending }
+  | {
+      kind: 'fixed'
+      block: FixedBlock
+      /** 끌어놓은 칸의 날짜 (start/end 는 이 날 0시 기준 분 — 수면은 음수·1440 이상일 수 있어요) */
+      date: string
+      start: number
+      end: number
+      pending: Pending
+      /** 수면: 기상(아침 블록의 끝)을 바꿨는지 취침(밤 블록의 시작)을 바꿨는지 */
+      edge?: 'wake' | 'bed'
+    }
 
 /** 묶음에 넣을 수 있는 Task: 시간이 정해져 있고 드래그로 옮길 수 있는 것 */
 const groupable = (t: TimeBlockTask) => !!t.plannedStartAt && canDragTask(t)
@@ -340,7 +353,13 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
       { taskId: task.taskId, plannedStartAt: toDateTime(date, start), plannedEndAt: toDateTime(date, end), scope },
       opts
     )
-  const saveFixed = (block: FixedBlock, start: number, end: number, scope: ChangeScope, opts: object) =>
+  /**
+   * @param date start/end 의 기준 날짜 (끌어놓은 칸). 블록 소속 날짜(targetDate)와 시작 날짜가 다르면
+   *             startDayOffset 으로 알려줘요 — 예: 토요일 소속 수면(00:00)을 금요일 밤 23:30 취침으로 → -1
+   */
+  const saveFixed = (block: FixedBlock, date: string, start: number, end: number, scope: ChangeScope, opts: object) => {
+    const startDate = addDays(date, Math.floor(start / 1440))
+    const startDayOffset = Math.round(minutesFrom(block.targetDate, `${startDate}T00:00:00`) / 1440)
     patternScoped.mutate(
       {
         lifePatternId: block.lifePatternId,
@@ -348,9 +367,11 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
         startTime: minutesToTime(start),
         endTime: minutesToTime(end),
         scope,
+        startDayOffset,
       },
       opts
     )
+  }
 
   const dropPending = (p: Pending) => setPending((list) => list.filter((x) => x !== p))
 
@@ -359,7 +380,7 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     // 성공·실패 모두 TimeTable 을 다시 불러온 뒤 임시 표시를 지워요
     const opts = { onSettled: () => dropPending(ask.pending) }
     if (ask.kind === 'routine') saveRoutine(ask.task, ask.date, ask.start, ask.end, scope, opts)
-    else saveFixed(ask.block, ask.start, ask.end, scope, opts)
+    else saveFixed(ask.block, ask.date, ask.start, ask.end, scope, opts)
     setAsk(null)
   }
   const cancelAsk = () => {
@@ -453,6 +474,7 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
         start: target.start,
         end: target.end,
         pending: p,
+        edge: source.block.patternType === 'SLEEP' ? (target.start !== source.start ? 'bed' : 'wake') : undefined,
       })
       return
     }
@@ -485,7 +507,7 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
         done
       )
     } else {
-      saveFixed(editing.block, v.start, v.end, scope, done)
+      saveFixed(editing.block, v.date, v.start, v.end, scope, done)
     }
   }
 
@@ -555,12 +577,21 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
           title={
             ask.kind === 'routine'
               ? `'${ask.task.taskName}' → ${formatMinutes(ask.start)}–${formatMinutes(ask.end)}`
-              : `${ask.block.emoji ? `${ask.block.emoji} ` : ''}${ask.block.title} → ${formatMinutes(ask.start)}–${formatMinutes(ask.end)}`
+              : ask.edge
+                ? ask.edge === 'wake'
+                  ? `☀️ 기상 ${minutesToTime(minutesFrom(ask.date, ask.block.end))} → ${minutesToTime(ask.end)}`
+                  : `🌙 취침 ${minutesToTime(minutesFrom(ask.date, ask.block.start))} → ${minutesToTime(ask.start)}`
+                : `${ask.block.emoji ? `${ask.block.emoji} ` : ''}${ask.block.title} → ${formatMinutes(ask.start)}–${formatMinutes(ask.end)}`
           }
           options={scopeOptions({
             kind: ask.kind,
             isToday: ask.date === today,
             crossesMidnight: ask.end >= 1440,
+            // 고정 시간: "앞으로 ○요일마다" — 수면은 끌어놓은 칸 기준 "토요일 아침/밤"
+            weekdayLabel:
+              ask.kind === 'fixed'
+                ? `${WEEKDAY_LABEL[weekdayIndex(ask.date)]}요일${ask.edge ? (ask.edge === 'wake' ? ' 아침' : ' 밤') : ''}`
+                : undefined,
           })}
           onChoose={chooseScope}
           onCancel={cancelAsk}

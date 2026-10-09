@@ -8,12 +8,13 @@ import {
   layoutColumns,
   placeActivities,
   placeFixed,
+  placeSleep,
   placeTasks,
   type Placed,
 } from '../layout'
 import { WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, minutesFrom, nowKst, weekdayIndex } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
-import { ActivityBlock, FixedBlockView, HATCH, TaskBlock, taskColors } from './Blocks'
+import { ActivityBlock, FixedBlockView, HATCH, SleepBlockView, TaskBlock, taskColors } from './Blocks'
 import {
   canUnschedule,
   groupMoves,
@@ -69,6 +70,25 @@ interface Props {
   onSelectActivity?: (a: ActualActivity, e: MouseEvent<HTMLElement>) => void
   /** 빈 칸(지난 시간)을 눌렀을 때 — 그 시각으로 "실제로 한 일" 기록 열기 */
   onEmptyClick?: (date: string, minutes: number, e: MouseEvent<HTMLElement>) => void
+}
+
+/** 기상은 취침보다, 취침은 기상보다 30분 이상 떨어져야 해요 (같은 날 칸 기준) */
+const MIN_AWAKE_MINUTES = 30
+
+function validateSleep(days: TimetableDay[], block: FixedBlock, target: Extract<DropTarget, { type: 'grid' }>) {
+  if (block.patternType !== 'SLEEP') return null
+  const day = days.find((d) => d.date === target.date)
+  const s = day?.sleep
+  if (!day || !s) return null
+  const key = fixedKey(block)
+  if (s.wake && fixedKey(s.wake) === key && s.bed) {
+    if (target.end > minutesFrom(day.date, s.bed.start) - MIN_AWAKE_MINUTES)
+      return '취침 시간보다 늦게 일어날 수 없어요'
+  }
+  if (s.bed && fixedKey(s.bed) === key && s.wake) {
+    if (target.start < minutesFrom(day.date, s.wake.end) + MIN_AWAKE_MINUTES) return '기상 시간보다 일찍 잘 수 없어요'
+  }
+  return null
 }
 
 function sameAsSource(source: DragSource, target: DropTarget) {
@@ -129,6 +149,7 @@ export function TimeGrid({
   // 한 시각에 Task 는 2개까지 겹쳐 둘 수 있어요 (백엔드 TaskScheduleService 와 같은 규칙)
   const validate = useCallback(
     (source: DragSource, target: DropTarget) => {
+      if (source.kind === 'fixed' && target.type === 'grid') return validateSleep(days, source.block, target)
       if (source.kind !== 'task' || target.type !== 'grid') return null
       const moves = groupMoves(source, target)
       const moving = new Set(moves.map((m) => m.task.taskId))
@@ -331,6 +352,22 @@ export function TimeGrid({
                   key={h}
                   className="border-line pointer-events-none absolute inset-x-0 border-t"
                   style={{ top: i * HOUR_PX }}
+                />
+              ))}
+              {placeSleep(d, from, to).map((p) => (
+                <SleepBlockView
+                  key={`${p.edge}-${fixedKey(p.item)}`}
+                  placed={p}
+                  geometry={geometry}
+                  selected={selection?.kind === 'fixed' && selection.key === fixedKey(p.item)}
+                  onSelect={selectFixed}
+                  dimmed={isDragging('fixed', fixedKey(p.item))}
+                  drag={
+                    enabled
+                      ? (e, mode) =>
+                          startDrag(e, { kind: 'fixed', block: p.item, date: d.date, start: p.start, end: p.end }, mode)
+                      : undefined
+                  }
                 />
               ))}
               {fixed.map((p) => (

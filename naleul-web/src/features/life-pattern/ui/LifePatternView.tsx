@@ -141,6 +141,9 @@ export function LifePatternView() {
                         {toHm(p.startTime)} – {toHm(p.endTime)}
                         {p.crossesMidnight && ' (다음 날)'} · {durationOf(p)} ·{' '}
                         <span className="text-ink-2 font-medium">{formatDays(p.days)}</span>
+                        {!!p.dayTimes?.length && (
+                          <span className="text-brand font-medium"> · 요일별 시간 {p.dayTimes.length}일</span>
+                        )}
                       </p>
                     </div>
                     <button

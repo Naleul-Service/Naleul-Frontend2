@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarDays, CalendarRange, Infinity as InfinityIcon, X } from 'lucide-react'
+import { CalendarDays, CalendarRange, Infinity as InfinityIcon, Repeat, X } from 'lucide-react'
 import { Chip } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
 import type { ChangeScope } from '../api'
@@ -20,18 +20,37 @@ export interface ScopeOption {
  * @param kind      루틴 / 고정 시간
  * @param sameDay   원래 날짜 그대로인지 (루틴을 다른 날로 옮기면 이날만)
  * @param crossesMidnight 새 시간이 자정을 넘기는지 (루틴 기본값은 자정을 넘길 수 없어요)
+ * @param weekdayLabel 고정 시간: "앞으로 ○마다"에 넣을 요일 이름 (예: "수요일", "토요일 아침"). 있으면 요일별 옵션이 생겨요
  */
 export function scopeOptions({
   kind,
   isToday,
   sameDay = true,
   crossesMidnight = false,
+  weekdayLabel,
 }: {
   kind: 'routine' | 'fixed'
   isToday: boolean
   sameDay?: boolean
   crossesMidnight?: boolean
+  weekdayLabel?: string
 }): ScopeOption[] {
+  if (kind === 'fixed' && weekdayLabel) {
+    return [
+      { scope: 'DAY', label: isToday ? '오늘만' : '이날만', hint: '이 하루만 바뀌어요' },
+      { scope: 'WEEK', label: '이번 주', hint: '이날부터 이번 주 일요일까지' },
+      {
+        scope: 'WEEKDAY',
+        label: `앞으로 ${weekdayLabel}마다`,
+        hint: '이 요일만 기본 시간이 바뀌어요 (지난 기록은 그대로)',
+      },
+      {
+        scope: 'FOLLOWING',
+        label: '앞으로 매일',
+        hint: '모든 요일이 이 시간으로 (요일별로 다르게 정한 시간도 맞춰요)',
+      },
+    ]
+  }
   const otherDay = kind === 'routine' && !sameDay ? '다른 날로 옮길 때는 이날만 바꿀 수 있어요' : undefined
   return [
     { scope: 'DAY', label: isToday ? '오늘만' : '이날만', hint: '이 하루만 바뀌어요' },
@@ -52,7 +71,7 @@ export function scopeOptions({
   ]
 }
 
-const ICON = { DAY: CalendarDays, WEEK: CalendarRange, FOLLOWING: InfinityIcon } as const
+const ICON = { DAY: CalendarDays, WEEK: CalendarRange, WEEKDAY: Repeat, FOLLOWING: InfinityIcon } as const
 
 /** 시간 직접 입력 창 안에서 쓰는 범위 고르기 (알약 버튼) */
 export function ScopeChips({
@@ -93,7 +112,7 @@ export function ScopeChips({
 
 /**
  * 드래그로 루틴·고정 시간을 옮긴 직후 화면 아래에 뜨는 선택 바.
- * 1 / 2 / 3 키 또는 버튼으로 고르고, Enter = 첫 번째(이날만), Esc·X = 취소(원래 자리로).
+ * 1 / 2 / 3 (/ 4) 키 또는 버튼으로 고르고, Enter = 첫 번째(이날만), Esc·X = 취소(원래 자리로).
  * 아무것도 고르지 않고 바깥을 누르거나 포커스가 빠져나가면 onDismiss (= "이날만"으로 저장).
  */
 export function ScopeChooser({
@@ -147,7 +166,7 @@ export function ScopeChooser({
       if (e.key === 'Escape') {
         e.preventDefault()
         cancel()
-      } else if (['1', '2', '3'].includes(e.key)) {
+      } else if (['1', '2', '3', '4'].includes(e.key)) {
         const o = opts[Number(e.key) - 1]
         if (o && !o.disabledReason) choose(o.scope)
       }
@@ -181,7 +200,7 @@ export function ScopeChooser({
             <X className="size-4" />
           </button>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        <div className={cn('mt-3 grid gap-2', options.length > 3 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
           {options.map((o, i) => {
             const Icon = ICON[o.scope]
             return (

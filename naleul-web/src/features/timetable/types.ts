@@ -101,6 +101,11 @@ export interface TimetableDay {
   unscheduledTasks: TimeBlockTask[]
   plan?: DayPlan | null
   stats: DayStats
+  /**
+   * 하루 범위를 정한 수면 블록 (자르지 않은 원본 구간). wake 의 끝 = 기상, bed 의 시작 = 취침.
+   * 화면은 기상 전·취침 후 2시간을 같이 보여주고, 이 두 가장자리를 끌어서 바꿔요. 수면 패턴이 없으면 null.
+   */
+  sleep?: { wake: FixedBlock | null; bed: FixedBlock | null } | null
 }
 
 export interface TimetableResponse {
@@ -133,6 +138,19 @@ export interface LifePattern {
   everyDay: boolean
   crossesMidnight: boolean
   sortOrder: number
+  /** 요일별로 다른 시간 (기본 시간과 다른 요일만) */
+  dayTimes?: LifePatternDayTime[]
+}
+
+/**
+ * 고정 시간 요일별 시간. day 요일에 "속한" 블록만 이 시간이에요.
+ * startDayOffset: 블록이 그 요일 하루 앞(-1)·뒤(+1)에 시작 (예: 토요일 수면을 금요일 밤 23:30 에 시작 → -1)
+ */
+export interface LifePatternDayTime {
+  day: JavaDayOfWeek
+  startTime: string
+  endTime: string
+  startDayOffset: number
 }
 
 /** GET /timetable/monthly (명세 5-2) */

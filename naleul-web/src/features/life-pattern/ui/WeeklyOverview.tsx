@@ -1,9 +1,10 @@
 'use client'
 
 import { Card, CardHeader } from '@/components/ui/Card'
-import { timeToMinutes } from '@/features/timetable/time'
 import type { LifePattern } from '@/features/timetable/types'
-import { ALL_DAYS, TYPE_COLOR, dayShort, toHm } from '../presets'
+import { minutesToTime } from '@/features/timetable/time'
+import { occurrenceOf } from '../dayTimes'
+import { ALL_DAYS, TYPE_COLOR, dayShort } from '../presets'
 
 interface Segment {
   pattern: LifePattern
@@ -15,21 +16,21 @@ interface Segment {
 /**
  * 요일별로 고정 시간이 어떻게 깔리는지 한눈에 보는 막대.
  * 자정을 넘기는 패턴(수면 23:00~07:00)은 시작한 요일에 23:00~24:00, 다음 요일에 00:00~07:00 으로 나눠 그려요.
- * (백엔드 FixedBlockCalculator 와 같은 규칙: 요일 판정은 "시작한 날" 기준)
+ * 요일별 시간(예: 주말 수면 01:00~09:30)과 "전날/다음 날 시작"도 반영해요.
+ * (백엔드 FixedBlockCalculator 와 같은 규칙: 요일 판정은 블록 "소속 요일" 기준)
  */
 function segmentsByDay(patterns: LifePattern[]) {
   const rows: Segment[][] = ALL_DAYS.map(() => [])
   for (const p of patterns) {
     const days = p.days.length ? p.days : ALL_DAYS
-    const s = timeToMinutes(p.startTime)
-    const e = timeToMinutes(p.endTime)
     for (const d of days) {
       const i = ALL_DAYS.indexOf(d)
-      if (e > s) {
-        rows[i].push({ pattern: p, start: s, end: e })
-      } else {
-        rows[i].push({ pattern: p, start: s, end: 1440 })
-        if (e > 0) rows[(i + 1) % 7].push({ pattern: p, start: 0, end: e })
+      const { start, end } = occurrenceOf(p, d) // 소속 요일 0시 기준 분 (전날·다음 날로 넘어갈 수 있음)
+      // 하루(1440분)씩 잘라서 해당 요일 줄에 그려요
+      for (let dayStart = Math.floor(start / 1440) * 1440; dayStart < end; dayStart += 1440) {
+        const s = Math.max(start, dayStart) - dayStart
+        const e = Math.min(end, dayStart + 1440) - dayStart
+        if (e > s) rows[(((i + dayStart / 1440) % 7) + 7) % 7].push({ pattern: p, start: s, end: e })
       }
     }
   }
@@ -74,7 +75,7 @@ export function WeeklyOverview({
                     key={`${seg.pattern.lifePatternId}-${j}`}
                     type="button"
                     onClick={() => onSelect(seg.pattern)}
-                    title={`${seg.pattern.title} ${toHm(seg.pattern.startTime)}–${toHm(seg.pattern.endTime)}`}
+                    title={`${seg.pattern.title} ${minutesToTime(seg.start)}–${seg.end === 1440 ? '24:00' : minutesToTime(seg.end)}`}
                     className="absolute inset-y-0.5 overflow-hidden rounded px-1 text-left text-[10px] leading-5 font-semibold whitespace-nowrap text-white hover:brightness-95"
                     style={{
                       left: `${(seg.start / 1440) * 100}%`,
