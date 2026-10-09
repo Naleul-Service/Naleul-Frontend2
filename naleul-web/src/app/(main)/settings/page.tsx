@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { cookies } from 'next/headers'
-import { Bell, ChevronRight, Clock, FileText, type LucideIcon } from 'lucide-react'
+import { BarChart3, Bell, ChevronRight, Clock, FileText, type LucideIcon } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { LogoutButton } from '@/features/account/ui/LogoutButton'
@@ -63,6 +63,23 @@ export default async function SettingsPage() {
             </Link>
           ))}
         </Card>
+
+        {/* ⚠️ DEV 전용 — 운영 대시보드 버튼. main 에 머지할 때 이 블록을 주석 처리해요 (시작) */}
+        <Card>
+          <Link href="/settings/dashboard" className={rowClass}>
+            <span className="bg-warning-soft grid size-10 shrink-0 place-items-center rounded-xl text-[#b45309]">
+              <BarChart3 className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[15px] font-bold">
+                운영 대시보드 <span className="text-ink-3 ml-1 text-[11px] font-semibold">DEV</span>
+              </p>
+              <p className="text-ink-3 mt-0.5 text-[13px]">목표 달성률 · Task/루틴 실천률 · AI 비용 · 매출 · 서버 비용</p>
+            </div>
+            <ChevronRight className="text-ink-4 size-4" />
+          </Link>
+        </Card>
+        {/* ⚠️ DEV 전용 — 운영 대시보드 버튼 (끝) */}
 
         {/* 하루 횟수가 정해진 기능 (AI 목표 만들기 · AI 계획 초안 · Task 추가) */}
         <UsageCard />
