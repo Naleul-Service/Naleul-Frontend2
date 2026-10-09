@@ -18,6 +18,8 @@ import { PLANNING_STYLE_LABEL } from '../../constants'
 import { markStyleSelectedByUser, wasStyleSelectedByUser } from '../../planningStyleMemory'
 import { goalFlowPath } from '../../routes'
 import type { DraftResponse, GoalPlan, PlanIssue, PlanningStyle, SessionDetail } from '../../types'
+import { useAiUsage, usageItem, usageKeys } from '@/features/usage/api'
+import { UsageLine } from '@/features/usage/ui/UsageLine'
 import { FlowShell } from '../SessionGate'
 import { textareaClass } from '../formParts'
 import { InlineItemEditor, sameTarget, type EditResult, type EditTarget } from './ItemEditModal'
@@ -59,6 +61,15 @@ export function DraftReviewView({ session, draft }: Props) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const sessionId = session.sessionId
+  // 계획 다시 만들기 남은 횟수: 이 대화 한도와 오늘 한도 중 작은 쪽
+  const usage = useAiUsage(sessionId)
+  const regenLeft = usage.data?.session ?? undefined
+  const draftLeft = usageItem(usage.data, 'GOAL_DRAFT')
+  const regenRemaining =
+    regenLeft?.remaining != null || draftLeft?.remaining != null
+      ? Math.min(regenLeft?.remaining ?? Infinity, draftLeft?.remaining ?? Infinity)
+      : null
+  const noRegen = regenRemaining === 0
   const colors = useUserColors()
 
   const [plan, setPlan] = useState<GoalPlan>(draft.plan)
@@ -192,6 +203,7 @@ export function DraftReviewView({ session, draft }: Props) {
     try {
       const res = await goalCreationApi.requestDraft(sessionId, body)
       queryClient.removeQueries({ queryKey: goalCreationKeys.session(sessionId) })
+      queryClient.invalidateQueries({ queryKey: usageKeys.all })
       router.replace(goalFlowPath.generating(sessionId, res.draftId))
     } catch (error) {
       setRegenerating(false)
@@ -484,18 +496,24 @@ export function DraftReviewView({ session, draft }: Props) {
       {/* 하단 고정 바 */}
       <div className="bg-canvas px-4 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
         <div className="bg-ink mx-auto flex max-w-[1280px] flex-col gap-3 rounded-[20px] px-5 py-4 text-white sm:flex-row sm:items-center sm:px-6">
-          <p className="flex-1 text-[14px] text-white/85">
-            이 목표로 시작하면 <b className="text-[#8EA2FF]">Task {oneTimes}개</b>와{' '}
-            <b className="text-[#8EA2FF]">루틴 {routines.length}개</b>가 내일부터 TimeBlock에 자동 배치돼요.
-          </p>
+          <div className="flex-1">
+            <p className="text-[14px] text-white/85">
+              이 목표로 시작하면 <b className="text-[#8EA2FF]">Task {oneTimes}개</b>와{' '}
+              <b className="text-[#8EA2FF]">루틴 {routines.length}개</b>가 내일부터 TimeBlock에 자동 배치돼요.
+            </p>
+            {/* 다시 생성은 한 대화 최대 횟수 + 하루 횟수가 있어요 — 누르기 전에 남은 횟수를 보여줘요 */}
+            <UsageLine tone="onDark" className="mt-1" items={[regenLeft, draftLeft]} />
+          </div>
           <div className="flex gap-2">
             <Button
               className="flex-1 bg-white/10 hover:bg-white/20 sm:flex-none"
               onClick={() => setRegenOpen(true)}
-              disabled={busy}
+              disabled={busy || noRegen}
+              title={noRegen ? '오늘(또는 이 목표에서) 계획을 더 만들 수 없어요. 초안을 직접 고쳐 주세요.' : undefined}
             >
               <RefreshCw className="size-4" />
               다시 생성
+              {regenRemaining != null && <span className="text-white/60">({regenRemaining}회 남음)</span>}
             </Button>
             <Button
               className="text-ink flex-1 bg-white hover:bg-white/90 sm:flex-none"

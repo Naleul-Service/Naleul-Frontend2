@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ChevronRight, Clock } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
+import { UsageCard } from '@/features/usage/ui/UsageCard'
 
 export const metadata: Metadata = { title: '설정' }
 
@@ -37,6 +38,10 @@ export default function SettingsPage() {
           </Link>
         ))}
       </Card>
+      {/* 하루 횟수가 정해진 기능 (AI 목표 만들기 · AI 계획 초안 · Task 추가) */}
+      <div className="mt-6">
+        <UsageCard />
+      </div>
     </>
   )
 }

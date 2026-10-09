@@ -12,6 +12,8 @@ import { toast } from '@/stores/toastStore'
 import { useGoalCategories } from '@/features/goal/api'
 import { MUST_DO_SUGGESTIONS, isKindComplete, subOption, type GoalKindValue } from '@/features/goal/kind'
 import { GoalKindPicker } from '@/features/goal/ui/GoalKindPicker'
+import { useAiUsage, useRefreshUsage, usageItem } from '@/features/usage/api'
+import { UsageLine } from '@/features/usage/ui/UsageLine'
 import { goalCreationApi } from '../api'
 import { EXAMPLE_GOALS } from '../constants'
 import { MustDoPicker, withDraft } from './MustDoPicker'
@@ -32,16 +34,26 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
   const goals = useGoalCategories()
   const source = sourceGoalId ? goals.data?.find((g) => g.goalCategoryId === sourceGoalId) : undefined
 
+  // 오늘 남은 횟수 (AI 목표 만들기 · 계획 초안) — 다 쓰면 시작 버튼을 막고 미리 알려줘요
+  const usage = useAiUsage()
+  const refreshUsage = useRefreshUsage()
+  const sessionLeft = usageItem(usage.data, 'GOAL_SESSION')
+  const draftLeft = usageItem(usage.data, 'GOAL_DRAFT')
+  const outOfQuota = sessionLeft?.remaining === 0 || draftLeft?.remaining === 0
+
   const start = useMutation({
     mutationFn: (initialMessage?: string) =>
       goalCreationApi.start(initialMessage, sourceGoalId, kind, withDraft(mustDo, mustDoDraft)),
-    onSuccess: (turn) => router.push(`/goal/new/${turn.sessionId}`),
+    onSuccess: (turn) => {
+      refreshUsage()
+      router.push(`/goal/new/${turn.sessionId}`)
+    },
     onError: (error) => toast.error(isApiError(error) ? error.message : '시작하지 못했어요. 다시 시도해 주세요.'),
   })
 
   const goalText = text.trim()
   const submit = () => {
-    if (goalText && kindReady && !start.isPending) start.mutate(goalText)
+    if (goalText && kindReady && !start.isPending && !outOfQuota) start.mutate(goalText)
   }
 
   // 이동 중에도 버튼이 다시 눌리지 않게 성공 후에도 막아둬요
@@ -183,16 +195,22 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
           className="mt-8 w-full"
           onClick={submit}
           loading={start.isPending}
-          disabled={busy || !kindReady || !goalText}
+          disabled={busy || !kindReady || !goalText || outOfQuota}
         >
           <Sparkles className="size-4" />
           AI와 목표 설계 시작하기
         </Button>
+        <UsageLine className="mt-2 justify-center" items={[sessionLeft, draftLeft]} />
+        {outOfQuota && (
+          <p className="text-danger mt-1 text-center text-[13px] font-semibold">
+            오늘 AI 목표 만들기 횟수를 모두 썼어요. 내일 0시에 다시 채워져요 — 지금은 직접 만들기를 쓸 수 있어요.
+          </p>
+        )}
 
         <button
           type="button"
           onClick={() => start.mutate(undefined)}
-          disabled={busy || !kindReady}
+          disabled={busy || !kindReady || outOfQuota}
           className="text-ink-3 hover:text-ink mt-6 inline-flex items-center gap-1.5 self-start text-sm font-medium disabled:opacity-40"
         >
           <MessageCircle className="size-4" />
