@@ -3,7 +3,6 @@
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
-import { useFillTimetable } from '../api'
 import type { TimetableDay } from '../types'
 
 /** 배치 대상: 오늘 이후 날짜의 "시간 미정" 미완료 Task (미션은 방장이 시간을 정하므로 제외) */
@@ -20,13 +19,26 @@ export function unplacedOf(days: TimetableDay[], today: string) {
 /**
  * 캘린더 위 "AI로 TimeTable 배치하기" 띠.
  * 시간 미정 Task 가 있을 때만 버튼이 켜져요. 직접 정한 시간(📌)과 고정 시간은 그대로 두고 남은 빈 시간에 넣어요.
+ * 누르면 바로 저장하지 않고 점선으로 먼저 보여줘요 (onPreview) → 화면 아래에서 "이대로 진행할까요?"
  */
-export function AutoPlaceBar({ days, today }: { days: TimetableDay[]; today: string }) {
-  const fill = useFillTimetable()
+export function AutoPlaceBar({
+  days,
+  today,
+  onPreview,
+  loading,
+  proposing,
+}: {
+  days: TimetableDay[]
+  today: string
+  onPreview: (range: { startDate: string; endDate: string }) => void
+  loading?: boolean
+  /** 미리보기 확인 중 */
+  proposing?: boolean
+}) {
   const targets = unplacedOf(days, today)
   const total = targets.reduce((n, d) => n + d.count, 0)
   const onlyToday = targets.length === 1 && targets[0].date === today
-  const active = total > 0
+  const active = total > 0 && !proposing
 
   return (
     <div
@@ -45,7 +57,11 @@ export function AutoPlaceBar({ days, today }: { days: TimetableDay[]; today: str
       </span>
       <div className="min-w-0 flex-1">
         <p className={cn('text-[14px] font-bold', !active && 'text-ink-3')}>
-          {active ? `아직 시간이 정해지지 않은 Task가 ${total}개 있어요` : '모든 Task가 TimeTable에 배치돼 있어요'}
+          {proposing
+            ? 'AI가 제안한 자리를 점선으로 보여주고 있어요'
+            : active
+              ? `아직 시간이 정해지지 않은 Task가 ${total}개 있어요`
+              : '모든 Task가 TimeTable에 배치돼 있어요'}
         </p>
         <p className="text-ink-3 text-xs leading-relaxed">
           직접 정한 시간(📌)과 고정 시간은 그대로 두고, 남은 빈 시간에 집중이 잘 되는 시간대부터 넣어요.
@@ -56,9 +72,9 @@ export function AutoPlaceBar({ days, today }: { days: TimetableDay[]; today: str
         variant={active ? 'brand' : 'secondary'}
         size="sm"
         disabled={!active}
-        loading={fill.isPending}
-        title={active ? undefined : '배치할 시간 미정 Task가 없어요'}
-        onClick={() => fill.mutate({ startDate: targets[0].date, endDate: targets[targets.length - 1].date })}
+        loading={loading}
+        title={proposing ? '아래에서 진행 여부를 골라 주세요' : active ? undefined : '배치할 시간 미정 Task가 없어요'}
+        onClick={() => onPreview({ startDate: targets[0].date, endDate: targets[targets.length - 1].date })}
       >
         <Sparkles className="size-3.5" />
         {onlyToday || !active ? 'AI로 오늘 TimeTable 배치하기' : `AI로 TimeTable 배치하기 (${targets.length}일)`}

@@ -286,7 +286,61 @@ export function useReplan() {
   )
 }
 
-// ─── AI로 TimeTable 배치하기 (시간 미정 Task 만 빈 시간에) ──────────────
+// ─── AI로 TimeTable 배치하기 — 미리보기(점선) → 확인 → 확정 ──────────────
+
+export interface FillProposal {
+  taskId: number
+  date: string
+  start: string
+  end: string
+  reason?: string | null
+}
+
+export interface FillPreviewResponse {
+  proposals: FillProposal[]
+  /** 빈 시간이 없어 제안하지 못한 Task */
+  unscheduled: number[]
+}
+
+/** 저장하지 않고 어디에 놓일지만 받아와요 */
+export function useFillPreview() {
+  return useMutation({
+    mutationFn: (v: { startDate: string; endDate: string }) =>
+      api.post<FillPreviewResponse>(`/v1/daily-plans/fill/preview?startDate=${v.startDate}&endDate=${v.endDate}`),
+    onError: (e) => toast.error(errorMessage(e)),
+  })
+}
+
+/** 점선 제안을 최종 자리로 확정 (그대로 둔 것 = AI 배치, 옮긴 것 = 📌 직접 정한 시간) */
+export function useFillApply() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: {
+      items: {
+        taskId: number
+        proposedStart: string
+        proposedEnd: string
+        start: string
+        end: string
+        reason?: string | null
+      }[]
+    }) => api.post<{ placed: number; skipped: number[] }>('/v1/daily-plans/fill/apply', v),
+    onSuccess: (r) => {
+      if (!r) return
+      toast.success(
+        `${r.placed}개 Task를 배치했어요.` +
+          (r.skipped.length ? ` ${r.skipped.length}개는 그사이 자리가 바뀌어 시간 미정으로 남겼어요.` : '')
+      )
+    },
+    onError: (e) => toast.error(errorMessage(e)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: timetableKeys.all })
+      qc.invalidateQueries({ queryKey: ['goals'] })
+    },
+  })
+}
+
+// ─── AI로 TimeTable 배치하기 (바로 저장 — Task 추가 화면용) ──────────────
 
 export interface FillResponse {
   days: { date: string; placed: number; unscheduled: number }[]

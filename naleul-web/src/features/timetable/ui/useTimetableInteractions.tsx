@@ -7,6 +7,8 @@ import {
   useCompleteWithActual,
   useDeletePatternOverride,
   useDeleteTask,
+  useFillApply,
+  useFillPreview,
   useLifePatterns,
   usePatternOverride,
   usePatternScopedChange,
@@ -18,7 +20,7 @@ import {
   useUnlockTask,
   useUnscheduleTask,
 } from '../api'
-import { applyPending, type Pending } from '../layout'
+import { applyPending, applyProposals, type Pending, type Proposal } from '../layout'
 import {
   SNAP_MINUTES,
   WEEKDAY_LABEL,
@@ -36,6 +38,7 @@ import {
 import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityForm, draftOf, type ActivityDraft } from './ActivityForm'
 import { CarryProposalBar } from './CarryProposalBar'
+import { FillProposalBar } from './FillProposalBar'
 import { FixedDetail } from './FixedDetail'
 import { ScopeChooser, scopeOptions } from './ScopeChooser'
 import { TaskDetail } from './TaskDetail'
@@ -72,7 +75,7 @@ type ScopeAsk =
     }
 
 /** 묶음에 넣을 수 있는 Task: 시간이 정해져 있고 드래그로 옮길 수 있는 것 */
-const groupable = (t: TimeBlockTask) => !!t.plannedStartAt && canDragTask(t)
+const groupable = (t: TimeBlockTask) => !!t.plannedStartAt && canDragTask(t) && !t.proposed
 
 /** 블록 날짜 (계획 시작일) */
 const blockDay = (t: TimeBlockTask) => t.plannedStartAt?.slice(0, 10) ?? null
@@ -146,6 +149,9 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   const [ask, setAsk] = useState<ScopeAsk | null>(null)
   // 묶음 드래그로 같이 옮길 Task id (Shift·⌘·Ctrl+클릭, 또는 상세의 "이어진 N개 묶어 옮기기")
   const [group, setGroup] = useState<number[]>([])
+  // "AI로 배치하기" 미리보기 제안 (저장 전 점선 블록). null 이면 미리보기 중 아님
+  const [proposals, setProposals] = useState<Proposal[] | null>(null)
+  const [proposalUnscheduled, setProposalUnscheduled] = useState(0)
   const today = todayKst()
 
   const toggleComplete = useToggleComplete()
@@ -153,6 +159,8 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   const unlock = useUnlockTask()
   const unschedule = useUnscheduleTask()
   const reschedule = useRescheduleTask()
+  const fillPreview = useFillPreview()
+  const fillApply = useFillApply()
   const rescheduleBatch = useRescheduleBatch()
   const completeWithActual = useCompleteWithActual()
   const override = usePatternOverride()
@@ -163,7 +171,58 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
   const needsPatterns = editing?.kind === 'fixed' || opened?.kind === 'fixed'
   const patterns = useLifePatterns(needsPatterns)
 
-  const days = useMemo(() => applyPending(rawDays, pending, fixedKey), [rawDays, pending])
+  const days = useMemo(
+    () => applyProposals(applyPending(rawDays, pending, fixedKey), proposals),
+    [rawDays, pending, proposals]
+  )
+
+  // ── AI로 배치하기: 미리보기 → (끌어서 고치기) → 이대로 진행 / 취소 ──
+  const previewFill = (range: { startDate: string; endDate: string }) =>
+    fillPreview.mutate(range, {
+      onSuccess: (r) => {
+        if (!r) return
+        setProposals(
+          r.proposals.map((p) => ({
+            taskId: p.taskId,
+            reason: p.reason,
+            proposedStart: p.start,
+            proposedEnd: p.end,
+            start: p.start,
+            end: p.end,
+          }))
+        )
+        setProposalUnscheduled(r.unscheduled.length)
+      },
+    })
+  const cancelProposals = () => setProposals(null)
+  const applyProposalsNow = () => {
+    if (!proposals?.length) return
+    fillApply.mutate(
+      {
+        items: proposals.map((p) => ({
+          taskId: p.taskId,
+          proposedStart: p.proposedStart,
+          proposedEnd: p.proposedEnd,
+          start: p.start,
+          end: p.end,
+          reason: p.reason,
+        })),
+      },
+      { onSuccess: () => setProposals(null) }
+    )
+  }
+  const editedProposals = (proposals ?? []).filter((p) => p.start !== p.proposedStart || p.end !== p.proposedEnd).length
+
+  // 미리보기 중 Esc → 취소 (상세 창·범위 고르기가 떠 있으면 그쪽이 먼저)
+  const proposing = proposals !== null
+  useEffect(() => {
+    if (!proposing) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented && !opened && !editing) setProposals(null)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [proposing, opened, editing])
 
   // 묶음 중 지금도 옮길 수 있는 Task 만 (완료했거나 시간 미정이 된 Task 는 빠져요)
   const groupIds = useMemo(() => {
@@ -428,6 +487,19 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
 
   // ── 드래그 앤 드롭 (명세 3-4) ──
   const onDrop = (source: DragSource, target: DropTarget) => {
+    // 미리보기 제안 블록: 저장하지 않고 제안 자리만 바꿔요 (시간 미정 칸으로 끌면 이번 배치에서 빼요)
+    if (source.kind === 'task' && source.task.proposed) {
+      setProposals((list) =>
+        (list ?? []).flatMap((p) =>
+          p.taskId !== source.task.taskId
+            ? [p]
+            : target.type === 'grid'
+              ? [{ ...p, start: toDateTime(target.date, target.start), end: toDateTime(target.date, target.end) }]
+              : []
+        )
+      )
+      return
+    }
     // 범위를 고르지 않고 다음 드래그를 하면 앞의 변경은 "이날만"으로 저장해요
     if (ask) chooseScope('DAY')
 
@@ -615,11 +687,23 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
         />
       )}
 
-      {/* 22시 이월 제안 — 다른 안내 바가 없을 때만 (범위 고르기·묶음이 먼저) */}
-      {!ask && groupIds.size === 0 && <CarryProposalBar tasks={carryProposals} today={today} />}
+      {/* AI 배치 미리보기 확인 — 범위 고르기 바가 없을 때 */}
+      {proposals && !ask && (
+        <FillProposalBar
+          count={proposals.length}
+          edited={editedProposals}
+          unscheduled={proposalUnscheduled}
+          loading={fillApply.isPending}
+          onApply={applyProposalsNow}
+          onCancel={cancelProposals}
+        />
+      )}
+
+      {/* 22시 이월 제안 — 다른 안내 바가 없을 때만 (범위 고르기·묶음·AI 배치 확인이 먼저) */}
+      {!ask && !proposals && groupIds.size === 0 && <CarryProposalBar tasks={carryProposals} today={today} />}
 
       {/* 묶음 드래그 안내 */}
-      {groupIds.size > 0 && !ask && (
+      {groupIds.size > 0 && !ask && !proposals && (
         <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
           <div
             role="status"
@@ -665,5 +749,9 @@ export function useTimetableInteractions(rawDays: TimetableDay[], fallbackDate: 
     overlays,
     /** 묶음 드래그로 같이 옮길 Task (TimeGrid groupIds 로 넘겨요) */
     groupIds,
+    /** AI로 배치하기 — 미리보기(점선)부터 */
+    previewFill,
+    fillPreviewing: fillPreview.isPending,
+    proposing,
   }
 }

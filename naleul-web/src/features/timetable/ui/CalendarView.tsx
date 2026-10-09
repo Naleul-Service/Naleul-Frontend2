@@ -78,6 +78,9 @@ export function CalendarView() {
     toggleComplete,
     overlays,
     groupIds,
+    previewFill,
+    fillPreviewing,
+    proposing,
   } = useTimetableInteractions(rawDays, date)
   const { startHour, endHour } = useMemo(() => visibleHours(days, acts), [days, acts])
 
@@ -223,7 +226,13 @@ export function CalendarView() {
         </Card>
       ) : (
         <>
-          <AutoPlaceBar days={rawDays} today={today} />
+          <AutoPlaceBar
+            days={rawDays}
+            today={today}
+            onPreview={previewFill}
+            loading={fillPreviewing}
+            proposing={proposing}
+          />
           {/* 일간: TimeTable(계획 | 실제) 오른쪽에 그날 할 일 목록 — Task 추가 패널이 열려 있으면 자리가 좁아 숨겨요 */}
           <div className={cn(view === 'day' && !add && 'grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]')}>
             <TimeGrid

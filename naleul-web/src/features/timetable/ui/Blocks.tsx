@@ -119,7 +119,7 @@ export function TaskBlock({
   // 완료 후 실제 시각에 그려진 블록 ("실제" 표시)
   const actual = !planned && (shownTime(t)?.actual ?? false)
   // 22시 이월 제안(아직 확인 안 함): 점선 + 연한 바탕 — "확정된 일정이 아니라 제안"으로 보이게
-  const proposed = !!t.carryPending && !done
+  const proposed = (!!t.carryPending || !!t.proposed) && !done
   const solid = t.sourceType !== 'ROUTINE' && !proposed
   const width = 100 / placed.cols
   const goalColor = hexOf(t.goalColorCode)
@@ -173,7 +173,9 @@ export function TaskBlock({
           <span className="bg-danger shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-white">NEW</span>
         )}
         {proposed && (
-          <span className="bg-ink shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-white">옮길까요?</span>
+          <span className="bg-ink shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-white">
+            {t.proposed ? 'AI 제안' : '옮길까요?'}
+          </span>
         )}
         {t.locked && (
           <Pin

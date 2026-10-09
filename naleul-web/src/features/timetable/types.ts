@@ -57,6 +57,8 @@ export interface TimeBlockTask {
   carryPending?: boolean
   /** 이월되기 전 날짜 */
   carriedFromDate?: string | null
+  /** (화면 전용) "AI로 배치하기" 미리보기 제안 — 아직 저장 안 된 점선 블록 */
+  proposed?: boolean
 }
 
 export interface Covered {

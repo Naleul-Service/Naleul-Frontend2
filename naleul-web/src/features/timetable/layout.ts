@@ -281,6 +281,46 @@ export function applyPending(
   })
 }
 
+/** "AI로 배치하기" 미리보기 제안 하나 (화면 상태) */
+export interface Proposal {
+  taskId: number
+  reason?: string | null
+  /** AI 가 처음 제안한 자리 — 확정할 때 "고쳤는지" 비교용 */
+  proposedStart: string
+  proposedEnd: string
+  /** 지금 자리 (끌어서 고치면 바뀜) */
+  start: string
+  end: string
+}
+
+/** 제안을 점선 블록으로 덧입혀요: 시간 미정 칸에서 빼서 제안 자리에 그려요 (저장 전) */
+export function applyProposals(days: TimetableDay[], proposals: Proposal[] | null): TimetableDay[] {
+  if (!proposals?.length) return days
+  const byId = new Map(proposals.map((p) => [p.taskId, p]))
+  const all = days.flatMap((d) => [...d.tasks, ...d.unscheduledTasks])
+  return days.map((d) => {
+    const tasks = d.tasks.filter((t) => !byId.has(t.taskId))
+    const unscheduledTasks = d.unscheduledTasks.filter((t) => !byId.has(t.taskId))
+    for (const p of proposals) {
+      if (p.start.slice(0, 10) !== d.date) continue
+      const t = all.find((x) => x.taskId === p.taskId)
+      if (!t) continue
+      tasks.push({
+        ...t,
+        date: d.date,
+        plannedStartAt: p.start,
+        plannedEndAt: p.end,
+        placedBy: 'ENGINE',
+        locked: false,
+        missed: false,
+        placementReason: p.reason ?? t.placementReason,
+        proposed: true,
+      })
+    }
+    return { ...d, tasks, unscheduledTasks }
+  })
+}
+
 /** 자동 배치가 밀어낼 수 없는 블록 — 백엔드 isMovableEngineBlock 의 반대 (건너뛴 Task 는 자리를 차지하지 않아요) */
 export const isBlockingTask = (t: TimeBlockTask) =>
   t.taskStatus !== 'SKIPPED' &&
