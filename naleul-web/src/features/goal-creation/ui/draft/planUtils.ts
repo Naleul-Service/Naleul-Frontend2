@@ -77,6 +77,8 @@ function roundLike(value: number, ...refs: number[]) {
  *  - 마일스톤: 날짜순 정렬 · 목표 기간 안으로 · 겹치는 날짜는 하루씩 밀기 · 마지막은 종료일
  *  - 마일스톤 수치: 시작값 → 목표값 직선 위의 값 (날짜 비율대로) — 그래프가 항상 한 방향
  *  - 일회성 할 일: 마감이 연결된 마일스톤보다 늦으면 마일스톤 날짜로, 실행일이 마감보다 늦으면 마감으로
+ *  - 시작일을 미뤘을 때: 루틴 시작일이 그보다 앞이면 비워서(= 목표 시작일부터) 시작일 전에 루틴이 생기지 않게,
+ *    일회성 할 일 실행일·마감도 시작일 이후로
  */
 export function normalizePlan(plan: GoalPlan): GoalPlan {
   const { goal } = plan
@@ -113,12 +115,20 @@ export function normalizePlan(plan: GoalPlan): GoalPlan {
   // 3) 일회성 할 일 날짜
   const dueOf = new Map(milestones.map((m) => [m.tempId, m.dueDate]))
   const tasks = plan.tasks.map((t) => {
-    if (isRoutine(t)) return t
+    if (isRoutine(t)) {
+      const routineStart = t.startDate && t.startDate < start ? null : t.startDate
+      const routineEnd = t.endDate && (t.endDate > end || t.endDate < start) ? null : t.endDate
+      return routineStart === t.startDate && routineEnd === t.endDate
+        ? t
+        : { ...t, startDate: routineStart, endDate: routineEnd }
+    }
     const msDue = t.milestoneTempId ? dueOf.get(t.milestoneTempId) : undefined
     let due = t.dueDate
     if (due && msDue && due > msDue) due = msDue
     if (due && due > end) due = end
-    const scheduled = t.scheduledDate && due && t.scheduledDate > due ? due : t.scheduledDate
+    if (due && due < start) due = msDue ?? start
+    let scheduled = t.scheduledDate && due && t.scheduledDate > due ? due : t.scheduledDate
+    if (scheduled && scheduled < start) scheduled = null
     return due === t.dueDate && scheduled === t.scheduledDate ? t : { ...t, dueDate: due, scheduledDate: scheduled }
   })
 

@@ -150,6 +150,7 @@ export function DraftReviewView({ session, draft }: Props) {
           ...p.goal,
           title: r.title,
           emoji: r.emoji,
+          startDate: r.startDate,
           endDate: r.endDate,
           metric,
         },

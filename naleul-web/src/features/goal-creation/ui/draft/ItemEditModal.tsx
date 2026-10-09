@@ -8,7 +8,7 @@ import { cn } from '@/lib/cn'
 import { DAY_LABEL, DAYS } from '../../constants'
 import type { DayOfWeek, GoalPlan, PlanMilestone, PlanSubGoal, PlanTask } from '../../types'
 import { Field, inputClass, textareaClass, toNumber } from '../formParts'
-import { LIMITS, formatMd, newTempId } from './planUtils'
+import { LIMITS, formatMd, newTempId, toYmd } from './planUtils'
 
 /** 지금 편집 중인 대상. index 가 null 이면 새로 추가 */
 export type EditTarget =
@@ -22,6 +22,7 @@ export type EditResult =
       kind: 'goal'
       title: string
       emoji: string | null
+      startDate: string
       endDate: string
       /** 수치 목표일 때만 (시작값·목표값) */
       metricValues: { startValue: number; targetValue: number } | null
@@ -83,14 +84,17 @@ function EmojiTitle({
 
 // ─── 목표 ───────────────────────────────────────────────────────
 /**
- * 목표 이름 + "그래프를 정하는 값" (종료일 · 시작값 · 목표값).
+ * 목표 이름 + "그래프를 정하는 값" (시작일 · 종료일 · 시작값 · 목표값).
+ * 시작일을 미루면 루틴·할 일·마일스톤도 그 날 이후로 맞춰져요 (normalizePlan).
  * 마일스톤 날짜·수치는 이 값에서 자동으로 계산돼서, 그래프를 고치려고 마일스톤을 하나하나 맞출 필요가 없어요.
  */
 function GoalForm({ plan, formId, onDone, onError }: FormProps<{ kind: 'goal' }>) {
   const { goal } = plan
   const [title, setTitle] = useState(goal.title)
   const [emoji, setEmoji] = useState(goal.emoji ?? '')
+  const [startDate, setStartDate] = useState(goal.startDate)
   const [endDate, setEndDate] = useState(goal.endDate)
+  const today = toYmd(new Date())
   const [startValue, setStartValue] = useState(goal.metric?.startValue.toString() ?? '')
   const [targetValue, setTargetValue] = useState(goal.metric?.targetValue.toString() ?? '')
   const metric = goal.metric
@@ -100,7 +104,8 @@ function GoalForm({ plan, formId, onDone, onError }: FormProps<{ kind: 'goal' }>
       className="space-y-4"
       onSubmit={submitter(() => {
         if (!title.trim()) return onError('목표 이름을 입력해 주세요.')
-        if (!endDate || endDate <= goal.startDate) return onError('종료일은 시작일보다 뒤여야 해요.')
+        if (!startDate || startDate < today) return onError('시작일은 오늘 이후여야 해요.')
+        if (!endDate || endDate <= startDate) return onError('종료일은 시작일보다 뒤여야 해요.')
         let metricValues: { startValue: number; targetValue: number } | null = null
         if (metric) {
           const sv = toNumber(startValue)
@@ -110,17 +115,26 @@ function GoalForm({ plan, formId, onDone, onError }: FormProps<{ kind: 'goal' }>
           if (sv === tv) return onError('목표값이 시작값과 같아요.')
           metricValues = { startValue: sv, targetValue: tv }
         }
-        onDone({ kind: 'goal', title: title.trim(), emoji: emoji.trim() || null, endDate, metricValues })
+        onDone({ kind: 'goal', title: title.trim(), emoji: emoji.trim() || null, startDate, endDate, metricValues })
       })}
     >
       <EmojiTitle emoji={emoji} title={title} onEmoji={setEmoji} onTitle={setTitle} />
-      <div className={cn('grid gap-3', metric ? 'grid-cols-3' : 'grid-cols-1 sm:max-w-[200px]')}>
+      <div className={cn('grid grid-cols-2 gap-3', metric ? 'sm:grid-cols-4' : 'sm:max-w-[400px]')}>
+        <Field label="시작일">
+          <input
+            type="date"
+            className={inputClass}
+            value={startDate}
+            min={today}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </Field>
         <Field label="종료일">
           <input
             type="date"
             className={inputClass}
             value={endDate}
-            min={goal.startDate}
+            min={startDate}
             onChange={(e) => setEndDate(e.target.value)}
           />
         </Field>
