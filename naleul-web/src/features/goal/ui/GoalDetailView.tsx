@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { BarChart3, NotebookPen } from 'lucide-react'
+import { BarChart3, KanbanSquare, NotebookPen } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -12,7 +12,9 @@ import { cn } from '@/lib/cn'
 import { RecordQuickLog } from '@/features/record/ui/RecordQuickLog'
 import { RecordJournal } from '@/features/record/ui/RecordJournal'
 import { RecordPatternSection } from '@/features/record/ui/pattern/RecordPatternSection'
-import { isRecordGoal, useGoalCategory, type GoalCategory } from '../api'
+import { HabitView } from '@/features/habit/ui/HabitView'
+import { WorkBoardView } from '@/features/work/ui/WorkBoardView'
+import { isHabitGoal, isRecordGoal, useGoalCategory, type GoalCategory } from '../api'
 import { EditingContext } from '../edit/inline'
 import { dDayLabel, periodProgress } from '../format'
 import { GoalAiEditBar } from './GoalAiEditBar'
@@ -21,12 +23,12 @@ import { GoalAdjustmentBanner, GoalOutcomeSection, GoalWrapUpSection } from './G
 import { GoalTaskList } from './GoalTaskList'
 import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
 import { DailyCheckInCard } from './progress/DailyCheckInCard'
+import { ExtraMetricsSection } from './progress/ExtraMetricsSection'
 import { ProgressSection } from './progress/ProgressSection'
 import { RefineWithAiCard } from './RefineWithAiCard'
 import { RoutineHeatmapSection } from './RoutineHeatmapSection'
 import { RoutinesSection } from './RoutinesSection'
 import { Section } from './sections'
-import { StructurePanel } from './StructurePanel'
 import { TaskRateSection } from './TaskRateSection'
 
 // ─── 작은 조각들 ───────────────────────────────────────────────
@@ -107,28 +109,31 @@ function Hero({ goal }: { goal: GoalCategory }) {
 
 // ─── 기록형 목표 ───────────────────────────────────────────────
 
-type RecordTab = 'journal' | 'stats'
+type RecordTab = 'board' | 'journal' | 'stats'
 
 const RECORD_TABS: { value: RecordTab; label: string; icon: typeof NotebookPen }[] = [
+  { value: 'board', label: '보드', icon: KanbanSquare },
   { value: 'journal', label: '업무 일지', icon: NotebookPen },
   { value: 'stats', label: '통계', icon: BarChart3 },
 ]
 
 /**
- * 업무형(기록형) 목표 — 탭 두 개.
+ * 업무형 목표 — 탭 세 개.
+ *  - 보드(기본): 마감 · 오늘 할 일 · 마감 임박 · 주제별 Task 보드 · 해 온 일 · 회고 (V52)
  *  - 업무 일지: 오늘 한 일 한 줄 기록 + 업무 일지 | (선택) 메모 · 반복 루틴 · Task
  *  - 통계: 이 목표에 대한 나의 패턴 (완료한 Task 기준 그래프, 넓게)
- * 고른 탭은 주소(?tab=stats)에 남겨서 새로고침·공유해도 그대로예요.
+ * 고른 탭은 주소(?tab=journal)에 남겨서 새로고침·공유해도 그대로예요.
  */
 function RecordGoalBody({ goal }: { goal: GoalCategory }) {
   const params = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const tab: RecordTab = params.get('tab') === 'stats' ? 'stats' : 'journal'
+  const raw = params.get('tab')
+  const tab: RecordTab = raw === 'stats' || raw === 'journal' ? raw : 'board'
 
   const setTab = (t: RecordTab) => {
     const next = new URLSearchParams(params)
-    if (t === 'journal') next.delete('tab')
+    if (t === 'board') next.delete('tab')
     else next.set('tab', t)
     const qs = next.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
@@ -157,7 +162,11 @@ function RecordGoalBody({ goal }: { goal: GoalCategory }) {
         ))}
       </div>
 
-      {tab === 'journal' ? (
+      {tab === 'board' ? (
+        <div id="record-panel-board" role="tabpanel" aria-labelledby="record-tab-board" className="mt-5">
+          <WorkBoardView goal={goal} />
+        </div>
+      ) : tab === 'journal' ? (
         <div
           id="record-panel-journal"
           role="tabpanel"
@@ -221,6 +230,15 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
     )
   }
 
+  // 기본 생활 습관 그릇은 목표 상세 대신 습관 체크 화면 (V52)
+  if (isHabitGoal(goal)) {
+    return (
+      <EditingContext.Provider value={editingCtx}>
+        <HabitView goal={goal} />
+      </EditingContext.Provider>
+    )
+  }
+
   return (
     <EditingContext.Provider value={editingCtx}>
       <GoalHeader goal={goal} />
@@ -238,7 +256,7 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
  * 달성형 목표.
  *  - 위: 진행 요약 → 오늘 기록(수치 + 회고) → "말로 고치기" → 이 목표를 시작한 이유
  *  - 왼쪽: 매일 보는 "할 것" — 루틴 · 루틴 실천 히트맵 · Task (세부 목표는 각 줄의 라벨)
- *  - 오른쪽: 수치 기록 · Task 실천률 · 접어 둔 "세부 구조"(마일스톤 · 세부 목표)
+ *  - 오른쪽: 수치 그래프(여러 개) · Task 실천률
  */
 function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
   const completed = goal.goalCategoryStatus === 'COMPLETED'
@@ -285,8 +303,11 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
           {completed && !goal.temporary && <GoalOutcomeSection goal={goal} />}
           {/* 목표 지점까지 지금 어디쯤인지 (수치 기록 그래프 · Task 누적) */}
           {!goal.temporary && <ProgressSection goal={goal} />}
+          {/* 그래프 여러 개 (V52) — 예: 메인 "모의고사 점수" + 추가 "기출 회독" */}
+          {!goal.temporary && !completed && <ExtraMetricsSection goal={goal} />}
+          {!goal.temporary && completed && <ExtraMetricsSection goal={goal} readOnly />}
           <TaskRateSection goal={goal} />
-          <StructurePanel goal={goal} />
+          {/* 마일스톤 · 세부 목표(세부 구조)는 V52 부터 화면에서 숨겨요 — "그래서 오늘 뭘 해야 해?"에 집중 (데이터는 그대로) */}
           {ongoing && <GoalWrapUpSection goal={goal} />}
           {goal.achievement && (
             <Section title="달성 기록">

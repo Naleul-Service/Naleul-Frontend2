@@ -81,8 +81,13 @@ export interface GoalCategory {
   aiGenerated?: boolean
   /** Brain dump 에서 자동으로 만든 임시 목표 (종료일·마일스톤 없음) → "AI로 구체화하기"를 권해요 */
   temporary?: boolean
-  /** 목표 형태: ACHIEVEMENT 달성형(기본) / RECORD 기록형 — 회사 업무처럼 종료일·수치 없이 "한 일"을 쌓는 목표 */
-  goalMode?: 'ACHIEVEMENT' | 'RECORD'
+  /**
+   * 목표 형태 (V52)
+   *  - ACHIEVEMENT 목표형(기본): 수치 · 기간이 있는 목표. 진행 그래프(여러 개)로 "오늘 어디까지"를 보여줘요
+   *  - RECORD 업무형: 회사 업무 · 사이드 프로젝트. 마감(선택) · 주제별 Task 보드 · 업무 일지
+   *  - HABIT 기본 생활 습관: 사용자마다 1개씩 자동으로 생기는 체크 전용 습관 그릇
+   */
+  goalMode?: GoalMode
   /** 목표 카테고리 2단계 (명세 6.A.1.2). 예전 목표는 null */
   goalType?: GoalType | null
   goalSubType?: GoalSubType | null
@@ -103,8 +108,12 @@ export interface GoalCategory {
   pausedDays?: number | null
 }
 
+export type GoalMode = 'ACHIEVEMENT' | 'RECORD' | 'HABIT'
+
 /** 기록형 목표인지 (예전 응답엔 goalMode 가 없어서 undefined = 달성형) */
 export const isRecordGoal = (g: Pick<GoalCategory, 'goalMode'> | null | undefined) => g?.goalMode === 'RECORD'
+/** 기본 생활 습관 그릇인지 (V52) */
+export const isHabitGoal = (g: Pick<GoalCategory, 'goalMode'> | null | undefined) => g?.goalMode === 'HABIT'
 
 export const goalKeys = {
   all: ['goals'] as const,
@@ -261,6 +270,15 @@ export interface GoalProgress {
   outcome?: GoalOutcome | null
   /** 주간 점검 제안 — 2주 연속 실천률이 낮거나 높을 때만 내려와요 */
   adjustment?: GoalAdjustment | null
+  /** 사용자가 더 만든 그래프 (V52) — 목표 기간 위 직선 계획선. expectedValue 가 "오늘은 여기까지" */
+  extraMetrics?: ExtraMetric[]
+}
+
+/** 추가 그래프 하나 (V52) */
+export interface ExtraMetric {
+  metricId: number
+  sortOrder: number
+  progress: MetricProgress
 }
 
 /** 목표 결과: 달성 · 일부 달성 · 못 함 */
@@ -431,3 +449,64 @@ export function useCompleteGoal(goalId: number) {
     onError: (e) => toast.error(isApiError(e) ? e.message : '마무리하지 못했어요. 다시 시도해 주세요.'),
   })
 }
+
+// ─── 추가 그래프 (V52) ──────────────────────────────────────────
+
+export interface ExtraMetricInput {
+  name?: string
+  unit?: string
+  startValue?: number
+  targetValue?: number
+}
+
+/** 추가 그래프 만들기 · 고치기 · 지우기 · 기록 — 응답이 진행 데이터 전체라 도표를 바로 다시 그려요 */
+function useExtraMetricMutation<V>(goalId: number, fn: (v: V) => Promise<GoalProgress>, success: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (data) => {
+      qc.setQueryData(goalKeys.progress(goalId), data)
+      toast.success(success)
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : '문제가 생겼어요. 다시 시도해 주세요.'),
+  })
+}
+
+export const useCreateExtraMetric = (goalId: number) =>
+  useExtraMetricMutation(
+    goalId,
+    (v: Required<Pick<ExtraMetricInput, 'name' | 'startValue' | 'targetValue'>> & { unit?: string }) =>
+      api.post<GoalProgress>(`/v1/goal-categories/${goalId}/metrics`, v),
+    '그래프를 추가했어요.'
+  )
+
+export const useUpdateExtraMetric = (goalId: number) =>
+  useExtraMetricMutation(
+    goalId,
+    ({ metricId, ...v }: ExtraMetricInput & { metricId: number }) =>
+      api.patch<GoalProgress>(`/v1/goal-categories/${goalId}/metrics/${metricId}`, v),
+    '그래프를 고쳤어요.'
+  )
+
+export const useDeleteExtraMetric = (goalId: number) =>
+  useExtraMetricMutation(
+    goalId,
+    (metricId: number) => api.delete<GoalProgress>(`/v1/goal-categories/${goalId}/metrics/${metricId}`),
+    '그래프를 지웠어요.'
+  )
+
+export const useRecordExtraMetric = (goalId: number) =>
+  useExtraMetricMutation(
+    goalId,
+    ({ metricId, ...v }: { metricId: number; date?: string; value: number; memo?: string | null }) =>
+      api.put<GoalProgress>(`/v1/goal-categories/${goalId}/metrics/${metricId}/logs`, v),
+    '기록했어요.'
+  )
+
+export const useDeleteExtraMetricLog = (goalId: number) =>
+  useExtraMetricMutation(
+    goalId,
+    ({ metricId, date }: { metricId: number; date: string }) =>
+      api.delete<GoalProgress>(`/v1/goal-categories/${goalId}/metrics/${metricId}/logs/${date}`),
+    '기록을 지웠어요.'
+  )

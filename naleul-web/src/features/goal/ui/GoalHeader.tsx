@@ -52,7 +52,7 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
       : null
   )
   const [showMetric, setShowMetric] = useState(goal.targetValue != null || !!goal.metricName)
-  // 업무형(기록형)은 기한·수치가 없어요 → 기간·수치 칸을 숨기고, 카테고리는 회사 업무 / 사이드 프로젝트만
+  // 업무형은 수치가 없고 기간 대신 마감(선택)만 있어요 (V52) → 시작일·수치 칸을 숨기고, 카테고리는 회사 업무 / 사이드 프로젝트만
   const isWork = goal.goalMode === 'RECORD'
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }))
 
@@ -79,6 +79,8 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
         motive: f.motive.trim(),
         goalCategoryStartDate: f.start || undefined,
         goalCategoryEndDate: f.end || undefined,
+        // 업무형: 마감일을 비웠으면 "마감 없이 진행하기" (V52)
+        ...(isWork && !f.end && goal.goalCategoryEndDate ? { clearEndDate: true } : {}),
         ...(f.colorId !== null ? { colorId: f.colorId } : {}),
         // 카테고리는 2단계까지 고른 경우에만 (1단계만 고르다 만 건 기존 값 유지)
         ...(isKindComplete(kind) ? kindBody(kind) : {}),
@@ -134,6 +136,17 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
           />
         </Field>
       </div>
+      {isWork && (
+        <Field label="마감 (선택 · 비우면 마감 없음)">
+          <input
+            type="date"
+            value={f.end}
+            min={f.start || undefined}
+            onChange={(e) => set('end', e.target.value)}
+            className={`${inlineInput} w-[170px]`}
+          />
+        </Field>
+      )}
       {!isWork && (
         <div className="grid grid-cols-2 gap-2">
           <Field label="시작일">
@@ -242,7 +255,7 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
           )}
         </div>
       ) : clearMetric ? (
-        <div className="bg-warning-soft flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] text-warning-ink-strong">
+        <div className="bg-warning-soft text-warning-ink-strong flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 text-[13px]">
           <span className="flex-1">저장하면 수치 목표와 마일스톤의 수치가 지워져요. 기록한 값은 남아요.</span>
           <button type="button" onClick={() => setClearMetric(false)} className="font-semibold underline">
             되돌리기
@@ -328,7 +341,11 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
           {goal.goalCategoryStartDate && (
             <p className="text-ink-3 mt-1.5 text-sm">
               {formatDot(goal.goalCategoryStartDate)} –{' '}
-              {goal.goalCategoryEndDate ? formatDot(goal.goalCategoryEndDate) : '종료일 미정'}
+              {goal.goalCategoryEndDate
+                ? `${formatDot(goal.goalCategoryEndDate)}${goal.goalMode === 'RECORD' ? ' 마감' : ''}`
+                : goal.goalMode === 'RECORD'
+                  ? '마감 없음'
+                  : '종료일 미정'}
               {period && ` · ${period.weeks}주`}
             </p>
           )}

@@ -156,8 +156,11 @@ export function ReviewView({ session }: { session: SessionDetail }) {
                 onClick={() => openEdit('goalStatement')}
               />
               <SummaryRow label="수치" value={summary?.metricText ?? null} onClick={() => openEdit('metric')} />
-              <SummaryRow label="이유" value={summary?.motivation ?? null} onClick={() => openEdit('motivation')} />
               <SummaryRow label="기한" value={summary?.deadlineText ?? null} onClick={() => openEdit('deadline')} />
+              <SummaryRow label="계획" value={summary?.approach ?? null} onClick={() => openEdit('approach')} />
+              {summary?.motivation && (
+                <SummaryRow label="이유" value={summary.motivation} onClick={() => openEdit('motivation')} />
+              )}
               <SummaryRow
                 label="실천 시간"
                 value={summary?.preferenceText ?? null}

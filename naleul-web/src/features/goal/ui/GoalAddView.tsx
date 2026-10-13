@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, type KeyboardEvent } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, BriefcaseBusiness, MessageCircle, PenLine, Sprout, X } from 'lucide-react'
+import { ArrowRight, BriefcaseBusiness, ListChecks, MessageCircle, PenLine, Target } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
@@ -13,6 +13,7 @@ import { useCreateGoal } from '../edit/mutations'
 import { ColorSwatches, Field, InlineForm, colorIdOf, inlineInput, toNum } from '../edit/inline'
 import { isKindComplete, kindBody, type GoalKindValue } from '../kind'
 import { RecordGoalForm } from '@/features/record/ui/RecordGoalForm'
+import { useHabitHome } from '@/features/habit/api'
 import { GoalKindPicker } from './GoalKindPicker'
 
 /** 직접 목표 만들기 폼 — Enter 로 만들기, Esc 로 닫기 */
@@ -36,8 +37,6 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
   })
   const [showMetric, setShowMetric] = useState(false)
   const [kind, setKind] = useState<GoalKindValue | null>(null)
-  const [subs, setSubs] = useState<string[]>([])
-  const [subDraft, setSubDraft] = useState('')
   const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((x) => ({ ...x, [k]: v }))
 
   const colorId = f.colorId ?? colorIdOf(colors.data, null)
@@ -54,21 +53,6 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
             ? '카테고리를 골라 주세요. (기타는 이름 1~10자)'
             : null
   const valid = !!f.name.trim() && !error && colorId !== null
-
-  const addSub = () => {
-    const v = subDraft.trim()
-    if (!v) return
-    if (!subs.includes(v) && subs.length < 10) setSubs([...subs, v.slice(0, 30)])
-    setSubDraft('')
-  }
-  // 세부 목표 칸의 Enter 는 "추가" (비어 있으면 목표 만들기로 넘어가요)
-  const onSubKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
-    if (subDraft.trim()) {
-      e.preventDefault()
-      addSub()
-    }
-  }
 
   const submit = () =>
     create.mutate(
@@ -88,8 +72,8 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
               targetValue: nums[1],
             }
           : {}),
-        // 입력칸에 적어 두고 추가를 안 누른 것도 넣어요
-        subGoals: [...subs, ...(subDraft.trim() && !subs.includes(subDraft.trim()) ? [subDraft.trim()] : [])],
+        // V52: 세부 목표는 화면에서 숨겨서 직접 만들 때도 받지 않아요
+        subGoals: [],
       },
       { onSuccess: ({ goal }) => router.push(`/goal/${goal.goalCategoryId}`) }
     )
@@ -151,38 +135,6 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
         />
       </Field>
 
-      {/* 세부 목표: Enter 로 하나씩 */}
-      <div>
-        <span className="text-ink-3 mb-1 block text-[12px] font-medium">세부 목표 (선택 · Enter로 추가)</span>
-        <div className="border-line-strong bg-surface focus-within:border-ink-3 flex flex-wrap items-center gap-1.5 rounded-xl border px-2 py-1.5">
-          {subs.map((s) => (
-            <span
-              key={s}
-              className="bg-brand-soft text-brand inline-flex h-7 items-center gap-1 rounded-full pr-1 pl-2.5 text-[13px] font-semibold"
-            >
-              {s}
-              <button
-                type="button"
-                onClick={() => setSubs(subs.filter((x) => x !== s))}
-                aria-label={`${s} 빼기`}
-                className="hover:bg-brand/10 rounded-full p-0.5"
-              >
-                <X className="size-3" />
-              </button>
-            </span>
-          ))}
-          <input
-            value={subDraft}
-            onChange={(e) => setSubDraft(e.target.value)}
-            onKeyDown={onSubKey}
-            maxLength={30}
-            placeholder={subs.length ? '' : '예: LC 연습, 단어 외우기'}
-            aria-label="세부 목표 추가"
-            className="placeholder:text-ink-4 h-7 min-w-[140px] flex-1 bg-transparent text-[14px] outline-none"
-          />
-        </div>
-      </div>
-
       {showMetric ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Field label="수치 이름">
@@ -231,18 +183,19 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
           + 수치 목표 추가 (예: 체중 80 → 72kg)
         </button>
       )}
-      <p className="text-ink-3 text-xs">만든 뒤 목표 상세에서 루틴·마일스톤·Task를 바로 추가할 수 있어요.</p>
+      <p className="text-ink-3 text-xs">만든 뒤 목표 상세에서 루틴·Task와 그래프를 바로 추가할 수 있어요.</p>
     </InlineForm>
   )
 }
 
-const WORK_EXAMPLES = ['OO팀 업무', '신규 서비스 기획', '포트폴리오 앱 만들기', '블로그 운영']
-const LIFE_EXAMPLES = ['주 3회 운동하기', '3개월에 5kg 감량', '토익 900점', '매일 6시 30분 기상', '한 달에 책 2권']
+const HABIT_EXAMPLES = ['영양제 먹기', '물 2L 마시기', '샤워하기', '집안일 하기', '금연 · 금주', '일기 쓰기']
+const WORK_EXAMPLES = ['OO팀 업무', '신규 서비스 기획', '포트폴리오 앱 만들기', '취업 준비']
+const GOAL_EXAMPLES = ['3개월에 5kg 감량', 'SQLD 합격', '토익 900점', '1000만원 모으기', '올해 책 24권']
 
 function Examples({ items }: { items: string[] }) {
   return (
     <div className="mt-4">
-      <p className="text-ink-3 mb-1.5 text-[12px] font-medium">이런 목표를 만들 수 있어요</p>
+      <p className="text-ink-3 mb-1.5 text-[12px] font-medium">이런 걸 담아요</p>
       <div className="flex flex-wrap gap-1.5">
         {items.map((x) => (
           <span key={x} className="bg-subtle text-ink-2 rounded-full px-2.5 py-1 text-[12px]">
@@ -254,10 +207,26 @@ function Examples({ items }: { items: string[] }) {
   )
 }
 
+/** 기본 생활 습관은 이미 하나씩 있어요 — 만들기 대신 습관 화면으로 보내요 */
+function HabitCardAction() {
+  const { data, isPending } = useHabitHome()
+  if (isPending || !data) return <span className="bg-subtle block h-5 w-32 animate-pulse rounded" />
+  return (
+    <Link
+      href={`/goal/${data.goalCategoryId}`}
+      className="text-success group flex items-center gap-1 text-sm font-semibold"
+    >
+      {data.habits.length ? `습관 ${data.habits.length}개 보러 가기` : '습관 추가하러 가기'}
+      <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+    </Link>
+  )
+}
+
 /**
- * /goal/add — 목적에 따라 두 가지
- *  - 업무형: 회사 업무 · 사이드 프로젝트. 기한·수치 없이 만들고 완료한 Task 로 업무 일지·패턴을 쌓아요 (goal_mode = RECORD)
- *  - 생활형: 건강 · 학습 · 생활습관. AI 가 대화로 기간·루틴까지 설계 (/goal/new), 계획이 있으면 직접 입력
+ * /goal/add — 목표는 성격에 따라 세 가지 (V52)
+ *  - 기본 생활 습관: 했는지만 체크하는 루틴. 모든 사용자에게 하나씩 이미 있어서 습관만 추가해요 (goal_mode = HABIT)
+ *  - 업무형: 회사 업무 · 사이드 프로젝트. 마감(선택)까지 주제별 Task 보드로 관리 (goal_mode = RECORD)
+ *  - 목표형: 수치로 잴 수 있는 목표. AI 가 대화로 "어떻게 이룰지"를 묻고 기간별 루틴까지 계획 (/goal/new), 계획이 있으면 직접 입력
  */
 export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | 'record' | null }) {
   const [open, setOpen] = useState<'manual' | 'record' | null>(initialMode)
@@ -265,23 +234,37 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
 
   return (
     <>
-      <PageHeader
-        breadcrumb={<Link href="/goal">목표</Link>}
-        title="목표 추가"
-        description="어떤 일을 위한 목표인가요?"
-      />
+      <PageHeader breadcrumb={<Link href="/goal">목표</Link>} title="목표 추가" description="어떤 성격의 목표인가요?" />
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        {/* 기본 생활 습관 */}
+        <section className={card} aria-labelledby="habit-title">
+          <span className="bg-success-soft text-success grid size-11 place-items-center rounded-2xl">
+            <ListChecks className="size-5" />
+          </span>
+          <p id="habit-title" className="mt-4 flex flex-wrap items-center gap-2 text-[18px] font-bold">
+            기본 생활 습관 <Badge tone="success">체크만</Badge>
+          </p>
+          <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
+            매일 챙겨야 하는데 잊기 쉬운 것들이에요. 마감 없이 했는지만 체크하고, 잔디로 쌓여요. 필요 없으면 쉬거나
+            지우면 돼요.
+          </p>
+          <Examples items={HABIT_EXAMPLES} />
+          <div className="mt-auto pt-5">
+            <HabitCardAction />
+          </div>
+        </section>
+
         {/* 업무형 */}
         <section className={cn(card, open === 'record' && 'border-ink ring-ink ring-1')} aria-labelledby="work-title">
-          <span className="bg-ink grid size-11 place-items-center rounded-2xl text-on-ink">
+          <span className="bg-ink text-on-ink grid size-11 place-items-center rounded-2xl">
             <BriefcaseBusiness className="size-5" />
           </span>
           <p id="work-title" className="mt-4 flex flex-wrap items-center gap-2 text-[18px] font-bold">
-            업무형 <Badge tone="neutral">회사 업무 · 사이드 프로젝트</Badge>
+            업무형 <Badge tone="neutral">Task 관리</Badge>
           </p>
           <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
-            마감이나 수치보다 꾸준히 해 나가는 일이에요. Task를 완료할 때마다 업무 일지와 나의 패턴이 쌓여요.
+            수치보다 해야 할 일이 많은 일이에요. 마감까지 오늘 할 일과 남은 일을 주제별 보드로 정리하고, 팀에 공유해요.
           </p>
           <Examples items={WORK_EXAMPLES} />
           <div className="mt-auto pt-5">
@@ -302,22 +285,23 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
           </div>
         </section>
 
-        {/* 생활형 */}
-        <section className={cn(card, open === 'manual' && 'border-ink ring-ink ring-1')} aria-labelledby="life-title">
+        {/* 목표형 */}
+        <section className={cn(card, open === 'manual' && 'border-ink ring-ink ring-1')} aria-labelledby="goal-title">
           <span className="bg-brand-soft text-brand grid size-11 place-items-center rounded-2xl">
-            <Sprout className="size-5" />
+            <Target className="size-5" />
           </span>
-          <p id="life-title" className="mt-4 flex flex-wrap items-center gap-2 text-[18px] font-bold">
-            생활형 <Badge tone="brand">건강 · 학습 · 생활습관</Badge>
+          <p id="goal-title" className="mt-4 flex flex-wrap items-center gap-2 text-[18px] font-bold">
+            목표형 <Badge tone="brand">수치 · 기한</Badge>
           </p>
           <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
-            이루고 싶은 모습이 분명한 목표예요. AI가 몇 가지 질문을 한 뒤 기간과 꼭 필요한 루틴까지 계획해 드려요.
+            숫자로 잴 수 있는 목표예요. AI가 지금 상황과 계획을 물어본 뒤, 오늘 어디까지 하면 되는지 그래프와 루틴으로
+            짜 드려요.
           </p>
-          <Examples items={LIFE_EXAMPLES} />
+          <Examples items={GOAL_EXAMPLES} />
           <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2 pt-5">
             <Link href="/goal/new" className="text-brand group flex items-center gap-1 text-sm font-semibold">
               <MessageCircle className="size-4" />
-              AI와 대화 시작하기
+              AI와 계획 세우기
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <button
@@ -327,7 +311,7 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
               className="text-ink-3 hover:text-ink-2 flex items-center gap-1 text-[13px] font-medium"
             >
               <PenLine className="size-3.5" />
-              {open === 'manual' ? '아래에서 입력해 주세요' : '계획이 있다면 직접 입력하기'}
+              {open === 'manual' ? '아래에서 입력해 주세요' : '직접 입력하기'}
             </button>
           </div>
         </section>

@@ -375,11 +375,17 @@ export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: 
   const weeklyCount = routines.reduce((n, t) => n + (t.routineDays?.length ?? 0), 0)
   const remain = dDay(goal.endDate)
 
+  // 기간별로 나눈 루틴(이론 → 기출)이 있으면 단계 수를 보여줘요 (V52: 마일스톤 대신)
+  const phases = new Set(routines.map((t) => `${t.startDate ?? ''}~${t.endDate ?? ''}`)).size
   const stats = [
-    ['세부 목표', `${plan.subGoals.length}개`],
-    ['마일스톤', `${plan.milestones.length}단계`],
+    ['루틴', `${routines.length}개`],
+    ['주간 실천', `주 ${weeklyCount}회`],
     ['일회성 Task', `${oneTimes}개`],
-    ['루틴', `주 ${weeklyCount}회`],
+    ...(phases > 1
+      ? ([['단계', `${phases}단계`]] as const)
+      : plan.milestones.length
+        ? ([['마일스톤', `${plan.milestones.length}단계`]] as const)
+        : []),
   ] as const
 
   return (

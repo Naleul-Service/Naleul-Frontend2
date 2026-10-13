@@ -6,7 +6,8 @@ import type { GoalSubType } from '@/features/goal/kind'
 export type SessionStatus =
   'INTERVIEWING' | 'READY_TO_GENERATE' | 'GENERATING' | 'DRAFT_READY' | 'CONFIRMED' | 'ABANDONED'
 
-export type SlotKey = 'goalStatement' | 'metric' | 'motivation' | 'deadline' | 'practicePreference'
+/** V52: 이유(motivation)는 더 묻지 않고, 어떻게 이룰지(approach)를 물어요. motivation 은 예전 세션 호환용 */
+export type SlotKey = 'goalStatement' | 'metric' | 'motivation' | 'deadline' | 'approach' | 'practicePreference'
 export type SlotStatus = 'EMPTY' | 'FILLED' | 'SKIPPED'
 export type PlanningStyle = 'PLANNER' | 'SPONTANEOUS'
 /** 계획 강도 — 안정형(기본)은 지금 실력 기준, 도전형은 조금 더 높게 */
@@ -43,6 +44,8 @@ export interface GoalSlots {
   motivation: Slot<string>
   deadline: Slot<DeadlineValue>
   practicePreference: Slot<PracticePreferenceValue>
+  /** 어떻게 이루고 싶은지 · 정해 둔 계획 (V52, 예전 세션엔 없어요) */
+  approach?: Slot<string>
 }
 
 export interface GoalSummary {
@@ -52,6 +55,8 @@ export interface GoalSummary {
   deadlineText: string | null
   preferenceText: string | null
   planningStyle: PlanningStyle | null
+  /** 어떻게 이루고 싶은지 · 정해 둔 계획 (V52) */
+  approach?: string | null
 }
 
 export interface GoalMessage {
@@ -103,6 +108,7 @@ export interface SlotsPatch {
   goalStatement?: string
   metric?: { name: string; currentValue: number | null; targetValue: number | null; unit: string | null }
   motivation?: string
+  approach?: string
   deadline?: DeadlineValue
   practicePreference?: PracticePreferenceValue
   /** 빈 목록이면 지워요 */

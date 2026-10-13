@@ -297,6 +297,33 @@ function PracticeForm({ slots, formId, onSubmit }: FormProps) {
   )
 }
 
+function ApproachForm({ slots, formId, onSubmit }: FormProps) {
+  const [value, setValue] = useState(slots.approach?.value ?? '')
+  const submit = useSubmit(onSubmit, () => {
+    const v = value.trim()
+    if (!v) return { error: '어떻게 하고 싶은지 적어 주세요. 정한 게 없으면 "정한 계획 없음"이라고 적어도 돼요.' }
+    return { patch: { approach: v } }
+  })
+  return (
+    <form id={formId} onSubmit={submit}>
+      <Field
+        label="어떻게 이루고 싶나요?"
+        hint="이미 정해 둔 순서 · 교재 · 꼭 할 일을 적으면 그대로 계획의 뼈대가 돼요."
+      >
+        <textarea
+          autoFocus
+          rows={4}
+          maxLength={500}
+          className={textareaClass}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="예) 2주는 이론 강의, 남은 기간은 기출 5회독"
+        />
+      </Field>
+    </form>
+  )
+}
+
 // ─── 모달 ─────────────────────────────────────────────────────
 
 const TITLES: Record<SlotKey, string> = {
@@ -304,6 +331,7 @@ const TITLES: Record<SlotKey, string> = {
   metric: '수치 수정',
   motivation: '이유 수정',
   deadline: '기한 수정',
+  approach: '계획 수정',
   practicePreference: '실천 시간 수정',
 }
 
@@ -312,6 +340,7 @@ const FORMS: Record<SlotKey, (props: FormProps) => ReactNode> = {
   metric: MetricForm,
   motivation: MotivationForm,
   deadline: DeadlineForm,
+  approach: ApproachForm,
   practicePreference: PracticeForm,
 }
 

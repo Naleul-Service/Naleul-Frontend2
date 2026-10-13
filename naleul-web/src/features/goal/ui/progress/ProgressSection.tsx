@@ -50,14 +50,14 @@ const STATUS: Record<ProgressStatus, { label: string; tone: string }> = {
   NO_PLAN: { label: '종료일 없음', tone: 'bg-subtle text-ink-3' },
 }
 
-function StatusChip({ status }: { status: ProgressStatus }) {
+export function StatusChip({ status }: { status: ProgressStatus }) {
   const s = STATUS[status]
   return <span className={cn('rounded-full px-2.5 py-1 text-[12px] font-semibold', s.tone)}>{s.label}</span>
 }
 
 // ─── 시작 → 목표 막대 위의 현재 위치 ───────────────────────────────
 
-function TrackBar({ m }: { m: MetricProgress }) {
+export function TrackBar({ m }: { m: MetricProgress }) {
   const span = m.targetValue - m.startValue
   const pos = (v: number) => Math.min(Math.max((v - m.startValue) / span, 0), 1) * 100
   const now = pos(m.currentValue)
@@ -113,7 +113,7 @@ function TrackBar({ m }: { m: MetricProgress }) {
 }
 
 /** "오늘 계획보다 0.3kg 늦어요 · 이 속도면 10월 16일 도달" */
-function Insight({ m, endDate }: { m: MetricProgress; endDate: string | null }) {
+export function Insight({ m, endDate }: { m: MetricProgress; endDate: string | null }) {
   const lines: string[] = []
   const dir = Math.sign(m.targetValue - m.startValue)
   if (m.status === 'ACHIEVED') {
@@ -382,7 +382,7 @@ function CheckInPrefilled({
   )
 }
 
-function Legend({ items }: { items: { name: string; kind: 'plan' | 'actual' }[] }) {
+export function Legend({ items }: { items: { name: string; kind: 'plan' | 'actual' }[] }) {
   return (
     <div className="text-ink-3 mt-2 flex flex-wrap items-center gap-4 text-[12px]">
       {items.map((i) => (

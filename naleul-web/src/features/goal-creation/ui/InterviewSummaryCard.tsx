@@ -20,8 +20,10 @@ export function InterviewSummaryCard({ summary }: { summary: GoalSummary }) {
     <dl className="divide-line divide-y">
       <Row label="목표">{summary.goalStatement ?? EMPTY}</Row>
       <Row label="수치">{summary.metricText ?? EMPTY}</Row>
-      <Row label="이유">{summary.motivation ?? EMPTY}</Row>
       <Row label="기한">{summary.deadlineText ?? EMPTY}</Row>
+      <Row label="계획">{summary.approach ?? EMPTY}</Row>
+      {/* 예전 세션(이유를 묻던 때)에 답한 이유가 있으면 보여줘요 */}
+      {summary.motivation && <Row label="이유">{summary.motivation}</Row>}
       <Row label="실천 시간">{summary.preferenceText ?? EMPTY}</Row>
       <Row label="성향">
         {summary.planningStyle ? <Badge tone="brand">{PLANNING_STYLE_LABEL[summary.planningStyle]}</Badge> : EMPTY}

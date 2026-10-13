@@ -423,11 +423,11 @@ export function DraftReviewView({ session, draft }: Props) {
           {/* SOFT 경고 */}
           {plan.warnings.length > 0 && (
             <div className="border-warning/40 bg-warning-soft mt-4 rounded-2xl border px-5 py-4">
-              <p className="flex items-center gap-1.5 text-sm font-bold text-warning-ink">
+              <p className="text-warning-ink flex items-center gap-1.5 text-sm font-bold">
                 <AlertTriangle className="size-4" />
                 확인해 보면 좋은 점
               </p>
-              <ul className="mt-1.5 space-y-0.5 text-[13px] text-warning-ink-strong">
+              <ul className="text-warning-ink-strong mt-1.5 space-y-0.5 text-[13px]">
                 {plan.warnings.map((w, i) => (
                   <li key={`${w.ruleId}-${i}`}>· {w.message}</li>
                 ))}
@@ -516,37 +516,40 @@ export function DraftReviewView({ session, draft }: Props) {
             <OneTimeTasksCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
           </div>
 
-          {/* 아래: 세부 구조 (접힘) — 세부 목표 · 마일스톤. 날짜·수치는 자동으로 맞춰져요 */}
-          <section className="border-line bg-surface mt-5 rounded-[20px] border">
-            <button
-              type="button"
-              onClick={() => setStructureOpen((v) => !v)}
-              aria-expanded={structureOpen || structureHasIssue}
-              className="flex w-full items-center gap-3 px-5 py-4 text-left sm:px-7"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-bold">세부 구조</span>
-                <span className="text-ink-3 block text-[13px]">
-                  세부 목표 {plan.subGoals.length}개 · 마일스톤 {plan.milestones.length}단계 — 날짜
-                  {plan.goal.metric ? '·수치' : ''}는 자동으로 맞춰져요. 꼭 바꿀 때만 열어 보세요.
+          {/* 아래: 세부 구조 (접힘) — 세부 목표 · 마일스톤. 날짜·수치는 자동으로 맞춰져요
+              V52: AI 초안은 마일스톤 없이 세부 목표 1개로 와서, 그럴 땐 이 칸을 아예 숨겨요 (예전 초안 · 문제가 있을 때만) */}
+          {(plan.milestones.length > 0 || plan.subGoals.length > 1 || structureHasIssue) && (
+            <section className="border-line bg-surface mt-5 rounded-[20px] border">
+              <button
+                type="button"
+                onClick={() => setStructureOpen((v) => !v)}
+                aria-expanded={structureOpen || structureHasIssue}
+                className="flex w-full items-center gap-3 px-5 py-4 text-left sm:px-7"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-bold">세부 구조</span>
+                  <span className="text-ink-3 block text-[13px]">
+                    세부 목표 {plan.subGoals.length}개 · 마일스톤 {plan.milestones.length}단계 — 날짜
+                    {plan.goal.metric ? '·수치' : ''}는 자동으로 맞춰져요. 꼭 바꿀 때만 열어 보세요.
+                  </span>
                 </span>
-              </span>
-              <ChevronDown
-                className={cn(
-                  'text-ink-3 size-5 transition-transform',
-                  (structureOpen || structureHasIssue) && 'rotate-180'
-                )}
-              />
-            </button>
-            {(structureOpen || structureHasIssue) && (
-              <div className="border-line grid grid-cols-[minmax(0,1fr)] gap-5 border-t px-5 pt-2 pb-6 sm:px-7 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                <MilestoneTimeline plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
-                <div className="pt-5">
-                  <SubGoalsCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
+                <ChevronDown
+                  className={cn(
+                    'text-ink-3 size-5 transition-transform',
+                    (structureOpen || structureHasIssue) && 'rotate-180'
+                  )}
+                />
+              </button>
+              {(structureOpen || structureHasIssue) && (
+                <div className="border-line grid grid-cols-[minmax(0,1fr)] gap-5 border-t px-5 pt-2 pb-6 sm:px-7 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                  <MilestoneTimeline plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
+                  <div className="pt-5">
+                    <SubGoalsCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
+                  </div>
                 </div>
-              </div>
-            )}
-          </section>
+              )}
+            </section>
+          )}
         </main>
       </div>
 
@@ -747,7 +750,7 @@ function PlanFitCard({
         <span className="text-ink-3"> · 내 기준 {hoursText(fit.weeklyCapMinutes)} 이내 추천</span>
       </p>
       {over && (
-        <p className="mt-1 text-[13px] text-warning-ink">
+        <p className="text-warning-ink mt-1 text-[13px]">
           지금 실천량보다 많아요. 처음엔 조금 줄여서 시작하면 끝까지 가기 쉬워요.
         </p>
       )}

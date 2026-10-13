@@ -102,6 +102,8 @@ export interface GoalUpdateInput {
   goalType?: GoalType
   goalSubType?: GoalSubType
   goalKindLabel?: string
+  /** true 면 종료일(업무형은 마감일)을 지워요 — 업무형 "마감 없이 진행하기" (V52) */
+  clearEndDate?: boolean
 }
 
 export const useUpdateGoal = (goalId: number) =>

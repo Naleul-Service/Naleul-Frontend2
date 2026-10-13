@@ -6,6 +6,7 @@ import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useUserColors } from '@/features/color/api'
 import { ColorSwatches, Field, InlineForm, inlineInput } from '@/features/goal/edit/inline'
+import { todayKst } from '@/features/timetable/time'
 import { useCreateRecordGoal } from '../api'
 
 type WorkKind = 'COMPANY_WORK' | 'SIDE_PROJECT'
@@ -57,6 +58,7 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
   const [kind, setKind] = useState<WorkKind>('COMPANY_WORK')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [deadline, setDeadline] = useState('')
   // null 이면 종류의 기본 이모지 (종류를 바꾸면 같이 바뀌게)
   const [emoji, setEmoji] = useState<string | null>(null)
   const [colorId, setColorId] = useState<number | null>(null)
@@ -75,6 +77,7 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
         goalType: 'WORK',
         goalSubType: kind,
         description: description.trim() || null,
+        deadline: deadline || null,
       },
       { onSuccess: (goal) => router.push(`/goal/${goal.goalCategoryId}`) }
     )
@@ -84,8 +87,8 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
       onSubmit={submit}
       onCancel={onCancel}
       saving={create.isPending}
-      valid={!!value}
-      error={null}
+      valid={!!value && !(deadline && deadline < todayKst())}
+      error={deadline && deadline < todayKst() ? '마감일은 오늘 이후로 정해 주세요.' : null}
       submitLabel="업무형 목표 만들기"
       className={className}
     >
@@ -155,7 +158,27 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
         />
       </Field>
 
-      {/* ④ 꾸미기 — 기본값이 있어서 접어 둬요 */}
+      {/* ④ 마감 (선택) */}
+      <Field label="마감 (선택)">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="date"
+            value={deadline}
+            min={todayKst()}
+            onChange={(e) => setDeadline(e.target.value)}
+            className={`${inlineInput} w-[170px]`}
+          />
+          {deadline ? (
+            <button type="button" onClick={() => setDeadline('')} className="text-ink-3 hover:text-ink text-[13px]">
+              마감 없이
+            </button>
+          ) : (
+            <span className="text-ink-4 text-[12px]">정하면 D-day와 하루에 끝낼 개수를 알려드려요</span>
+          )}
+        </div>
+      </Field>
+
+      {/* ⑤ 꾸미기 — 기본값이 있어서 접어 둬요 */}
       <div>
         <button
           type="button"
@@ -197,8 +220,8 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
 
       {/* 예시 — 만든 뒤 어떻게 쓰는지 */}
       <p className="bg-subtle text-ink-2 rounded-xl px-3 py-2.5 text-[13px] leading-relaxed">
-        기한·수치 없이 만들어요. 예를 들어 <b>{t.taskExamples.map((x) => `‘${x}’`).join(', ')}</b> 같은 Task를 완료할
-        때마다 날짜별 업무 일지와 나의 패턴에 쌓여요.
+        수치 없이 만들어요. <b>{t.taskExamples.map((x) => `‘${x}’`).join(', ')}</b> 같은 Task를 주제별 보드(시작 전 ·
+        진행 중 · 완료)로 정리하고, 끝낸 일은 날짜별로 쌓여요. 팀에 공유하기도 쉬워요.
       </p>
     </InlineForm>
   )

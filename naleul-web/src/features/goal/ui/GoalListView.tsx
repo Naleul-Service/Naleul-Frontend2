@@ -7,6 +7,7 @@ import { Button, buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Chip'
 import { ResumeCard } from '@/features/goal-creation/ui/ResumeCard'
+import { HabitSummaryCard } from '@/features/habit/ui/HabitSummaryCard'
 import { useRecordPattern } from '@/features/record/api'
 import { useGoalCategories, type GoalCategory } from '../api'
 import { dDayLabel, formatDot, goalColor, isOngoing, periodProgress, statusLabel } from '../format'
@@ -190,7 +191,11 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
       {goal.goalCategoryStartDate && (
         <p className="text-ink-3 mt-1 text-[13px]">
           {formatDot(goal.goalCategoryStartDate)} –{' '}
-          {goal.goalCategoryEndDate ? formatDot(goal.goalCategoryEndDate) : '계속'}
+          {goal.goalCategoryEndDate
+            ? formatDot(goal.goalCategoryEndDate)
+            : goal.goalMode === 'RECORD'
+              ? '마감 없음'
+              : '계속'}
         </p>
       )}
 
@@ -201,8 +206,8 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
       )}
       <p className="text-ink-3 mt-3 text-xs">
         {goal.goalMode === 'RECORD'
-          ? `${goal.goalType === 'WORK' && goal.goalSubType ? subOption(goal.goalSubType).label : '업무형'} · 완료한 Task를 쌓는 목표${routineCount ? ` · 루틴 ${routineCount}개` : ''}`
-          : `세부 목표 ${goal.generalCategories.length}개 · 루틴 ${routineCount}개`}
+          ? `${goal.goalType === 'WORK' && goal.goalSubType ? subOption(goal.goalSubType).label : '업무형'} · 주제별 Task 보드${routineCount ? ` · 루틴 ${routineCount}개` : ''}`
+          : `목표형 · 루틴 ${routineCount}개`}
       </p>
     </Link>
   )
@@ -229,6 +234,9 @@ export function GoalListView() {
       />
 
       <ResumeCard className="mt-6" />
+
+      {/* 기본 생활 습관 — 모든 사용자에게 하나씩 있는 체크 전용 목표 (V52) */}
+      <HabitSummaryCard className="mt-6" />
 
       {isPending && (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

@@ -152,7 +152,8 @@ export function normalizePlan(plan: GoalPlan): GoalPlan {
 export const LIMITS = {
   title: 40,
   subGoals: [1, 5],
-  milestones: [1, 8],
+  // V52: AI 초안은 마일스톤 없이 와요 (서버 USER_LIMITS 0~8)
+  milestones: [0, 8],
   routines: [0, 10],
   oneTimes: [0, 30],
   routineMinutes: [1, 240],
