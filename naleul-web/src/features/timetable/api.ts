@@ -55,7 +55,11 @@ function useTimetableMutation<V, R>(fn: (v: V) => Promise<R>, opts: { success?: 
       if (msg) toast.success(msg)
     },
     onError: (e) => toast.error(errorMessage(e)),
-    onSettled: () => qc.invalidateQueries({ queryKey: timetableKeys.all }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: timetableKeys.all })
+      // 홈의 "오늘 회고 · 다가오는 마감"(features/home 의 homeKeys.all)도 Task 로 계산해요
+      qc.invalidateQueries({ queryKey: ['home'] })
+    },
   })
 }
 

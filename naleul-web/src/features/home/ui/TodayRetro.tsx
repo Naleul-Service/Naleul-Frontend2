@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronDown, Pencil, Trash2 } from 'lucide-react'
+import { ArrowRight, Check, Pencil, PencilLine, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
@@ -17,11 +17,21 @@ function promptOf(g: HomeGoalToday) {
   return '오늘 목표에 얼마나 다가갔나요? 잘 된 점 · 아쉬운 점'
 }
 
+/** 아직 회고를 안 쓴 다음 목표 (오늘 할 일이 있던 목표 → 그다음 나머지 순, 지금 목표는 빼고) */
+function nextGoal(goals: HomeGoalToday[], after: number | null, written: Set<number>) {
+  const order = goals.filter((g) => g.activeToday)
+  const start = after === null ? -1 : order.findIndex((g) => g.goalCategoryId === after)
+  const rest = [...order.slice(start + 1), ...order.slice(0, Math.max(start, 0))]
+  return rest.find((g) => g.retros.length === 0 && !written.has(g.goalCategoryId) && g.goalCategoryId !== after) ?? null
+}
+
 /**
- * 오늘 회고 — 진행 중인 목표마다 오늘 끝낸 일 · 못 한 일을 보면서 바로 한 줄 남겨요.
- * 오늘 할 일이 있었던 목표만 펼쳐 두고, 나머지는 "다른 목표"로 접어요.
+ * 오늘 회고 (홈 오른쪽 패널) — 목표를 하나씩 고를 필요 없이 입력창 하나로 써요.
+ *  - 오늘 할 일이 있던 목표 중 아직 회고가 없는 것부터 자동으로 골라 둬요
+ *  - Enter 로 저장하면 다음 목표로 넘어가요 (건너뛰기도 가능) · Shift+Enter 줄바꿈
+ *  - 위의 목표 칩을 눌러 직접 고를 수도 있어요 (✓ = 오늘 회고 있음)
  */
-export function TodayRetro({
+export function RetroPanel({
   goals,
   today,
   failed,
@@ -30,140 +40,195 @@ export function TodayRetro({
   today: string
   failed: boolean
 }) {
+  const create = useCreateTodayRetro()
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const [picked, setPicked] = useState<number | null>(null)
+  const [finished, setFinished] = useState(false)
+  // 저장 직후 서버 응답이 오기 전에도 "썼다"로 보이게
+  const [written, setWritten] = useState<Set<number>>(new Set())
+  const [text, setText] = useState('')
   const [showIdle, setShowIdle] = useState(false)
+
   if (failed) return null
-  if (!goals) return <div className="bg-subtle h-40 animate-pulse rounded-[20px]" />
+  if (!goals) return <div className="bg-subtle h-60 animate-pulse rounded-[20px]" />
   if (goals.length === 0) return null
 
+  const hasRetro = (g: HomeGoalToday) => g.retros.length > 0 || written.has(g.goalCategoryId)
+  const auto = nextGoal(goals, null, written) ?? goals.find((g) => g.activeToday) ?? goals[0]
+  const current = finished ? null : (goals.find((g) => g.goalCategoryId === picked) ?? auto)
   const active = goals.filter((g) => g.activeToday)
   const idle = goals.filter((g) => !g.activeToday)
-  const written = goals.filter((g) => g.retros.length > 0).length
+  const doneCount = active.filter(hasRetro).length
 
-  return (
-    <section aria-labelledby="home-retro">
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 id="home-retro" className="text-[19px] font-bold">
-          오늘 회고
-        </h2>
-        <span className="text-ink-3 text-[13px]">
-          {written > 0 ? `${written}개 목표에 남겼어요` : '오늘 한 일을 보면서 목표마다 한 줄씩 남겨 보세요'}
-        </span>
-      </div>
-      {active.length === 0 && (
-        <Card className="text-ink-3 mb-3 p-5 text-sm">
-          오늘 목표와 연결된 할 일이 없었어요. 아래 목표에 생각을 남겨도 돼요.
-        </Card>
-      )}
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
-        {(active.length > 0 ? active : idle.slice(0, 2)).map((g) => (
-          <RetroCard key={g.goalCategoryId} goal={g} today={today} />
-        ))}
-      </div>
-      {active.length > 0 && idle.length > 0 && (
-        <div className="mt-3">
-          <button
-            type="button"
-            onClick={() => setShowIdle((v) => !v)}
-            aria-expanded={showIdle}
-            className="text-ink-3 hover:text-ink flex items-center gap-1 text-[13px] font-semibold"
-          >
-            오늘 할 일이 없던 목표 {idle.length}개
-            <ChevronDown className={cn('size-4 transition-transform', showIdle && 'rotate-180')} />
-          </button>
-          {showIdle && (
-            <div className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
-              {idle.map((g) => (
-                <RetroCard key={g.goalCategoryId} goal={g} today={today} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </section>
-  )
-}
-
-function RetroCard({ goal: g, today }: { goal: HomeGoalToday; today: string }) {
-  const create = useCreateTodayRetro()
-  const [text, setText] = useState('')
+  const focus = () => requestAnimationFrame(() => inputRef.current?.focus())
+  const pick = (id: number) => {
+    setPicked(id)
+    setFinished(false)
+    focus()
+  }
+  const goNext = (from: number, justWrote: boolean) => {
+    const w = justWrote ? new Set([...written, from]) : written
+    const n = nextGoal(goals, from, w)
+    if (n) {
+      setPicked(n.goalCategoryId)
+      focus()
+    } else {
+      setPicked(null)
+      setFinished(true)
+    }
+  }
   const submit = () => {
     const v = text.trim()
-    if (!v || create.isPending) return
-    create.mutate({ goalCategoryId: g.goalCategoryId, content: v, date: today }, { onSuccess: () => setText('') })
+    if (!v || !current || create.isPending) return
+    const id = current.goalCategoryId
+    create.mutate(
+      { goalCategoryId: id, content: v, date: today },
+      {
+        onSuccess: () => {
+          setText('')
+          setWritten((s) => new Set([...s, id]))
+          goNext(id, true)
+        },
+      }
+    )
   }
 
+  const chip = (g: HomeGoalToday) => (
+    <button
+      key={g.goalCategoryId}
+      type="button"
+      onClick={() => pick(g.goalCategoryId)}
+      aria-pressed={current?.goalCategoryId === g.goalCategoryId}
+      className={cn(
+        'flex h-8 max-w-full items-center gap-1 rounded-full border px-2.5 text-[12px] font-semibold transition-colors',
+        current?.goalCategoryId === g.goalCategoryId
+          ? 'border-ink bg-ink text-on-ink'
+          : 'border-line-strong bg-surface text-ink-2 hover:border-ink-4'
+      )}
+    >
+      {hasRetro(g) ? (
+        <Check className="text-success size-3.5 shrink-0" strokeWidth={3} />
+      ) : (
+        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hexOf(g.colorCode) }} aria-hidden />
+      )}
+      <span className="truncate">
+        {g.emoji ? `${g.emoji} ` : ''}
+        {g.goalName}
+      </span>
+    </button>
+  )
+
   return (
-    <Card className="flex flex-col p-5">
-      <div className="flex items-center gap-2">
-        <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: hexOf(g.colorCode) }} aria-hidden />
-        <Link
-          href={`/goal/${g.goalCategoryId}`}
-          className="min-w-0 flex-1 truncate text-[15px] font-bold hover:underline"
-        >
-          {g.emoji ? `${g.emoji} ` : ''}
-          {g.goalName}
-        </Link>
-        {g.planned + g.done > 0 && (
-          <span className="text-ink-3 shrink-0 text-[12px] tabular-nums">
-            오늘 {g.done}
-            {g.planned > 0 && ` / ${g.planned}`}개 끝냄
+    <Card id="home-retro" className="p-4 sm:p-5">
+      <div className="flex items-baseline gap-2">
+        <h2 className="flex items-center gap-1.5 text-[17px] font-bold">
+          <PencilLine className="size-4" />
+          오늘 회고
+        </h2>
+        {active.length > 0 && (
+          <span className="text-ink-3 ml-auto text-[12px] tabular-nums">
+            {doneCount} / {active.length} 목표
           </span>
         )}
       </div>
 
-      {(g.doneTasks.length > 0 || g.openTasks.length > 0) && (
-        <ul className="mt-3 flex flex-wrap gap-1.5">
-          {g.doneTasks.map((name, i) => (
-            <li
-              key={`d${i}`}
-              className="bg-success-soft text-success flex max-w-full items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-semibold"
-            >
-              <Check className="size-3 shrink-0" strokeWidth={3} />
-              <span className="truncate">{name}</span>
-            </li>
-          ))}
-          {g.openTasks.map((name, i) => (
-            <li
-              key={`o${i}`}
-              className="bg-subtle text-ink-3 max-w-full truncate rounded-full px-2.5 py-1 text-[12px] font-medium"
-              title="오늘 못 한 일"
-            >
-              {name}
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {g.retros.length > 0 && (
-        <ul className="mt-3 space-y-1.5">
-          {g.retros.map((r) => (
-            <RetroItem key={r.retrospectiveId} retro={r} />
-          ))}
-        </ul>
-      )}
-
-      <div className="mt-3">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault()
-              submit()
-            }
-          }}
-          rows={2}
-          aria-label={`${g.goalName} 오늘 회고`}
-          placeholder={promptOf(g)}
-          className={`${inlineInput} h-auto resize-none py-2 text-[14px] leading-relaxed`}
-        />
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-ink-4 text-[11px]">Enter 저장 · Shift+Enter 줄바꿈</span>
-          <Button size="sm" loading={create.isPending} disabled={!text.trim()} onClick={submit}>
-            {g.retros.length > 0 ? '한 줄 더 남기기' : '회고 남기기'}
-          </Button>
-        </div>
+      {/* 목표 고르기 — 자동으로 골라 두지만 눌러서 바꿀 수 있어요 */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {(active.length ? active : idle).map(chip)}
+        {active.length > 0 && idle.length > 0 && !showIdle && (
+          <button
+            type="button"
+            onClick={() => setShowIdle(true)}
+            className="text-ink-3 hover:text-ink h-8 px-1.5 text-[12px] font-semibold"
+          >
+            + 다른 목표 {idle.length}
+          </button>
+        )}
+        {active.length > 0 && showIdle && idle.map(chip)}
       </div>
+
+      {current ? (
+        <div className="mt-4">
+          <div className="text-ink-3 flex items-center gap-1.5 text-[12px]">
+            <span className="size-2 rounded-full" style={{ backgroundColor: hexOf(current.colorCode) }} aria-hidden />
+            <Link href={`/goal/${current.goalCategoryId}`} className="text-ink truncate font-bold hover:underline">
+              {current.goalName}
+            </Link>
+            {current.planned + current.done > 0 && (
+              <span className="shrink-0 tabular-nums">
+                · 오늘 {current.done}
+                {current.planned > 0 && `/${current.planned}`}개 끝냄
+              </span>
+            )}
+          </div>
+
+          {(current.doneTasks.length > 0 || current.openTasks.length > 0) && (
+            <ul className="mt-2 flex flex-wrap gap-1">
+              {current.doneTasks.map((name, i) => (
+                <li
+                  key={`d${i}`}
+                  className="bg-success-soft text-success flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                >
+                  <Check className="size-3 shrink-0" strokeWidth={3} />
+                  <span className="truncate">{name}</span>
+                </li>
+              ))}
+              {current.openTasks.map((name, i) => (
+                <li
+                  key={`o${i}`}
+                  title="오늘 못 한 일"
+                  className="bg-subtle text-ink-3 max-w-full truncate rounded-full px-2 py-0.5 text-[11px] font-medium"
+                >
+                  {name}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {current.retros.length > 0 && (
+            <ul className="mt-2 space-y-1.5">
+              {current.retros.map((r) => (
+                <RetroItem key={r.retrospectiveId} retro={r} />
+              ))}
+            </ul>
+          )}
+
+          <textarea
+            ref={inputRef}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault()
+                submit()
+              }
+            }}
+            rows={4}
+            aria-label={`${current.goalName} 오늘 회고`}
+            placeholder={promptOf(current)}
+            className={`${inlineInput} mt-3 h-auto resize-none py-2.5 text-[14px] leading-relaxed`}
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => goNext(current.goalCategoryId, false)}
+              className="text-ink-3 hover:text-ink text-[13px] font-semibold"
+            >
+              건너뛰기
+            </button>
+            <Button size="sm" className="ml-auto" loading={create.isPending} disabled={!text.trim()} onClick={submit}>
+              저장하고 다음
+              <ArrowRight className="size-3.5" />
+            </Button>
+          </div>
+          <p className="text-ink-4 mt-1.5 text-[11px]">Enter 저장 후 다음 목표로 · Shift+Enter 줄바꿈</p>
+        </div>
+      ) : (
+        <div className="mt-5 py-4 text-center">
+          <p className="text-[15px] font-bold">오늘 회고를 모두 남겼어요 🎉</p>
+          <p className="text-ink-3 mt-1 text-[13px]">더 쓰고 싶은 목표가 있으면 위에서 골라 주세요.</p>
+        </div>
+      )}
     </Card>
   )
 }

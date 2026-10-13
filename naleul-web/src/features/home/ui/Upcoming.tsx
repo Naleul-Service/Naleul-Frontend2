@@ -1,11 +1,13 @@
 'use client'
 
+import { Fragment, useState } from 'react'
 import Link from 'next/link'
+import { Flag } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { dayLabel } from '@/features/work/format'
 import { hexOf } from '@/features/timetable/layout'
-import { hm } from '@/features/timetable/time'
+import { hm, todayKst, weekdayIndex, WEEKDAY_LABEL } from '@/features/timetable/time'
 import type { TimeBlockTask, TimetableDay } from '@/features/timetable/types'
 import type { DeadlineType, HomeDeadline } from '../api'
 import { isRoutineTask, startMinutes, tasksOfDay } from '../today'
@@ -80,7 +82,8 @@ function ScheduleRow({ t }: { t: TimeBlockTask }) {
   )
 }
 
-const TYPE_LABEL: Record<DeadlineType, string> = { TASK: 'Task', TOPIC: '주제', GOAL: '목표 마감' }
+const TYPE_LABEL: Record<DeadlineType, string> = { TASK: 'Task 마감', TOPIC: '주제 마감', GOAL: '목표 종료' }
+const PAGE = 10
 
 function ddayText(d: HomeDeadline) {
   if (d.dDay === 0) return '오늘'
@@ -88,73 +91,169 @@ function ddayText(d: HomeDeadline) {
   return d.dDay < 0 ? `${-d.dDay}일 지남` : `D-${d.dDay}`
 }
 
-/** 다가오는 마감 — Task 마감 · 업무형 주제 마감 · 목표형 종료일 (지난 7일 ~ 앞으로 14 · 30일) */
-export function UpcomingDeadlines({
-  deadlines,
-  today,
-  failed,
-}: {
-  deadlines: HomeDeadline[] | undefined
-  today: string
-  failed: boolean
-}) {
+/** 점 — Task 는 작은 점, 업무형 주제는 테두리 점, 목표 종료는 깃발 */
+function Node({ d }: { d: HomeDeadline }) {
+  const color = hexOf(d.colorCode)
+  if (d.type === 'GOAL') {
+    return (
+      <span
+        className="relative z-[1] grid size-7 place-items-center rounded-full text-white"
+        style={{ backgroundColor: color }}
+      >
+        <Flag className="size-3.5" />
+      </span>
+    )
+  }
+  if (d.type === 'TOPIC') {
+    return (
+      <span
+        className="bg-surface relative z-[1] size-5 rounded-full border-[3px]"
+        style={{ borderColor: d.overdue ? 'var(--color-danger)' : color }}
+      />
+    )
+  }
+  return (
+    <span
+      className="ring-surface relative z-[1] size-3 rounded-full ring-4"
+      style={{ backgroundColor: d.overdue ? 'var(--color-danger)' : color }}
+    />
+  )
+}
+
+/**
+ * 마감 로드맵 — 모든 목표의 마감을 날짜 순으로 세로 선 위에 (업무형 보드의 로드맵과 같은 모양).
+ *  - Task 마감(앞으로 2주) · 업무형 주제 마감 · 목표형 종료일(앞으로 1년)
+ *  - 마감이 지난 것(최근 7일)은 맨 위에 빨갛게, 그다음 "오늘" 줄
+ */
+export function DeadlineRoadmap({ deadlines, failed }: { deadlines: HomeDeadline[] | undefined; failed: boolean }) {
+  const [limit, setLimit] = useState(PAGE)
+  // 해가 바뀌는 마감은 "27년 · 금"처럼 해를 같이 적어요
+  const year = todayKst().slice(0, 4)
+  const list = deadlines ?? []
+  const shown = list.slice(0, limit)
+  const todayAt = (() => {
+    const i = shown.findIndex((d) => !d.overdue)
+    return i === -1 ? shown.length : i
+  })()
+
   return (
     <Card className="p-5 sm:p-6">
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-[17px] font-bold">다가오는 마감</h2>
-        {deadlines && deadlines.length > 0 && (
-          <span className="text-ink-3 text-[13px]">{deadlines.filter((d) => !d.overdue).length}개</span>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h2 className="text-[17px] font-bold">마감 로드맵</h2>
+        {list.length > 0 && (
+          <span className="text-ink-3 text-[13px]">{list.filter((d) => !d.overdue).length}개 남음</span>
         )}
       </div>
       {failed ? (
         <p className="text-ink-3 py-4 text-sm">마감을 불러오지 못했어요.</p>
       ) : !deadlines ? (
-        <div className="bg-subtle h-24 animate-pulse rounded-xl" />
-      ) : deadlines.length === 0 ? (
-        <p className="text-ink-3 py-4 text-sm">2주 안에 다가오는 마감이 없어요.</p>
+        <div className="bg-subtle h-32 animate-pulse rounded-xl" />
+      ) : list.length === 0 ? (
+        <p className="text-ink-3 py-4 text-sm">
+          다가오는 마감이 없어요. 목표형 종료일 · 업무형 주제 마감 · Task 마감이 여기 이어져요.
+        </p>
       ) : (
-        <ul className="divide-line -my-1 divide-y">
-          {deadlines.map((d) => (
-            <li key={`${d.type}-${d.id}`}>
-              <Link
-                href={d.goalCategoryId ? `/goal/${d.goalCategoryId}` : `/calendar?view=day&date=${d.date}`}
-                className="hover:bg-subtle/60 -mx-2 flex items-center gap-3 rounded-lg px-2 py-2.5"
-              >
-                <span
-                  className={cn(
-                    'grid h-9 w-14 shrink-0 place-items-center rounded-lg text-[12px] font-bold tabular-nums',
-                    d.overdue
-                      ? 'bg-danger-soft text-danger'
-                      : d.dDay <= 2
-                        ? 'bg-warning-soft text-warning-ink'
-                        : 'bg-subtle text-ink-2'
-                  )}
-                >
-                  {ddayText(d)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] font-semibold">
-                    {d.emoji ? `${d.emoji} ` : ''}
-                    {d.title}
-                  </span>
-                  <span className="text-ink-3 flex items-center gap-1.5 text-[12px]">
-                    <span
-                      className="size-1.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: hexOf(d.colorCode) }}
-                      aria-hidden
-                    />
-                    <span className="truncate">
-                      {TYPE_LABEL[d.type]} · {dayLabel(d.date, today)}
-                      {d.type !== 'GOAL' && d.goalName ? ` · ${d.goalName}` : ''}
-                      {d.type === 'TOPIC' && d.remaining ? ` · 남은 ${d.remaining}개` : ''}
-                    </span>
-                  </span>
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ol className="relative">
+            {/* 세로 선 (날짜 칸 52px + 2px + 점 칸 28px 의 가운데) */}
+            <span aria-hidden className="bg-line absolute top-2 bottom-2 left-[67px] w-0.5" />
+            {shown.map((d, i) => {
+              const newDate = i === 0 || shown[i - 1].date !== d.date
+              return (
+                <Fragment key={`${d.type}-${d.id}`}>
+                  {i === todayAt && <TodayLine />}
+                  <li>
+                    <Link
+                      href={d.goalCategoryId ? `/goal/${d.goalCategoryId}` : `/calendar?view=day&date=${d.date}`}
+                      className="hover:bg-subtle/60 -mx-2 flex items-start gap-0 rounded-xl px-2 py-2"
+                    >
+                      <span className="w-[52px] shrink-0 pt-0.5 text-right">
+                        {newDate && (
+                          <>
+                            <span
+                              className={cn('block text-[13px] font-bold tabular-nums', d.overdue && 'text-danger')}
+                            >
+                              {Number(d.date.slice(5, 7))}/{Number(d.date.slice(8, 10))}
+                            </span>
+                            <span className="text-ink-4 block text-[11px]">
+                              {d.date.slice(0, 4) !== year ? `${d.date.slice(2, 4)}년 · ` : ''}
+                              {WEEKDAY_LABEL[weekdayIndex(d.date)]}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                      <span className="ml-[2px] grid w-7 shrink-0 place-items-center pt-0.5">
+                        <Node d={d} />
+                      </span>
+                      <span className="ml-2.5 min-w-0 flex-1">
+                        <span
+                          className={cn(
+                            'block truncate text-[14px]',
+                            d.type === 'GOAL' ? 'font-bold' : 'font-semibold'
+                          )}
+                        >
+                          {d.emoji ? `${d.emoji} ` : ''}
+                          {d.title}
+                        </span>
+                        <span className="text-ink-3 block truncate text-[12px]">
+                          {TYPE_LABEL[d.type]}
+                          {d.type !== 'GOAL' && d.goalName ? ` · ${d.goalName}` : ''}
+                          {d.type === 'TOPIC' && d.remaining ? ` · 남은 ${d.remaining}개` : ''}
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          'ml-2 shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums',
+                          d.overdue
+                            ? 'bg-danger-soft text-danger'
+                            : d.dDay <= 2
+                              ? 'bg-warning-soft text-warning-ink'
+                              : 'bg-subtle text-ink-2'
+                        )}
+                      >
+                        {ddayText(d)}
+                      </span>
+                    </Link>
+                  </li>
+                </Fragment>
+              )
+            })}
+            {todayAt === shown.length && <TodayLine />}
+          </ol>
+          {list.length > shown.length && (
+            <button
+              type="button"
+              onClick={() => setLimit((n) => n + PAGE)}
+              className="text-ink-2 hover:bg-subtle mt-1 w-full rounded-xl py-2 text-[13px] font-semibold"
+            >
+              더 보기 ({list.length - shown.length}개)
+            </button>
+          )}
+          <p className="text-ink-4 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+            <span className="flex items-center gap-1">
+              <i className="bg-ink-3 inline-block size-2 rounded-full" /> Task
+            </span>
+            <span className="flex items-center gap-1">
+              <i className="border-ink-3 inline-block size-2.5 rounded-full border-2" /> 업무형 주제
+            </span>
+            <span className="flex items-center gap-1">
+              <Flag className="size-3" /> 목표 종료일
+            </span>
+          </p>
+        </>
       )}
     </Card>
+  )
+}
+
+function TodayLine() {
+  return (
+    <li className="flex items-center py-1.5" aria-label="오늘">
+      <span className="text-ink w-[52px] shrink-0 text-right text-[12px] font-bold">오늘</span>
+      <span className="ml-[2px] grid w-7 shrink-0 place-items-center">
+        <span className="bg-ink relative z-[1] size-2.5 rounded-full" />
+      </span>
+      <span className="bg-ink/40 ml-2.5 h-px flex-1" />
+    </li>
   )
 }

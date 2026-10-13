@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -10,12 +9,12 @@ import { useHabitHome, useToggleHabitCheck, type Habit } from '@/features/habit/
 import { useTimetable, useToggleComplete } from '@/features/timetable/api'
 import { addDays, formatMinutes, monthOf, dayOfMonth, nowKst, weekdayIndex } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
-import { homeKeys, useHomeToday } from '../api'
+import { useHomeToday } from '../api'
 import { agendaOf, inLabel, isDone, isRoutineTask, startMinutes, tasksOfDay } from '../today'
-import { TodayAgenda } from './TodayAgenda'
+import { HomeDayCalendar } from './HomeDayCalendar'
 import { TodayRoutines, TodayTasks } from './TodayChecklist'
-import { TodayRetro } from './TodayRetro'
-import { UpcomingDeadlines, UpcomingSchedule } from './Upcoming'
+import { RetroPanel } from './TodayRetro'
+import { DeadlineRoadmap, UpcomingSchedule } from './Upcoming'
 
 const WEEKDAY_FULL = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']
 
@@ -32,12 +31,11 @@ function useNow() {
 /**
  * 홈 — 오늘 해야 할 것만 한곳에.
  *  1. 오늘 요약 (얼마나 했는지 · 지금/다음 할 일)
- *  2. 오늘 일정표 · 할 일 · 루틴과 생활 습관 (바로 체크)
- *  3. 다가오는 일정 (6일) · 다가오는 마감 (Task · 업무형 주제 · 목표)
- *  4. 오늘 회고 — 목표마다 오늘 한 일을 보며 한 줄
+ *  2. 오늘 일간 캘린더 (캘린더 화면과 같은 계획 | 실제) · 할 일 · 루틴과 생활 습관 (바로 체크)
+ *  3. 다가오는 일정 (6일) · 마감 로드맵 (Task · 업무형 주제 · 목표형 종료일을 날짜순 세로 선으로)
+ *  오른쪽: 오늘 회고 — 입력창 하나로 목표를 차례로 넘기며 써요
  */
 export function HomeView({ userName }: { userName: string }) {
-  const qc = useQueryClient()
   const now = useNow()
   const today = now.date
   const week = useTimetable(today, addDays(today, 6))
@@ -71,11 +69,8 @@ export function HomeView({ userName }: { userName: string }) {
   const routines = all.filter(isRoutineTask).sort((a, b) => startMinutes(today, a) - startMinutes(today, b))
   const togglingId = toggle.isPending ? (toggle.variables?.taskId ?? null) : null
 
-  const onToggle = (t: TimeBlockTask) =>
-    toggle.mutate(t, {
-      // 목표별 "오늘 끝낸 일"(회고 카드)도 같이 바뀌어요
-      onSettled: () => qc.invalidateQueries({ queryKey: homeKeys.all }),
-    })
+  // 완료하면 캘린더 · 홈(목표별 오늘 끝낸 일 · 마감)이 같이 다시 불러와져요 (timetable/api 의 공통 처리)
+  const onToggle = (t: TimeBlockTask) => toggle.mutate(t)
   const onToggleHabit = (h: Habit) => toggleHabit.mutate({ habit: h, day: today })
 
   return (
@@ -93,29 +88,33 @@ export function HomeView({ userName }: { userName: string }) {
         overdue={(home.data?.deadlines ?? []).filter((d) => d.overdue).length}
       />
 
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="order-last lg:order-none">
-          <TodayAgenda day={day} now={now.minutes} onToggle={onToggle} togglingId={togglingId} />
-        </div>
-        <div className="space-y-5">
-          <TodayTasks today={today} tasks={tasks} onToggle={onToggle} togglingId={togglingId} />
-          <TodayRoutines
-            today={today}
-            routines={routines}
-            habits={habits.data}
-            onToggleTask={onToggle}
-            onToggleHabit={onToggleHabit}
-            togglingId={togglingId}
-          />
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        {/* 오늘 회고 — 넓은 화면에선 오른쪽에 붙어서 따라와요 (좁은 화면에선 맨 아래) */}
+        <aside className="lg:sticky lg:top-4 lg:order-last">
+          <RetroPanel goals={home.data?.goals} today={today} failed={home.isError} />
+        </aside>
+
+        <div className="min-w-0 space-y-5">
+          <HomeDayCalendar day={day} />
+
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-2">
+            <TodayTasks today={today} tasks={tasks} onToggle={onToggle} togglingId={togglingId} />
+            <TodayRoutines
+              today={today}
+              routines={routines}
+              habits={habits.data}
+              onToggleTask={onToggle}
+              onToggleHabit={onToggleHabit}
+              togglingId={togglingId}
+            />
+          </div>
+
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-2">
+            <UpcomingSchedule days={rest} today={today} />
+            <DeadlineRoadmap deadlines={home.data?.deadlines} failed={home.isError} />
+          </div>
         </div>
       </div>
-
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <UpcomingSchedule days={rest} today={today} />
-        <UpcomingDeadlines deadlines={home.data?.deadlines} today={today} failed={home.isError} />
-      </div>
-
-      <TodayRetro goals={home.data?.goals} today={today} failed={home.isError} />
     </div>
   )
 }

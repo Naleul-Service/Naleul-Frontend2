@@ -131,7 +131,7 @@ export function TodayRoutines({
                   {habits?.emoji ?? '🌱'} 생활 습관
                 </Link>
               </SubTitle>
-              <ul className="grid gap-x-3 sm:grid-cols-2">
+              <ul>
                 {sortedHabits.map((h) => (
                   <li key={h.habitId} className="flex items-center gap-2.5 py-1.5">
                     <TaskCheck done={h.checked} label={h.name} onToggle={() => onToggleHabit(h)} />
