@@ -12,7 +12,8 @@ export async function syncRoleFromBilling(result: BackendResult<{ premium?: bool
   if (!result.ok || typeof result.data?.premium !== 'boolean') return
   const store = await cookies()
   const current = store.get(COOKIE.userRole)?.value as UserRole | undefined
-  if (current === 'ADMIN') return
+  // ADMIN · 둘러보기(GUEST)는 구독 상태로 바꾸지 않아요 (GUEST 가 FREE 로 바뀌면 로그인 안내가 사라져요)
+  if (current === 'ADMIN' || current === 'GUEST') return
   const next: UserRole = result.data.premium ? 'PRO' : 'FREE'
-  if (current !== next) setUserCookies(store, { userRole: next }, store.get(COOKIE.refresh)?.value)
+  if (current !== next) setUserCookies(store, { userRole: next })
 }

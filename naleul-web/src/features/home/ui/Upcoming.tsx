@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { Fragment } from 'react'
 import Link from 'next/link'
 import { Flag } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
@@ -11,14 +11,21 @@ import { hm, todayKst, weekdayIndex, WEEKDAY_LABEL } from '@/features/timetable/
 import type { TimeBlockTask, TimetableDay } from '@/features/timetable/types'
 import type { DeadlineType, HomeDeadline } from '../api'
 import { isRoutineTask, startMinutes, tasksOfDay } from '../today'
-
-const MAX_PER_DAY = 4
+import { BODY, FILL } from './fill'
 
 /**
  * 다가오는 일정 — 내일부터 6일 동안 시간이 정해진 일 (루틴은 매일 반복이라 빼요).
  * 약속(APPOINTMENT)은 강조해요.
  */
-export function UpcomingSchedule({ days, today }: { days: TimetableDay[]; today: string }) {
+export function UpcomingSchedule({
+  days,
+  today,
+  className,
+}: {
+  days: TimetableDay[]
+  today: string
+  className?: string
+}) {
   const groups = days
     .map((d) => ({
       date: d.date,
@@ -29,36 +36,35 @@ export function UpcomingSchedule({ days, today }: { days: TimetableDay[]; today:
     .filter((g) => g.items.length > 0)
 
   return (
-    <Card className="p-5 sm:p-6">
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <Card className={cn(FILL, className)}>
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
         <h2 className="text-[17px] font-bold">다가오는 일정</h2>
         <span className="text-ink-3 text-[13px]">앞으로 6일</span>
       </div>
-      {groups.length === 0 ? (
-        <p className="text-ink-3 py-4 text-sm">이번 주에 잡힌 일정이 없어요.</p>
-      ) : (
-        <div className="space-y-3">
-          {groups.map((g) => (
-            <section key={g.date}>
-              <Link
-                href={`/calendar?view=day&date=${g.date}`}
-                className="text-ink-2 hover:text-ink mb-1 inline-block text-[13px] font-bold"
-              >
-                {dayLabel(g.date, today)}
-                <span className="text-ink-4 ml-1 font-semibold">{g.items.length}개</span>
-              </Link>
-              <ul>
-                {g.items.slice(0, MAX_PER_DAY).map((t) => (
-                  <ScheduleRow key={t.taskId} t={t} />
-                ))}
-              </ul>
-              {g.items.length > MAX_PER_DAY && (
-                <p className="text-ink-4 pl-[54px] text-[12px]">+{g.items.length - MAX_PER_DAY}개 더</p>
-              )}
-            </section>
-          ))}
-        </div>
-      )}
+      <div className={BODY}>
+        {groups.length === 0 ? (
+          <p className="text-ink-3 py-4 text-sm">이번 주에 잡힌 일정이 없어요.</p>
+        ) : (
+          <div className="space-y-3">
+            {groups.map((g) => (
+              <section key={g.date}>
+                <Link
+                  href={`/calendar?view=day&date=${g.date}`}
+                  className="text-ink-2 hover:text-ink mb-1 inline-block text-[13px] font-bold"
+                >
+                  {dayLabel(g.date, today)}
+                  <span className="text-ink-4 ml-1 font-semibold">{g.items.length}개</span>
+                </Link>
+                <ul>
+                  {g.items.map((t) => (
+                    <ScheduleRow key={t.taskId} t={t} />
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
     </Card>
   )
 }
@@ -83,7 +89,6 @@ function ScheduleRow({ t }: { t: TimeBlockTask }) {
 }
 
 const TYPE_LABEL: Record<DeadlineType, string> = { TASK: 'Task 마감', TOPIC: '주제 마감', GOAL: '목표 종료' }
-const PAGE = 10
 
 function ddayText(d: HomeDeadline) {
   if (d.dDay === 0) return '오늘'
@@ -125,20 +130,27 @@ function Node({ d }: { d: HomeDeadline }) {
  *  - Task 마감(앞으로 2주) · 업무형 주제 마감 · 목표형 종료일(앞으로 1년)
  *  - 마감이 지난 것(최근 7일)은 맨 위에 빨갛게, 그다음 "오늘" 줄
  */
-export function DeadlineRoadmap({ deadlines, failed }: { deadlines: HomeDeadline[] | undefined; failed: boolean }) {
-  const [limit, setLimit] = useState(PAGE)
+export function DeadlineRoadmap({
+  deadlines,
+  failed,
+  className,
+}: {
+  deadlines: HomeDeadline[] | undefined
+  failed: boolean
+  className?: string
+}) {
   // 해가 바뀌는 마감은 "27년 · 금"처럼 해를 같이 적어요
   const year = todayKst().slice(0, 4)
   const list = deadlines ?? []
-  const shown = list.slice(0, limit)
+  const shown = list
   const todayAt = (() => {
     const i = shown.findIndex((d) => !d.overdue)
     return i === -1 ? shown.length : i
   })()
 
   return (
-    <Card className="p-5 sm:p-6">
-      <div className="mb-4 flex items-center justify-between gap-2">
+    <Card className={cn(FILL, className)}>
+      <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
         <h2 className="text-[17px] font-bold">마감 로드맵</h2>
         {list.length > 0 && (
           <span className="text-ink-3 text-[13px]">{list.filter((d) => !d.overdue).length}개 남음</span>
@@ -154,82 +166,75 @@ export function DeadlineRoadmap({ deadlines, failed }: { deadlines: HomeDeadline
         </p>
       ) : (
         <>
-          <ol className="relative">
-            {/* 세로 선 (날짜 칸 52px + 2px + 점 칸 28px 의 가운데) */}
-            <span aria-hidden className="bg-line absolute top-2 bottom-2 left-[67px] w-0.5" />
-            {shown.map((d, i) => {
-              const newDate = i === 0 || shown[i - 1].date !== d.date
-              return (
-                <Fragment key={`${d.type}-${d.id}`}>
-                  {i === todayAt && <TodayLine />}
-                  <li>
-                    <Link
-                      href={d.goalCategoryId ? `/goal/${d.goalCategoryId}` : `/calendar?view=day&date=${d.date}`}
-                      className="hover:bg-subtle/60 -mx-2 flex items-start gap-0 rounded-xl px-2 py-2"
-                    >
-                      <span className="w-[52px] shrink-0 pt-0.5 text-right">
-                        {newDate && (
-                          <>
-                            <span
-                              className={cn('block text-[13px] font-bold tabular-nums', d.overdue && 'text-danger')}
-                            >
-                              {Number(d.date.slice(5, 7))}/{Number(d.date.slice(8, 10))}
-                            </span>
-                            <span className="text-ink-4 block text-[11px]">
-                              {d.date.slice(0, 4) !== year ? `${d.date.slice(2, 4)}년 · ` : ''}
-                              {WEEKDAY_LABEL[weekdayIndex(d.date)]}
-                            </span>
-                          </>
-                        )}
-                      </span>
-                      <span className="ml-[2px] grid w-7 shrink-0 place-items-center pt-0.5">
-                        <Node d={d} />
-                      </span>
-                      <span className="ml-2.5 min-w-0 flex-1">
+          <div className={BODY}>
+            <ol className="relative">
+              {/* 세로 선 (날짜 칸 52px + 2px + 점 칸 28px 의 가운데) */}
+              <span aria-hidden className="bg-line absolute top-2 bottom-2 left-[67px] w-0.5" />
+              {shown.map((d, i) => {
+                const newDate = i === 0 || shown[i - 1].date !== d.date
+                return (
+                  <Fragment key={`${d.type}-${d.id}`}>
+                    {i === todayAt && <TodayLine />}
+                    <li>
+                      <Link
+                        href={d.goalCategoryId ? `/goal/${d.goalCategoryId}` : `/calendar?view=day&date=${d.date}`}
+                        className="hover:bg-subtle/60 -mx-2 flex items-start gap-0 rounded-xl px-2 py-2"
+                      >
+                        <span className="w-[52px] shrink-0 pt-0.5 text-right">
+                          {newDate && (
+                            <>
+                              <span
+                                className={cn('block text-[13px] font-bold tabular-nums', d.overdue && 'text-danger')}
+                              >
+                                {Number(d.date.slice(5, 7))}/{Number(d.date.slice(8, 10))}
+                              </span>
+                              <span className="text-ink-4 block text-[11px]">
+                                {d.date.slice(0, 4) !== year ? `${d.date.slice(2, 4)}년 · ` : ''}
+                                {WEEKDAY_LABEL[weekdayIndex(d.date)]}
+                              </span>
+                            </>
+                          )}
+                        </span>
+                        <span className="ml-[2px] grid w-7 shrink-0 place-items-center pt-0.5">
+                          <Node d={d} />
+                        </span>
+                        <span className="ml-2.5 min-w-0 flex-1">
+                          <span
+                            className={cn(
+                              'block truncate text-[14px]',
+                              d.type === 'GOAL' ? 'font-bold' : 'font-semibold'
+                            )}
+                          >
+                            {d.emoji ? `${d.emoji} ` : ''}
+                            {d.title}
+                          </span>
+                          <span className="text-ink-3 block truncate text-[12px]">
+                            {TYPE_LABEL[d.type]}
+                            {d.type !== 'GOAL' && d.goalName ? ` · ${d.goalName}` : ''}
+                            {d.type === 'TOPIC' && d.remaining ? ` · 남은 ${d.remaining}개` : ''}
+                          </span>
+                        </span>
                         <span
                           className={cn(
-                            'block truncate text-[14px]',
-                            d.type === 'GOAL' ? 'font-bold' : 'font-semibold'
+                            'ml-2 shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums',
+                            d.overdue
+                              ? 'bg-danger-soft text-danger'
+                              : d.dDay <= 2
+                                ? 'bg-warning-soft text-warning-ink'
+                                : 'bg-subtle text-ink-2'
                           )}
                         >
-                          {d.emoji ? `${d.emoji} ` : ''}
-                          {d.title}
+                          {ddayText(d)}
                         </span>
-                        <span className="text-ink-3 block truncate text-[12px]">
-                          {TYPE_LABEL[d.type]}
-                          {d.type !== 'GOAL' && d.goalName ? ` · ${d.goalName}` : ''}
-                          {d.type === 'TOPIC' && d.remaining ? ` · 남은 ${d.remaining}개` : ''}
-                        </span>
-                      </span>
-                      <span
-                        className={cn(
-                          'ml-2 shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-bold tabular-nums',
-                          d.overdue
-                            ? 'bg-danger-soft text-danger'
-                            : d.dDay <= 2
-                              ? 'bg-warning-soft text-warning-ink'
-                              : 'bg-subtle text-ink-2'
-                        )}
-                      >
-                        {ddayText(d)}
-                      </span>
-                    </Link>
-                  </li>
-                </Fragment>
-              )
-            })}
-            {todayAt === shown.length && <TodayLine />}
-          </ol>
-          {list.length > shown.length && (
-            <button
-              type="button"
-              onClick={() => setLimit((n) => n + PAGE)}
-              className="text-ink-2 hover:bg-subtle mt-1 w-full rounded-xl py-2 text-[13px] font-semibold"
-            >
-              더 보기 ({list.length - shown.length}개)
-            </button>
-          )}
-          <p className="text-ink-4 mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                      </Link>
+                    </li>
+                  </Fragment>
+                )
+              })}
+              {todayAt === shown.length && <TodayLine />}
+            </ol>
+          </div>
+          <p className="text-ink-4 mt-2 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
             <span className="flex items-center gap-1">
               <i className="bg-ink-3 inline-block size-2 rounded-full" /> Task
             </span>

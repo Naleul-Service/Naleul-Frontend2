@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Bell, BellOff } from 'lucide-react'
+import { Bell, BellOff, CalendarClock, X } from 'lucide-react'
 import { DaysPicker, Field, InlineForm, inlineInput } from '@/features/goal/edit/inline'
 import { JAVA_DAYS } from '@/features/goal/format'
 import type { JavaDayOfWeek } from '@/features/goal/api'
@@ -47,8 +47,18 @@ export function HabitForm({
   // 매일이면 화면에선 7일 모두 켠 상태로 보여줘요 (DaysPicker 의 "매일" 칩이 켜지게)
   const [days, setDays] = useState<JavaDayOfWeek[]>(initial && !initial.daily ? initial.repeatDays : [...JAVA_DAYS])
   const [remind, setRemind] = useState(initial?.remindTime ?? '')
+  const [start, setStart] = useState(initial?.startTime ?? '')
+  const [end, setEnd] = useState(initial?.endTime ?? '')
   const value = name.trim()
-  const error = days.length === 0 ? '요일을 하나 이상 골라 주세요.' : null
+  const hasTime = !!start || !!end
+  const error =
+    days.length === 0
+      ? '요일을 하나 이상 골라 주세요.'
+      : hasTime && (!start || !end)
+        ? '시간대는 시작과 끝을 함께 정해 주세요.'
+        : hasTime && end <= start
+          ? '끝나는 시간이 시작보다 뒤여야 해요.'
+          : null
 
   const submit = () =>
     onSubmit({
@@ -56,6 +66,7 @@ export function HabitForm({
       emoji: emoji.trim(),
       repeatDays: days.length === 7 ? [] : days,
       ...(remind ? { remindTime: remind } : initial?.remindTime ? { clearRemindTime: true } : {}),
+      ...(start && end ? { startTime: start, endTime: end } : initial?.startTime ? { clearTimeRange: true } : {}),
     })
 
   return (
@@ -92,6 +103,45 @@ export function HabitForm({
       <div>
         <span className="text-ink-3 mb-1 block text-[12px] font-medium">언제 하나요?</span>
         <DaysPicker value={days} onChange={setDays} />
+      </div>
+      <div>
+        <span className="text-ink-3 mb-1 block text-[12px] font-medium">하는 시간 (선택)</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative">
+            <CalendarClock className="text-ink-3 pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <input
+              type="time"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+              aria-label="시작 시각"
+              className={`${inlineInput} w-[150px] pl-9`}
+            />
+          </div>
+          <span className="text-ink-3">~</span>
+          <input
+            type="time"
+            value={end}
+            onChange={(e) => setEnd(e.target.value)}
+            aria-label="끝 시각"
+            className={`${inlineInput} w-[120px]`}
+          />
+          {hasTime && (
+            <button
+              type="button"
+              onClick={() => {
+                setStart('')
+                setEnd('')
+              }}
+              className="text-ink-3 hover:text-ink flex items-center gap-1 text-[13px] font-medium"
+            >
+              <X className="size-3.5" />
+              지우기
+            </button>
+          )}
+        </div>
+        <p className="text-ink-4 mt-1 text-[12px]">
+          정하면 캘린더에 그 시간이 블록으로 보이고, 자동 배치가 그 시간은 비워 둬요. (예: 샤워 20:00 ~ 20:30)
+        </p>
       </div>
       <div>
         <span className="text-ink-3 mb-1 block text-[12px] font-medium">알림 (선택)</span>

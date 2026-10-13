@@ -44,6 +44,7 @@ import { FillProposalBar } from './FillProposalBar'
 import { FixedDetail } from './FixedDetail'
 import { ScopeChooser, scopeOptions } from './ScopeChooser'
 import { TaskDetail } from './TaskDetail'
+import { ActualTimeModal, type ActualSegment } from './ActualTimeModal'
 import { TimeEditModal, type TimeValue } from './TimeEditModal'
 import { canDragTask, fixedKey, type Selection } from './TimeGrid'
 import { groupMoves, type DragSource, type DropTarget } from './useGridDrag'
@@ -388,9 +389,16 @@ export function useTimetableInteractions(
     onCompleteWithTime: (t: TimeBlockTask) => {
       if (!t.plannedStartAt) return
       close()
-      const day = t.plannedStartAt.slice(0, 10)
-      const s = minutesFrom(day, t.plannedStartAt)
-      const e = t.plannedEndAt ? minutesFrom(day, t.plannedEndAt) : s + (t.plannedDurationMinutes ?? 30)
+      // 이미 실제 시간을 남겼으면 그 시간부터 고쳐요 (나눠서 한 구간은 모달이 actualSegments 로 채워요)
+      const hasActual = t.taskStatus === 'COMPLETED' && !!t.actualStartAt && !!t.actualEndAt
+      // 실제로 다른 날 했으면 그 날 기준
+      const day = (hasActual ? t.actualStartAt! : t.plannedStartAt).slice(0, 10)
+      const s = minutesFrom(day, hasActual ? t.actualStartAt! : t.plannedStartAt)
+      const e = hasActual
+        ? minutesFrom(day, t.actualEndAt!)
+        : t.plannedEndAt
+          ? minutesFrom(day, t.plannedEndAt)
+          : s + (t.plannedDurationMinutes ?? 30)
       setEditing({ kind: 'actual', task: t, initial: { date: day, start: s, end: Math.max(e, s + 10) } })
     },
     onUnlock: (t: TimeBlockTask) => unlock.mutate(t.taskId, { onSuccess: close }),
@@ -631,17 +639,30 @@ export function useTimetableInteractions(
     if (!editing) return
     const done = { onSuccess: () => setEditing(null) }
     if (editing.kind === 'actual') {
-      completeWithActual.mutate(
-        {
-          taskId: editing.task.taskId,
-          actualStartAt: toDateTime(v.date, v.start),
-          actualEndAt: toDateTime(v.date, v.end),
-        },
-        done
-      )
+      submitActual([{ start: v.start, end: v.end }])
     } else {
       saveFixed(editing.block, v.date, v.start, v.end, scope, done)
     }
+  }
+
+  /** 실제로 한 시간 저장 (여러 번 나눠서 했으면 구간마다) */
+  const submitActual = (segments: ActualSegment[]) => {
+    if (editing?.kind !== 'actual' || !segments.length) return
+    const date = editing.initial.date
+    const first = segments[0]
+    const last = segments[segments.length - 1]
+    completeWithActual.mutate(
+      {
+        taskId: editing.task.taskId,
+        actualStartAt: toDateTime(date, first.start),
+        actualEndAt: toDateTime(date, last.end),
+        segments:
+          segments.length > 1
+            ? segments.map((g) => ({ start: toDateTime(date, g.start), end: toDateTime(date, g.end) }))
+            : undefined,
+      },
+      { onSuccess: () => setEditing(null) }
+    )
   }
 
   const busyTask = toggleComplete.isPending || unlock.isPending || unschedule.isPending
@@ -679,26 +700,29 @@ export function useTimetableInteractions(
         </Popover>
       )}
 
+      {/* 실제로 한 시간 (나눠서 한 경우 여러 구간) */}
+      {editing?.kind === 'actual' && (
+        <ActualTimeModal
+          key={`a${editing.task.taskId}`}
+          task={liveTask(editing.task)}
+          date={editing.initial.date}
+          initial={editing.initial}
+          loading={completeWithActual.isPending}
+          onSubmit={submitActual}
+          onClose={() => setEditing(null)}
+        />
+      )}
+
       {/* 시간 변경 */}
-      {editing && (
+      {editing?.kind === 'fixed' && (
         <TimeEditModal
-          key={editing.kind === 'fixed' ? `f${fixedKey(editing.block)}` : `a${editing.task.taskId}`}
-          title={
-            editing.kind === 'actual'
-              ? '실제로 한 시간'
-              : `${formatMonthDay(editing.block.targetDate)} ${editing.block.title} 시간`
-          }
-          description={
-            editing.kind === 'actual'
-              ? '실제로 시작하고 끝낸 시각을 남기면 완료로 표시되고, 나의 패턴의 시작 지연이 더 정확해져요.'
-              : '적용 범위를 골라 주세요. 이날만 바꾸면 다음 날부터는 기본 시간이에요.'
-          }
-          scope={editing.kind === 'fixed' ? { kind: 'fixed', today } : undefined}
+          key={`f${fixedKey(editing.block)}`}
+          title={`${formatMonthDay(editing.block.targetDate)} ${editing.block.title} 시간`}
+          description="적용 범위를 골라 주세요. 이날만 바꾸면 다음 날부터는 기본 시간이에요."
+          scope={{ kind: 'fixed', today }}
           initial={editing.initial}
           dateEditable={false}
-          loading={
-            reschedule.isPending || patternScoped.isPending || routineScoped.isPending || completeWithActual.isPending
-          }
+          loading={reschedule.isPending || patternScoped.isPending || routineScoped.isPending}
           onSubmit={submitEdit}
           onClose={() => setEditing(null)}
         />

@@ -2,15 +2,16 @@
  * Next.js 16 의 proxy (예전 이름: middleware)
  * 페이지 이동마다 실행돼요.
  *
- *  - 로그인 안 됐으면 → /login?redirect=원래경로
+ *  - 로그인 안 했으면 → "둘러보기" 읽기 전용 토큰을 받아서 그대로 보여줘요 (빈 화면 + "추가해 보세요" 안내)
+ *    저장하려고 하면 그때 로그인 안내가 떠요 (백엔드가 401 GUEST_LOGIN_REQUIRED)
  *  - accessToken 이 만료(직전)이면 → refreshToken 으로 미리 재발급
  *    · 새 토큰을 "브라우저 응답"과 "지금 처리 중인 요청" 양쪽에 넣어요.
  *      응답에만 넣으면 이번 화면의 서버 컴포넌트는 여전히 옛 쿠키를 읽어서 첫 화면이 실패해요.
  */
 import { NextResponse, type NextRequest } from 'next/server'
 import { isJwtExpired } from '@/lib/jwt'
-import { reissueAccessToken } from '@/lib/server/authApi'
-import { COOKIE, clearSessionCookies, setTokenCookies } from '@/lib/server/session'
+import { guestLogin, reissueAccessToken } from '@/lib/server/authApi'
+import { COOKIE, GUEST_NAME, clearSessionCookies, setGuestCookies, setTokenCookies } from '@/lib/server/session'
 
 const PUBLIC_PATHS = ['/login']
 
@@ -23,22 +24,38 @@ function redirectToLogin(req: NextRequest) {
   return NextResponse.redirect(url)
 }
 
+/** 둘러보기 토큰을 받아 지금 요청 · 응답 양쪽에 넣어요. 실패하면 로그인 화면으로 */
+async function startGuest(req: NextRequest) {
+  const token = await guestLogin()
+  if (!token) return redirectToLogin(req)
+  req.cookies.set(COOKIE.access, token)
+  req.cookies.delete(COOKIE.refresh)
+  req.cookies.set(COOKIE.userName, GUEST_NAME)
+  req.cookies.set(COOKIE.userRole, 'GUEST')
+  const res = NextResponse.next({ request: { headers: req.headers } })
+  setGuestCookies(res.cookies, token)
+  return res
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl
   const access = req.cookies.get(COOKIE.access)?.value
   const refresh = req.cookies.get(COOKIE.refresh)?.value
+  const guest = req.cookies.get(COOKIE.userRole)?.value === 'GUEST'
   const accessValid = !!access && !isJwtExpired(access)
 
   if (isPublic(pathname)) {
-    // 이미 로그인된 사용자가 /login 에 오면 홈으로
-    if (accessValid) return NextResponse.redirect(new URL('/', req.url))
+    // 이미 로그인된 사용자가 /login 에 오면 홈으로 (둘러보는 중이면 로그인 화면을 보여줘요)
+    if (accessValid && !guest) return NextResponse.redirect(new URL('/', req.url))
     return NextResponse.next()
   }
 
   if (accessValid) return NextResponse.next()
-  if (!refresh) return redirectToLogin(req)
+  if (!refresh) return startGuest(req)
 
   const tokens = await reissueAccessToken(refresh)
+  // 서버가 잠깐 응답을 못 하면 로그아웃시키지 않고 그대로 보여줘요 (API 호출 때 다시 재발급 시도)
+  if (tokens === 'unavailable') return NextResponse.next()
   if (!tokens) {
     const res = redirectToLogin(req)
     clearSessionCookies(res.cookies)

@@ -6,7 +6,7 @@ import { api } from '@/lib/client/api'
  * 한도에 걸린 뒤에야 알리는 대신, 시작 전에 "오늘 3/5회 남음"을 보여주려고 써요.
  */
 export interface UsageItem {
-  /** GOAL_SESSION · GOAL_DRAFT · TASK_PER_DAY · SESSION_REGENERATE */
+  /** GOAL_SESSION · GOAL_SESSION_WEEK · GOAL_DRAFT · GOAL_EDIT · BRAIN_DUMP · TASK_PER_DAY · SESSION_REGENERATE */
   key: string
   label: string
   description: string

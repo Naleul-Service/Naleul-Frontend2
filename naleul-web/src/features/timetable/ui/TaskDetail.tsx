@@ -378,7 +378,9 @@ export function TaskDetail({
         {actual && (
           <Prop icon={<Check className="text-success size-4" />} label="실제 시간">
             <span className="text-ink-3 mr-1">실제</span>
-            {rangeText(actual.actualStartAt!, actual.actualEndAt)}
+            {actual.actualSegments && actual.actualSegments.length > 1
+              ? actual.actualSegments.map((g) => rangeText(g.start, g.end)).join(' · ')
+              : rangeText(actual.actualStartAt!, actual.actualEndAt)}
           </Prop>
         )}
         {editing === 'time' ? (
@@ -615,13 +617,13 @@ export function TaskDetail({
           )}
         </div>
       )}
-      {!done && !confirmingDelete && t.plannedStartAt && t.sourceType !== 'MISSION' && actions.onCompleteWithTime && (
+      {!confirmingDelete && t.plannedStartAt && t.sourceType !== 'MISSION' && actions.onCompleteWithTime && (
         <button
           type="button"
           onClick={() => actions.onCompleteWithTime?.(t)}
           className="text-ink-3 hover:text-ink mt-2.5 w-full text-center text-[13px] underline-offset-2 hover:underline"
         >
-          계획과 다른 시간에 했어요
+          {done ? '실제로 한 시간 고치기 (나눠서 했어요)' : '계획과 다른 시간에 · 나눠서 했어요'}
         </button>
       )}
       {/* 계획 시각이 이미 시작됐는데 안 했으면: 그 시간에 실제로 한 일을 남길 수 있게 */}

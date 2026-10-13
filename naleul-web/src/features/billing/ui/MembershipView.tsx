@@ -13,10 +13,15 @@ import { PLAN_LABEL, STATUS_LABEL, longDate, won } from '../format'
 import { openCardRegistration, tossClientKey } from '../toss'
 import type { BillingStatus, WebPlan } from '../types'
 
+/**
+ * BM(2026-10): 목표 · 루틴 · Task · 회고 만들기와 알림은 Free 도 제한 없이 써요.
+ * Pro 는 AI 를 더 많이 + 광고 없이.
+ */
 const BENEFITS = [
-  'AI 목표 만들기 · AI 계획 초안 더 많이',
-  'Task 하루 생성 개수 제한 없음',
-  'Task · 미션 푸시 알림',
+  'AI 목표 만들기 하루 10개 (Free: 하루 1개 · 주 3개)',
+  'AI 계획 초안 하루 20번 (Free: 하루 5번)',
+  'AI로 목표 고치기 · 브레인 덤프 AI 정리 하루 30번 (Free: 각 3번)',
+  '광고 없이',
   '웹과 iOS 앱 어디서든 같은 Pro',
 ]
 
@@ -117,7 +122,7 @@ function PlanPicker({ data }: { data: BillingStatus }) {
               onClick={() => setPlan(p.plan)}
               className={cn(
                 'relative rounded-2xl border p-4 text-left transition-colors',
-                plan === p.plan ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4',
+                plan === p.plan ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
               )}
             >
               <div className="flex items-center gap-2">

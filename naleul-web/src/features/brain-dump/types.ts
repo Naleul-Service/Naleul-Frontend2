@@ -62,6 +62,8 @@ export interface ParseResponse {
   tempGoals: { tempKey: string; name: string; emoji?: string | null }[]
   /** true 면 AI 없이 규칙으로만 해석 (목표 연결이 비어 있을 수 있음) */
   aiFailed: boolean
+  /** true 면 오늘 AI 정리 횟수를 다 써서 기본 정리로만 나눴어요 (aiFailed 도 true) */
+  aiLimited?: boolean
 }
 
 // ── 2단계 → 3단계 ──

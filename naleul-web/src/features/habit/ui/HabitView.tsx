@@ -145,6 +145,11 @@ function HabitRow({ habit, day, isToday }: { habit: Habit; day: string; isToday:
         </p>
         <p className="text-ink-3 mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px]">
           <span>{daysLabel(habit)}</span>
+          {habit.startTime && habit.endTime && (
+            <span className="tabular-nums">
+              {habit.startTime}–{habit.endTime}
+            </span>
+          )}
           {habit.remindTime && (
             <span className="flex items-center gap-0.5">
               <Bell className="size-3" />
@@ -256,8 +261,8 @@ function AddHabit({ existing }: { existing: Habit[] }) {
  * 기본 생활 습관 (goalMode = HABIT) — 목표 상세 대신 이 화면을 보여줘요.
  *  - 위: 날짜(어제 · 그제도 체크할 수 있어요) + 오늘 몇 개 했는지
  *  - 왼쪽: 해야 하는 습관 체크 목록 · 오늘은 안 해도 되는 습관 · 쉬는 습관
- *  - 오른쪽: 일회성 할 일 (병원 가기 · 친구 만나기) — 습관과 달리 한 번 하고 끝나요
- *  - 아래: 습관별 잔디 (추가한 달부터 한 달씩)
+ *  - 오른쪽: 습관별 잔디 (‹ › 로 한 달씩, 세로 요일 × 가로 주)
+ *  - 아래: 일회성 할 일 (병원 가기 · 친구 만나기) — 습관과 달리 한 번 하고 끝나요
  */
 export function HabitView({ goal }: { goal: GoalCategory }) {
   const today = todayKst()
@@ -396,6 +401,11 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
           {!isPending && !isError && <AddHabit existing={habits} />}
         </Card>
 
+        {/* 오른쪽: 습관별 잔디 (한 달씩) — 할 일은 많아지면 길어져서 아래로 */}
+        {!isPending && !isError ? <HabitHeatmap habits={habits} today={today} /> : <div />}
+      </div>
+
+      <div className="mt-5">
         <GoalTaskList
           goal={goal}
           title="할 일"
@@ -405,12 +415,6 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
           initialPeriod="ALL"
         />
       </div>
-
-      {!isPending && !isError && (
-        <div className="mt-5">
-          <HabitHeatmap habits={habits} today={today} />
-        </div>
-      )}
     </>
   )
 }

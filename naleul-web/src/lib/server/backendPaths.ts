@@ -5,6 +5,8 @@
 export const BACKEND_PATHS = {
   kakaoLogin: '/api/v1/auth/kakao/callback',
   tokenReissue: '/api/v1/auth/token-reissue',
+  logout: '/api/v1/auth/logout',
+  guest: '/api/v1/auth/guest',
 } as const
 
 export function backendUrl(path: string): string {

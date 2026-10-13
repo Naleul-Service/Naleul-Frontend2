@@ -13,13 +13,21 @@ const stripBearer = (v: string | null) => v?.replace(/^Bearer\s+/i, '').trim() |
  * (화면 하나에서 API 3개가 동시에 401을 받으면 재발급도 3번 나가는 문제 방지)
  * 서버 인스턴스 하나 안에서만 효과가 있어요.
  */
-const inflight = new Map<string, Promise<SessionTokens | null>>()
+const inflight = new Map<string, Promise<ReissueResult>>()
 
-export function reissueAccessToken(refreshToken: string): Promise<SessionTokens | null> {
+/**
+ * - SessionTokens: 성공
+ * - null: refresh token 이 정말 무효 (401/400) → 다시 로그인해야 함
+ * - 'unavailable': 서버가 잠깐 응답을 못 함 (5xx, 네트워크) → 로그아웃시키지 말고 쿠키 유지
+ *   (예전엔 이 경우도 로그아웃시켜서, 배포 중이나 서버가 잠깐 느릴 때 로그인이 풀렸어요)
+ */
+export type ReissueResult = SessionTokens | null | 'unavailable'
+
+export function reissueAccessToken(refreshToken: string): Promise<ReissueResult> {
   const existing = inflight.get(refreshToken)
   if (existing) return existing
 
-  const task = (async (): Promise<SessionTokens | null> => {
+  const task = (async (): Promise<ReissueResult> => {
     try {
       const res = await fetch(backendUrl(BACKEND_PATHS.tokenReissue), {
         method: 'GET',
@@ -27,7 +35,7 @@ export function reissueAccessToken(refreshToken: string): Promise<SessionTokens 
         cache: 'no-store',
         signal: AbortSignal.timeout(10_000),
       })
-      if (!res.ok) return null
+      if (!res.ok) return res.status === 400 || res.status === 401 || res.status === 403 ? null : 'unavailable'
 
       // 새 access 는 응답 헤더 Authorization 에 담겨 와요.
       // 혹시 body(data.accessToken)로 오는 경우도 대비해요.
@@ -46,7 +54,7 @@ export function reissueAccessToken(refreshToken: string): Promise<SessionTokens 
       return { accessToken, refreshToken: newRefresh }
     } catch (error) {
       console.error('[auth] token reissue failed', error)
-      return null
+      return 'unavailable'
     } finally {
       // 잠깐 뒤에 지워서, 거의 동시에 들어온 요청도 같은 결과를 쓰게 해요.
       setTimeout(() => inflight.delete(refreshToken), 5_000)
@@ -55,6 +63,39 @@ export function reissueAccessToken(refreshToken: string): Promise<SessionTokens 
 
   inflight.set(refreshToken, task)
   return task
+}
+
+/**
+ * 로그인 없이 둘러보기 — 읽기 전용 access token 만 받아요 (refresh 없음, 30일).
+ * 저장하려고 하면 백엔드가 401 GUEST_LOGIN_REQUIRED 를 줘요.
+ */
+export async function guestLogin(): Promise<string | null> {
+  try {
+    const res = await fetch(backendUrl(BACKEND_PATHS.guest), {
+      method: 'POST',
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8_000),
+    })
+    const body = (await res.json().catch(() => null)) as ApiEnvelope<{ accessToken?: string }> | null
+    return res.ok && body?.data?.accessToken ? body.data.accessToken : null
+  } catch (error) {
+    console.error('[auth] guest login failed', error)
+    return null
+  }
+}
+
+/** 백엔드에 이 기기의 refresh token 무효화를 알려요 (실패해도 쿠키는 지워요) */
+export async function revokeRefreshToken(refreshToken: string): Promise<void> {
+  try {
+    await fetch(backendUrl(BACKEND_PATHS.logout), {
+      method: 'POST',
+      headers: { 'Authorization-Refresh': `Bearer ${refreshToken}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(5_000),
+    })
+  } catch (error) {
+    console.error('[auth] logout failed', error)
+  }
 }
 
 export interface KakaoLoginData {

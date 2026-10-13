@@ -10,6 +10,7 @@ import { hexOf } from '@/features/timetable/layout'
 import { addDays, dDay, hm } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
 import { isDone } from '../today'
+import { BODY, FILL } from './fill'
 import { TaskCheck } from './TaskCheck'
 
 /** 오늘 할 일 — 루틴이 아닌 Task. 남은 일(시간순, 시간 미정은 아래) → 끝낸 일(접힘) */
@@ -18,7 +19,9 @@ export function TodayTasks({
   tasks,
   onToggle,
   togglingId,
+  className,
 }: {
+  className?: string
   today: string
   tasks: TimeBlockTask[]
   onToggle: (t: TimeBlockTask) => void
@@ -29,7 +32,7 @@ export function TodayTasks({
   const done = tasks.filter(isDone)
 
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className={cn(FILL, className)}>
       <Header title="할 일" done={done.length} total={tasks.length}>
         <Link
           href="/tasks/new"
@@ -40,41 +43,48 @@ export function TodayTasks({
           추가
         </Link>
       </Header>
-      {tasks.length === 0 ? (
-        <p className="text-ink-3 py-4 text-sm">오늘로 정한 할 일이 없어요.</p>
-      ) : (
-        <>
-          {todo.length === 0 ? (
-            <p className="text-success py-2 text-[14px] font-semibold">오늘 할 일을 모두 끝냈어요 🎉</p>
-          ) : (
-            <ul className="-my-1">
-              {todo.map((t) => (
-                <TaskRow key={t.taskId} t={t} today={today} onToggle={onToggle} busy={togglingId === t.taskId} />
-              ))}
-            </ul>
-          )}
-          {done.length > 0 && (
-            <div className="border-line mt-2 border-t pt-2">
-              <button
-                type="button"
-                onClick={() => setShowDone((v) => !v)}
-                aria-expanded={showDone}
-                className="text-success flex items-center gap-1 text-[13px] font-semibold"
-              >
-                끝낸 일 {done.length}
-                <ChevronDown className={cn('size-4 transition-transform', showDone && 'rotate-180')} />
-              </button>
-              {showDone && (
-                <ul>
-                  {done.map((t) => (
-                    <TaskRow key={t.taskId} t={t} today={today} onToggle={onToggle} busy={togglingId === t.taskId} />
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </>
-      )}
+      <div className={BODY}>
+        {tasks.length === 0 ? (
+          <p className="text-ink-3 py-4 text-sm">
+            오늘로 정한 할 일이 없어요.{' '}
+            <Link href="/tasks/new" className="text-brand font-semibold">
+              할 일을 추가해 보세요
+            </Link>
+          </p>
+        ) : (
+          <>
+            {todo.length === 0 ? (
+              <p className="text-success py-2 text-[14px] font-semibold">오늘 할 일을 모두 끝냈어요 🎉</p>
+            ) : (
+              <ul className="-my-1">
+                {todo.map((t) => (
+                  <TaskRow key={t.taskId} t={t} today={today} onToggle={onToggle} busy={togglingId === t.taskId} />
+                ))}
+              </ul>
+            )}
+            {done.length > 0 && (
+              <div className="border-line mt-2 border-t pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDone((v) => !v)}
+                  aria-expanded={showDone}
+                  className="text-success flex items-center gap-1 text-[13px] font-semibold"
+                >
+                  끝낸 일 {done.length}
+                  <ChevronDown className={cn('size-4 transition-transform', showDone && 'rotate-180')} />
+                </button>
+                {showDone && (
+                  <ul>
+                    {done.map((t) => (
+                      <TaskRow key={t.taskId} t={t} today={today} onToggle={onToggle} busy={togglingId === t.taskId} />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </Card>
   )
 }
@@ -87,7 +97,9 @@ export function TodayRoutines({
   onToggleTask,
   onToggleHabit,
   togglingId,
+  className,
 }: {
+  className?: string
   today: string
   routines: TimeBlockTask[]
   habits: HabitHome | undefined
@@ -103,55 +115,65 @@ export function TodayRoutines({
   const sortedHabits = [...todayHabits].sort((a, b) => Number(a.checked) - Number(b.checked))
 
   return (
-    <Card className="p-5 sm:p-6">
+    <Card className={cn(FILL, className)}>
       <Header title="루틴 · 습관" done={done} total={total} />
-      {total === 0 ? (
-        <p className="text-ink-3 py-4 text-sm">
-          오늘 할 루틴이 없어요.{' '}
-          <Link href="/goal" className="text-brand font-semibold">
-            생활 습관 추가하기
-          </Link>
-        </p>
-      ) : (
-        <>
-          {sortedRoutines.length > 0 && (
-            <>
-              <SubTitle>목표 루틴</SubTitle>
-              <ul className="mb-2">
-                {sortedRoutines.map((t) => (
-                  <TaskRow key={t.taskId} t={t} today={today} onToggle={onToggleTask} busy={togglingId === t.taskId} />
-                ))}
-              </ul>
-            </>
-          )}
-          {sortedHabits.length > 0 && (
-            <>
-              <SubTitle>
-                <Link href={habits ? `/goal/${habits.goalCategoryId}` : '/goal'} className="hover:text-ink">
-                  {habits?.emoji ?? '🌱'} 생활 습관
-                </Link>
-              </SubTitle>
-              <ul>
-                {sortedHabits.map((h) => (
-                  <li key={h.habitId} className="flex items-center gap-2.5 py-1.5">
-                    <TaskCheck done={h.checked} label={h.name} onToggle={() => onToggleHabit(h)} />
-                    <span className={cn('min-w-0 flex-1 truncate text-[14px]', h.checked && 'text-ink-3 line-through')}>
-                      {h.emoji ? `${h.emoji} ` : ''}
-                      {h.name}
-                    </span>
-                    {h.streak > 1 && (
-                      <span className="flex shrink-0 items-center text-[11px] font-semibold text-[#ea580c]">
-                        <Flame className="size-3" />
-                        {h.streak}
+      <div className={BODY}>
+        {total === 0 ? (
+          <p className="text-ink-3 py-4 text-sm">
+            오늘 할 루틴이 없어요.{' '}
+            <Link href="/goal" className="text-brand font-semibold">
+              생활 습관 추가하기
+            </Link>
+          </p>
+        ) : (
+          <>
+            {sortedRoutines.length > 0 && (
+              <>
+                <SubTitle>목표 루틴</SubTitle>
+                <ul className="mb-2">
+                  {sortedRoutines.map((t) => (
+                    <TaskRow
+                      key={t.taskId}
+                      t={t}
+                      today={today}
+                      onToggle={onToggleTask}
+                      busy={togglingId === t.taskId}
+                    />
+                  ))}
+                </ul>
+              </>
+            )}
+            {sortedHabits.length > 0 && (
+              <>
+                <SubTitle>
+                  <Link href={habits ? `/goal/${habits.goalCategoryId}` : '/goal'} className="hover:text-ink">
+                    {habits?.emoji ?? '🌱'} 생활 습관
+                  </Link>
+                </SubTitle>
+                <ul>
+                  {sortedHabits.map((h) => (
+                    <li key={h.habitId} className="flex items-center gap-2.5 py-1.5">
+                      <TaskCheck done={h.checked} label={h.name} onToggle={() => onToggleHabit(h)} />
+                      <span
+                        className={cn('min-w-0 flex-1 truncate text-[14px]', h.checked && 'text-ink-3 line-through')}
+                      >
+                        {h.emoji ? `${h.emoji} ` : ''}
+                        {h.name}
                       </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </>
-      )}
+                      {h.streak > 1 && (
+                        <span className="flex shrink-0 items-center text-[11px] font-semibold text-[#ea580c]">
+                          <Flame className="size-3" />
+                          {h.streak}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </Card>
   )
 }

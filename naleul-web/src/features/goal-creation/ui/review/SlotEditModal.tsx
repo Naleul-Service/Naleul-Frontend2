@@ -148,6 +148,8 @@ function DeadlineForm({ slots, formId, onSubmit }: FormProps) {
   const d = slots.deadline.value
   const min = ymd(addDays(1))
   const max = ymd(addDays(365 * 2))
+  const today = ymd(addDays(0))
+  const [startDate, setStartDate] = useState(d?.startDate ?? '')
   const [endDate, setEndDate] = useState(d?.endDate ?? '')
   const [flexible, setFlexible] = useState(d?.isFlexible ?? false)
 
@@ -155,11 +157,23 @@ function DeadlineForm({ slots, formId, onSubmit }: FormProps) {
     if (!endDate) return { error: '날짜를 골라 주세요.' }
     if (endDate < min) return { error: '오늘 이후 날짜를 골라 주세요.' }
     if (endDate > max) return { error: '기한은 최대 2년까지 정할 수 있어요.' }
-    return { patch: { deadline: { endDate, isFlexible: flexible } } }
+    if (startDate && startDate < today) return { error: '시작일은 오늘부터 고를 수 있어요.' }
+    if (startDate && endDate <= startDate) return { error: '마감일은 시작일 뒤여야 해요.' }
+    return { patch: { deadline: { endDate, isFlexible: flexible, startDate: startDate || null } } }
   })
 
   return (
     <form id={formId} onSubmit={submit} className="space-y-4">
+      <Field label="언제부터 시작할까요? (비우면 오늘부터)">
+        <input
+          type="date"
+          className={inputClass}
+          value={startDate}
+          min={today}
+          max={max}
+          onChange={(e) => setStartDate(e.target.value)}
+        />
+      </Field>
       <Field label="언제까지 이루고 싶나요?">
         <input
           autoFocus

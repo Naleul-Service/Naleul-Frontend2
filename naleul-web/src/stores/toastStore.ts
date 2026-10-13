@@ -26,9 +26,16 @@ export const useToastStore = create<ToastState>((set, get) => ({
   dismiss: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
 }))
 
+/** 백엔드 · BFF 가 둘러보기 중 저장을 막을 때 쓰는 문구 (401 GUEST_LOGIN_REQUIRED) */
+export const GUEST_LOGIN_MESSAGE = '로그인하면 저장할 수 있어요.'
+
 /** 컴포넌트 밖(예: mutation onError)에서도 쓸 수 있는 단축 함수 */
 export const toast = {
   show: (message: string) => useToastStore.getState().show(message),
   success: (message: string) => useToastStore.getState().show(message, 'success'),
-  error: (message: string) => useToastStore.getState().show(message, 'error'),
+  // 둘러보기 중 저장 시도는 로그인 안내 창(LoginRequiredDialog)이 대신 알려줘요 → 토스트는 겹치지 않게 생략
+  error: (message: string) => {
+    if (message === GUEST_LOGIN_MESSAGE) return
+    useToastStore.getState().show(message, 'error')
+  },
 }

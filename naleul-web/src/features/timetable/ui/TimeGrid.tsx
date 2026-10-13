@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
+import { CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { useToggleHabitBlock } from '../api'
 import {
   MAX_TASKS_AT_ONCE,
   crowdedTasks,
@@ -12,7 +14,7 @@ import {
   placeTasks,
   type Placed,
 } from '../layout'
-import { WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, minutesFrom, nowKst, weekdayIndex } from '../time'
+import { WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, hm, minutesFrom, nowKst, weekdayIndex } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityBlock, FixedBlockView, HATCH, SleepBlockView, TaskBlock, taskColors } from './Blocks'
 import {
@@ -326,8 +328,11 @@ export function TimeGrid({
               {/* 일간 "계획 | 실제" 칸 이름 — 아래 격자의 60% · 40% 와 맞춰요 */}
               {compareHead && (
                 <span className="text-ink-3 absolute inset-x-0 bottom-0 flex text-[11px] font-semibold" aria-hidden>
-                  <span className="w-[60%] px-3">📋 계획한 일</span>
-                  <span className="border-line w-[40%] border-l border-dashed px-2">✅ 실제로 한 일</span>
+                  {/* 좁은 칸(홈의 1/3 캘린더)에서도 두 줄로 넘쳐 날짜를 덮지 않게 한 줄로 자르기 */}
+                  <span className="w-[60%] truncate px-3 whitespace-nowrap">📋 계획한 일</span>
+                  <span className="border-line w-[40%] truncate border-l border-dashed px-2 whitespace-nowrap">
+                    ✅ 실제로 한 일
+                  </span>
                 </span>
               )}
             </Head>
@@ -442,6 +447,7 @@ export function TimeGrid({
                   }
                 />
               ))}
+              <HabitBlocks day={d} from={from} to={to} right={split ? '40%' : '0'} />
               <div
                 className={cn(
                   'pointer-events-none absolute inset-y-0 left-0 *:pointer-events-auto',
@@ -460,7 +466,7 @@ export function TimeGrid({
                     : []
                   return (
                     <TaskBlock
-                      key={p.item.taskId}
+                      key={`${p.item.taskId}-${p.part ?? 0}`}
                       placed={p}
                       geometry={geometry}
                       selected={selection?.kind === 'task' && selection.id === p.item.taskId}
@@ -519,7 +525,7 @@ export function TimeGrid({
                 >
                   {doneTasks.map((p) => (
                     <TaskBlock
-                      key={`done-${p.item.taskId}`}
+                      key={`done-${p.item.taskId}-${p.part ?? 0}`}
                       placed={p}
                       geometry={geometry}
                       selected={selection?.kind === 'task' && selection.id === p.item.taskId}
@@ -697,5 +703,54 @@ function DragGhost({
         </span>
       )}
     </div>
+  )
+}
+
+/**
+ * 시간대를 정한 습관 (V56) — 캘린더의 그 시간에 연한 블록으로. 누르면 체크 · 체크 풀기.
+ * Task 블록보다 아래 층이라 겹치면 Task 가 위에 보여요 (자동 배치는 이 시간을 비워 둬요).
+ */
+function HabitBlocks({ day, from, to, right }: { day: TimetableDay; from: number; to: number; right: string }) {
+  const toggle = useToggleHabitBlock()
+  const list = day.habits ?? []
+  if (!list.length) return null
+  return (
+    <>
+      {list.map((h) => {
+        const s = Math.max(minutesFrom(day.date, h.start), from)
+        const e = Math.min(minutesFrom(day.date, h.end), to)
+        if (e <= s) return null
+        const height = (e - s) * PPM
+        return (
+          <button
+            key={`habit-${h.habitId}`}
+            type="button"
+            onClick={(ev) => {
+              ev.stopPropagation()
+              toggle.mutate({ habitId: h.habitId, date: day.date, checked: h.checked })
+            }}
+            disabled={toggle.isPending}
+            title={`${h.name} ${hm(h.start)}–${hm(h.end)} · 눌러서 ${h.checked ? '체크 풀기' : '체크'}`}
+            className={cn(
+              'absolute left-0.5 z-[1] flex items-start gap-1 overflow-hidden rounded-md border border-dashed px-1.5 py-0.5 text-left text-[11px] font-semibold',
+              h.checked
+                ? 'border-success/50 bg-success-soft text-success'
+                : 'border-[#16a34a]/40 bg-[#16a34a]/5 text-[#15803d] hover:bg-[#16a34a]/10'
+            )}
+            style={{ top: (s - from) * PPM, height: Math.max(height, 16), right: `calc(${right} + 2px)` }}
+          >
+            {h.checked ? (
+              <CheckCircle2 className="mt-px size-3 shrink-0" />
+            ) : (
+              <Circle className="mt-px size-3 shrink-0" />
+            )}
+            <span className={cn('truncate', h.checked && 'line-through')}>
+              {h.emoji ? `${h.emoji} ` : ''}
+              {h.name}
+            </span>
+          </button>
+        )
+      })}
+    </>
   )
 }

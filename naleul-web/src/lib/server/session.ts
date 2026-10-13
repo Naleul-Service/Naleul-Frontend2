@@ -17,7 +17,10 @@ export const COOKIE = {
   userRole: 'userRole',
 } as const
 
-export type UserRole = 'FREE' | 'PRO' | 'ADMIN'
+/** GUEST = 로그인 없이 둘러보기 (읽기 전용 토큰) */
+export type UserRole = 'FREE' | 'PRO' | 'ADMIN' | 'GUEST'
+
+export const GUEST_NAME = '둘러보기'
 
 interface CookieOptions {
   httpOnly?: boolean
@@ -32,8 +35,8 @@ export interface CookieWriter {
   delete(name: string): unknown
 }
 
-const ACCESS_FALLBACK_SEC = 60 * 60 * 24 // 백엔드 access 만료 86400000ms = 24시간
-const REFRESH_FALLBACK_SEC = 60 * 60 * 24 * 14 // refresh 만료를 못 읽을 때 기본 14일
+const ACCESS_FALLBACK_SEC = 60 * 60 // 백엔드 access 만료 1시간
+const REFRESH_FALLBACK_SEC = 60 * 60 * 24 * 60 // refresh 만료를 못 읽을 때 기본 60일 (쓸 때마다 연장)
 
 function baseOptions(maxAge: number): CookieOptions {
   return {
@@ -68,13 +71,27 @@ export function setTokenCookies(writer: CookieWriter, tokens: SessionTokens) {
   }
 }
 
-/** 사이드바 표시용 사용자 정보. 서버 컴포넌트에서만 읽으므로 httpOnly 로 둬요. */
-export function setUserCookies(writer: CookieWriter, user: SessionUser, refreshToken?: string) {
-  const maxAge = refreshToken ? secondsUntilExp(refreshToken, REFRESH_FALLBACK_SEC) : REFRESH_FALLBACK_SEC
-  const opts = baseOptions(maxAge)
+/**
+ * 사이드바 표시용 사용자 정보. 서버 컴포넌트에서만 읽으므로 httpOnly 로 둬요.
+ * refresh token 은 쓸 때마다 연장되는데 이 쿠키는 로그인 때만 저장돼서, 수명을 길게(400일, 브라우저 최대) 잡아요.
+ * 로그아웃하면 같이 지워지고, 토큰이 없으면 proxy 가 로그인 화면으로 보내므로 남아 있어도 문제없어요.
+ */
+const USER_COOKIE_SEC = 60 * 60 * 24 * 400
+
+export function setUserCookies(writer: CookieWriter, user: SessionUser) {
+  const opts = baseOptions(USER_COOKIE_SEC)
   if (user.userId !== undefined && user.userId !== null) writer.set(COOKIE.userId, String(user.userId), opts)
   if (user.userName) writer.set(COOKIE.userName, user.userName, opts)
   if (user.userRole) writer.set(COOKIE.userRole, user.userRole, opts)
+}
+
+/** 둘러보기 세션 저장: 읽기 전용 토큰 + 표시용 이름/역할 */
+export function setGuestCookies(writer: CookieWriter, accessToken: string) {
+  writer.set(COOKIE.access, accessToken, baseOptions(secondsUntilExp(accessToken, 60 * 60 * 24 * 30)))
+  writer.delete(COOKIE.refresh)
+  const opts = baseOptions(USER_COOKIE_SEC)
+  writer.set(COOKIE.userName, GUEST_NAME, opts)
+  writer.set(COOKIE.userRole, 'GUEST', opts)
 }
 
 export function clearSessionCookies(writer: CookieWriter) {

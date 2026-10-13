@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { PencilLine, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -33,7 +34,8 @@ function useNow() {
  *  1. 오늘 요약 (얼마나 했는지 · 지금/다음 할 일)
  *  2. 오늘 일간 캘린더 (캘린더 화면과 같은 계획 | 실제) · 할 일 · 루틴과 생활 습관 (바로 체크)
  *  3. 다가오는 일정 (6일) · 마감 로드맵 (Task · 업무형 주제 · 목표형 종료일을 날짜순 세로 선으로)
- *  오른쪽: 오늘 회고 — 입력창 하나로 목표를 차례로 넘기며 써요
+ *  넓은 화면에선 스크롤 없이 한 화면: 요약 한 줄 · 캘린더(1/3) · 할 일 | 루틴·습관 / 다가오는 일정 | 마감 로드맵
+ *  오늘 회고는 요약의 "오늘 회고" 버튼 → 오른쪽 패널 (캘린더의 Task 추가 패널처럼)
  */
 export function HomeView({ userName }: { userName: string }) {
   const now = useNow()
@@ -43,6 +45,7 @@ export function HomeView({ userName }: { userName: string }) {
   const home = useHomeToday()
   const toggle = useToggleComplete()
   const toggleHabit = useToggleHabitCheck()
+  const [retroOpen, setRetroOpen] = useState(false)
 
   if (week.isPending) {
     return (
@@ -73,9 +76,13 @@ export function HomeView({ userName }: { userName: string }) {
   const onToggle = (t: TimeBlockTask) => toggle.mutate(t)
   const onToggleHabit = (h: Habit) => toggleHabit.mutate({ habit: h, day: today })
 
+  const retroLeft = (home.data?.goals ?? []).filter((g) => g.activeToday && g.retros.length === 0).length
+
   return (
-    <div className="space-y-5">
-      <Hero
+    // 넓은 화면(lg~): 한 화면에 다 보이게 — 요약 한 줄 + 칸 나누기(캘린더 1/3 · 나머지 2×2), 넘치면 칸 안에서 스크롤
+    // 회고 패널이 열리면 아주 넓은 화면(2xl~)에선 옆으로 비켜서 나란히, 그보다 좁으면 위에 덮어요
+    <div className={cn('flex flex-col gap-4 lg:h-[calc(100dvh-4rem)] lg:min-h-[640px]', retroOpen && '2xl:pr-[416px]')}>
+      <Summary
         userName={userName}
         today={today}
         nowMinutes={now.minutes}
@@ -83,43 +90,75 @@ export function HomeView({ userName }: { userName: string }) {
         routines={routines}
         habitDone={habits.data?.doneCount ?? 0}
         habitTotal={habits.data?.scheduledCount ?? 0}
-        agendaTasks={agendaOf(day).flatMap((it) => (it.kind === 'task' ? [{ ...it, task: it.task }] : []))}
+        agendaTasks={agendaOf(day).flatMap((it) => (it.kind === 'task' ? [it] : []))}
         dueToday={(home.data?.deadlines ?? []).filter((d) => d.dDay === 0).length}
         overdue={(home.data?.deadlines ?? []).filter((d) => d.overdue).length}
+        retroLeft={retroLeft}
+        onRetro={() => setRetroOpen(true)}
       />
 
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        {/* 오늘 회고 — 넓은 화면에선 오른쪽에 붙어서 따라와요 (좁은 화면에선 맨 아래) */}
-        <aside className="lg:sticky lg:top-4 lg:order-last">
-          <RetroPanel goals={home.data?.goals} today={today} failed={home.isError} />
-        </aside>
-
-        <div className="min-w-0 space-y-5">
-          <HomeDayCalendar day={day} />
-
-          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-2">
-            <TodayTasks today={today} tasks={tasks} onToggle={onToggle} togglingId={togglingId} />
-            <TodayRoutines
-              today={today}
-              routines={routines}
-              habits={habits.data}
-              onToggleTask={onToggle}
-              onToggleHabit={onToggleHabit}
-              togglingId={togglingId}
-            />
-          </div>
-
-          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-2">
-            <UpcomingSchedule days={rest} today={today} />
-            <DeadlineRoadmap deadlines={home.data?.deadlines} failed={home.isError} />
-          </div>
-        </div>
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3 lg:grid-rows-2">
+        <HomeDayCalendar day={day} className="lg:row-span-2" />
+        <TodayTasks today={today} tasks={tasks} onToggle={onToggle} togglingId={togglingId} />
+        <TodayRoutines
+          today={today}
+          routines={routines}
+          habits={habits.data}
+          onToggleTask={onToggle}
+          onToggleHabit={onToggleHabit}
+          togglingId={togglingId}
+        />
+        <UpcomingSchedule days={rest} today={today} />
+        <DeadlineRoadmap deadlines={home.data?.deadlines} failed={home.isError} />
       </div>
+
+      {retroOpen && (
+        <RetroSidePanel onClose={() => setRetroOpen(false)}>
+          <RetroPanel goals={home.data?.goals} today={today} failed={home.isError} bare />
+        </RetroSidePanel>
+      )}
     </div>
   )
 }
 
-function Hero({
+/** 오른쪽 회고 패널 — 캘린더의 "Task 추가" 패널과 같은 자리 · 모양 */
+function RetroSidePanel({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  // Esc 로 닫기 — 입력 중이거나 다른 창(모달 · 팝오버)이 떠 있으면 그쪽이 먼저
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented) return
+      const el = e.target instanceof HTMLElement ? e.target : null
+      if (el?.closest('input, textarea, select, [role="dialog"]')) return
+      onClose()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <aside
+      aria-label="오늘 회고"
+      className="bg-canvas border-line shadow-pop fixed inset-0 z-40 flex animate-[slide-in-right_180ms_ease-out] flex-col sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[400px] sm:border-l 2xl:shadow-none"
+    >
+      <div className="border-line bg-surface flex h-14 shrink-0 items-center gap-2 border-b px-4">
+        <PencilLine className="size-4" />
+        <p className="text-[16px] font-bold">오늘 회고</p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="오늘 회고 닫기"
+          className="text-ink-3 hover:bg-subtle hover:text-ink ml-auto rounded-lg p-1.5"
+        >
+          <X className="size-5" />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
+    </aside>
+  )
+}
+
+/** 요약 한 줄 — 날짜 · 인사 · 진행률 · 지금/다음 할 일 · 회고 쓰기 */
+function Summary({
   userName,
   today,
   nowMinutes,
@@ -130,6 +169,8 @@ function Hero({
   agendaTasks,
   dueToday,
   overdue,
+  retroLeft,
+  onRetro,
 }: {
   userName: string
   today: string
@@ -141,81 +182,77 @@ function Hero({
   agendaTasks: { start: number; end: number; task: TimeBlockTask }[]
   dueToday: number
   overdue: number
+  retroLeft: number
+  onRetro: () => void
 }) {
   const taskDone = tasks.filter(isDone).length
   const routineDone = routines.filter(isDone).length
   const total = tasks.length + routines.length + habitTotal
   const done = taskDone + routineDone + habitDone
-  const percent = total ? Math.round((done / total) * 100) : null
+  const percent = total ? Math.round((done / total) * 100) : 0
   const left = total - done
 
-  // 지금 하고 있어야 할 일, 없으면 다음 일
   const open = agendaTasks.filter((a) => !isDone(a.task))
   const current = open.find((a) => a.start <= nowMinutes && nowMinutes < a.end)
   const next = open.find((a) => a.start > nowMinutes)
   const focus = current ?? next
 
   return (
-    <section className="bg-inverse rounded-[24px] p-6 text-white sm:p-7">
-      <p className="text-[13px] text-white/70">
-        {monthOf(today)}월 {dayOfMonth(today)}일 {WEEKDAY_FULL[weekdayIndex(today)]}
-      </p>
-      <h1 className="mt-1 text-[24px] leading-snug font-bold sm:text-[28px]">
-        {total === 0
-          ? `${userName}님, 오늘은 비어 있어요`
-          : left === 0
-            ? `${userName}님, 오늘 할 일을 모두 끝냈어요 🎉`
-            : `${userName}님, 오늘 ${left}개 남았어요`}
-      </h1>
+    <section className="bg-inverse flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 rounded-[20px] px-5 py-4 text-white">
+      <div className="min-w-0">
+        <p className="text-[12px] text-white/65">
+          {monthOf(today)}월 {dayOfMonth(today)}일 {WEEKDAY_FULL[weekdayIndex(today)]}
+        </p>
+        <h1 className="truncate text-[19px] leading-snug font-bold">
+          {total === 0
+            ? `${userName}님, 오늘은 비어 있어요`
+            : left === 0
+              ? `${userName}님, 오늘 할 일을 모두 끝냈어요 🎉`
+              : `${userName}님, 오늘 ${left}개 남았어요`}
+        </h1>
+      </div>
 
-      <div className="mt-5 flex flex-wrap items-end gap-x-10 gap-y-5">
-        <div className="min-w-[200px] flex-1">
-          <div className="flex items-baseline gap-2">
-            <span className="text-[40px] leading-none font-bold tabular-nums">{percent ?? 0}%</span>
-            <span className="text-[14px] text-white/70">
-              {done} / {total}개 끝냄
-            </span>
+      <div className="flex min-w-[180px] items-center gap-3">
+        <span className="text-[26px] leading-none font-bold tabular-nums">{percent}%</span>
+        <div>
+          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-white/15">
+            <div className="h-full rounded-full bg-white transition-all" style={{ width: `${percent}%` }} />
           </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15">
-            <div className="h-full rounded-full bg-white transition-all" style={{ width: `${percent ?? 0}%` }} />
-          </div>
-        </div>
-
-        <div className="min-w-[220px] flex-1 rounded-2xl bg-white/8 px-4 py-3">
-          <p className="text-[12px] font-semibold text-white/60">{current ? '지금 할 일' : '다음 일정'}</p>
-          {focus ? (
-            <>
-              <p className="mt-0.5 truncate text-[16px] font-bold">
-                {focus.task.emoji ? `${focus.task.emoji} ` : ''}
-                {focus.task.taskName}
-              </p>
-              <p className="text-[13px] text-white/75">
-                {formatMinutes(focus.start)} ~ {formatMinutes(focus.end)}
-                {!current && ` · ${inLabel(focus.start - nowMinutes)}`}
-              </p>
-            </>
-          ) : (
-            <p className="mt-0.5 text-[15px] font-semibold text-white/85">남은 일정이 없어요</p>
-          )}
+          <p className="mt-1 text-[11px] whitespace-nowrap text-white/65 tabular-nums">
+            할 일 {taskDone}/{tasks.length}
+            {routines.length > 0 && ` · 루틴 ${routineDone}/${routines.length}`}
+            {habitTotal > 0 && ` · 습관 ${habitDone}/${habitTotal}`}
+          </p>
         </div>
       </div>
 
-      <div className="mt-5 flex flex-wrap gap-2 text-[13px]">
-        <Pill>
-          할 일 {taskDone}/{tasks.length}
-        </Pill>
-        {routines.length > 0 && (
-          <Pill>
-            루틴 {routineDone}/{routines.length}
-          </Pill>
-        )}
-        {habitTotal > 0 && (
-          <Pill>
-            습관 {habitDone}/{habitTotal}
-          </Pill>
-        )}
-        {dueToday > 0 && <Pill tone="warning">오늘 마감 {dueToday}개</Pill>}
-        {overdue > 0 && <Pill tone="danger">마감 지남 {overdue}개</Pill>}
+      <div className="flex flex-wrap gap-1.5 text-[12px]">
+        {dueToday > 0 && <Pill tone="warning">오늘 마감 {dueToday}</Pill>}
+        {overdue > 0 && <Pill tone="danger">마감 지남 {overdue}</Pill>}
+      </div>
+
+      <div className="ml-auto flex flex-wrap items-center gap-2">
+        <div className="max-w-[260px] min-w-0 rounded-xl bg-white/8 px-3 py-1.5">
+          <p className="text-[11px] font-semibold text-white/60">{current ? '지금 할 일' : '다음 일정'}</p>
+          {focus ? (
+            <p className="truncate text-[13px] font-bold">
+              {formatMinutes(focus.start)} {focus.task.emoji ? `${focus.task.emoji} ` : ''}
+              {focus.task.taskName}
+              {!current && <span className="font-medium text-white/70"> · {inLabel(focus.start - nowMinutes)}</span>}
+            </p>
+          ) : (
+            <p className="text-[13px] font-semibold text-white/80">남은 일정이 없어요</p>
+          )}
+        </div>
+        <Button variant="secondary" size="sm" onClick={onRetro}>
+          <PencilLine className="size-4" />
+          오늘 회고
+          {retroLeft > 0 && (
+            <span className="bg-brand grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-bold text-white">
+              {retroLeft}
+            </span>
+          )}
+        </Button>
       </div>
     </section>
   )
@@ -225,7 +262,7 @@ function Pill({ children, tone }: { children: React.ReactNode; tone?: 'danger' |
   return (
     <span
       className={cn(
-        'rounded-full px-3 py-1 font-semibold tabular-nums',
+        'rounded-full px-2.5 py-0.5 font-semibold tabular-nums',
         tone === 'danger'
           ? 'bg-[#EF4444]/25 text-[#FECACA]'
           : tone === 'warning'

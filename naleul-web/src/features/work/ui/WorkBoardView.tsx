@@ -1207,8 +1207,8 @@ function Kanban({
  *   1. 다음 마감 · 진행 요약
  *   2. 로드맵 — 주제를 마감 순서대로 세로 선 위에, 점과 점 사이에 그 주제의 남은 할 일
  *   3. 보드 (시작 전 · 진행 중 · 완료) — 끌어서 옮기기
- *   4. 업무 일지 (완료한 Task + 직접 남긴 기록) · 루틴 · 메모
- *  오른쪽(붙어 있는 패널): 적기 — 할 일 · 한 일 · 회고 입력을 한곳에
+ *   4. 업무 일지 (완료한 Task + 직접 남긴 기록) · 메모
+ *  오른쪽(붙어 있는 패널): 적기 — 할 일 · 한 일 · 회고 입력을 한곳에 + 반복 루틴
  * 오늘 할 일 · 마감 임박은 홈에서 모든 목표를 모아 보여줘서 여기선 뺐어요.
  */
 export function WorkBoardView({ goal }: { goal: GoalCategory }) {
@@ -1274,8 +1274,8 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
       <SummaryHero board={board} onShare={() => setSharing(true)} />
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        {/* 적기 — 좁은 화면에선 맨 위, 넓은 화면에선 오른쪽에 붙어서 따라와요 */}
-        <aside className="lg:sticky lg:top-4 lg:order-last">
+        {/* 적기 + 루틴 — 좁은 화면에선 맨 위, 넓은 화면에선 오른쪽에 붙어서 따라와요 (길면 패널 안에서 스크롤) */}
+        <aside className="space-y-5 lg:sticky lg:top-4 lg:order-last lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:pb-1">
           <ComposePanel
             goal={goal}
             board={board}
@@ -1285,6 +1285,8 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
             onTopic={setComposeTopic}
             inputRef={composeInput}
           />
+          {/* 반복 루틴 — 맨 아래에 있으면 잘 안 보여서 적기 패널 바로 아래로 */}
+          <RoutinesSection goal={goal} />
         </aside>
 
         <div className="min-w-0 space-y-5">
@@ -1316,10 +1318,7 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
 
           <RecordJournal goalId={goalId} goalName={goal.goalCategoryName} />
 
-          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-2">
-            <RoutinesSection goal={goal} />
-            <GoalNotes goal={goal} />
-          </div>
+          <GoalNotes goal={goal} />
         </div>
       </div>
 

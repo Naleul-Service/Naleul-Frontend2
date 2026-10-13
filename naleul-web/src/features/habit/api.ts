@@ -37,6 +37,9 @@ export interface Habit {
   rate30: number | null
   /** 최근 7일 (오래된 날 → 기준 날짜) */
   recent7: { date: string; state: HabitDayState }[]
+  /** 하는 시간대 "20:00" ~ "20:30" (선택) — 있으면 캘린더에 블록으로 보여요 */
+  startTime?: string | null
+  endTime?: string | null
 }
 
 export interface HabitHome {
@@ -77,6 +80,10 @@ export interface HabitInput {
   /** "HH:mm" */
   remindTime?: string | null
   clearRemindTime?: boolean
+  /** 하는 시간대 "HH:mm" — 둘 다 보내거나 clearTimeRange */
+  startTime?: string
+  endTime?: string
+  clearTimeRange?: boolean
 }
 
 export const habitKeys = {

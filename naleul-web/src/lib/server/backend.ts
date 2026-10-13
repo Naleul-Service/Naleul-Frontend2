@@ -13,8 +13,15 @@ import 'server-only'
 import { cookies } from 'next/headers'
 import { isJwtExpired } from '@/lib/jwt'
 import { backendUrl } from './backendPaths'
-import { reissueAccessToken } from './authApi'
-import { COOKIE, clearSessionCookies, setTokenCookies, type CookieWriter, type SessionTokens } from './session'
+import { guestLogin, reissueAccessToken } from './authApi'
+import {
+  COOKIE,
+  clearSessionCookies,
+  setGuestCookies,
+  setTokenCookies,
+  type CookieWriter,
+  type SessionTokens,
+} from './session'
 
 export interface BackendResult<T = unknown> {
   ok: boolean
@@ -67,12 +74,14 @@ function safeWriter(store: CookieStore): CookieWriter {
   }
 }
 
-async function refreshSession(store: CookieStore, refreshToken: string): Promise<SessionTokens | null> {
-  const tokens = await reissueAccessToken(refreshToken)
+/** @returns 새 토큰 / null(무효 → 쿠키 삭제) / 'unavailable'(잠깐 실패 → 쿠키 유지) */
+async function refreshSession(store: CookieStore, refreshToken: string): Promise<SessionTokens | null | 'unavailable'> {
+  const result = await reissueAccessToken(refreshToken)
   const writer = safeWriter(store)
-  if (tokens) setTokenCookies(writer, tokens)
+  if (result === 'unavailable') return result
+  if (result) setTokenCookies(writer, result)
   else clearSessionCookies(writer)
-  return tokens
+  return result
 }
 
 async function send(path: string, init: RequestInit, accessToken?: string): Promise<Response | BackendResult<never>> {
@@ -130,14 +139,39 @@ export async function parseBackendResponse<T>(res: Response): Promise<BackendRes
   }
 }
 
+/** 둘러보기(로그인 전)에서 저장하려고 할 때 — 클라이언트가 이 status 를 보고 로그인 안내를 띄워요 */
+export const GUEST_LOGIN_REQUIRED = 'GUEST_LOGIN_REQUIRED'
+const guestBlocked = (): BackendResult<never> => ({
+  ok: false,
+  httpStatus: 401,
+  status: GUEST_LOGIN_REQUIRED,
+  message: '로그인하면 저장할 수 있어요.',
+})
+
 export async function backendFetch<T = unknown>(path: string, init: RequestInit = {}): Promise<BackendResult<T>> {
   const store = await cookies()
   const refreshToken = store.get(COOKIE.refresh)?.value
   let accessToken = store.get(COOKIE.access)?.value
+  const guest = store.get(COOKIE.userRole)?.value === 'GUEST'
+  const method = (init.method ?? 'GET').toUpperCase()
+
+  if (guest) {
+    // 둘러보기는 읽기만 — 백엔드에 보내기 전에 막아요 (백엔드 필터도 같은 규칙)
+    if (method !== 'GET' && method !== 'HEAD') return guestBlocked()
+    if (!accessToken || isJwtExpired(accessToken)) {
+      accessToken = (await guestLogin()) ?? undefined
+      if (accessToken) setGuestCookies(safeWriter(store), accessToken)
+    }
+    if (!accessToken) return { ok: false, httpStatus: 503, message: defaultMessage(503) }
+    const res = await send(path, init, accessToken)
+    return res instanceof Response ? parseBackendResponse<T>(res) : res
+  }
 
   // ① 선제 갱신: 만료(또는 60초 안에 만료)된 토큰은 보내지 않고 먼저 재발급
   if ((!accessToken || isJwtExpired(accessToken)) && refreshToken) {
-    accessToken = (await refreshSession(store, refreshToken))?.accessToken
+    const r = await refreshSession(store, refreshToken)
+    if (r === 'unavailable') return { ok: false, httpStatus: 503, message: defaultMessage(503) }
+    accessToken = r?.accessToken
   }
   if (!accessToken) {
     clearSessionCookies(safeWriter(store))
@@ -149,6 +183,7 @@ export async function backendFetch<T = unknown>(path: string, init: RequestInit 
   // ② 사후 갱신: 그래도 401 이면 한 번만 재발급 후 재시도
   if (res instanceof Response && res.status === 401 && refreshToken) {
     const tokens = await refreshSession(store, refreshToken)
+    if (tokens === 'unavailable') return { ok: false, httpStatus: 503, message: defaultMessage(503) }
     if (tokens) res = await send(path, init, tokens.accessToken)
   }
 

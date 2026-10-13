@@ -52,6 +52,8 @@ export interface TimeBlockTask {
   /** 완료한 Task 의 실제 수행 시각 (완료 전이거나 실제 시각 기록이 없으면 null) */
   actualStartAt?: string | null
   actualEndAt?: string | null
+  /** 여러 번 나눠서 했을 때만 각 구간 (예: 13~15시, 16~18시). 한 번에 했으면 비어 있어요 */
+  actualSegments?: { start: string; end: string }[]
   missed: boolean
   /** 22시 이월로 놓였지만 아직 확인 안 함 → 점선 블록 + "옮길까요?" */
   carryPending?: boolean
@@ -112,6 +114,17 @@ export interface TimetableDay {
    * 화면은 기상 전·취침 후 2시간을 같이 보여주고, 이 두 가장자리를 끌어서 바꿔요. 수면 패턴이 없으면 null.
    */
   sleep?: { wake: FixedBlock | null; bed: FixedBlock | null } | null
+  /** 시간대를 정한 기본 생활 습관 (예: 샤워 20:00~20:30) — 체크할 수 있는 블록 */
+  habits?: HabitBlock[]
+}
+
+export interface HabitBlock {
+  habitId: number
+  name: string
+  emoji: string | null
+  start: string
+  end: string
+  checked: boolean
 }
 
 export interface TimetableResponse {

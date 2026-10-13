@@ -83,6 +83,7 @@ export function TaskAddView({
   const [items, setItems] = useState<MapItem[]>([])
   const [tempGoals, setTempGoals] = useState<TempGoalInput[]>([])
   const [aiFailed, setAiFailed] = useState(false)
+  const [aiLimited, setAiLimited] = useState(false)
   const [conflicts, setConflicts] = useState<Record<string, string>>({})
   const [result, setResult] = useState<ConfirmResponse | null>(null)
 
@@ -111,6 +112,7 @@ export function TaskAddView({
           setItems(mapped.items)
           setTempGoals(mapped.tempGoals)
           setAiFailed(res.aiFailed)
+          setAiLimited(!!res.aiLimited)
           setConflicts({})
           setStep(1)
         },
@@ -313,6 +315,7 @@ export function TaskAddView({
                 tempGoals={tempGoals}
                 goals={ongoingGoals}
                 aiFailed={aiFailed}
+                aiLimited={aiLimited}
                 conflicts={conflicts}
                 today={today}
                 loading={confirm.isPending}

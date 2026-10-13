@@ -9,7 +9,7 @@ import { cookies } from 'next/headers'
 import type { NextRequest } from 'next/server'
 import { backendFetch } from '@/lib/server/backend'
 import { toRouteResponse } from '@/lib/server/routeResponse'
-import { COOKIE, setUserCookies } from '@/lib/server/session'
+import { setUserCookies } from '@/lib/server/session'
 
 interface NicknameUpdated {
   userId: number
@@ -22,7 +22,7 @@ export async function PATCH(req: NextRequest) {
 
   if (result.ok && result.data?.nickname) {
     const store = await cookies()
-    setUserCookies(store, { userName: result.data.nickname }, store.get(COOKIE.refresh)?.value)
+    setUserCookies(store, { userName: result.data.nickname })
   }
   return toRouteResponse(result)
 }

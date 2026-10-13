@@ -3,8 +3,9 @@
 import { useState, type ReactNode } from 'react'
 import { Menu } from 'lucide-react'
 import { Logo } from '@/components/brand/Logo'
+import { GuestBanner, LoginRequiredDialog } from '@/components/auth/LoginRequiredDialog'
 import { Sidebar } from './Sidebar'
-import type { SessionUserView } from './types'
+import { isGuestUser, type SessionUserView } from './types'
 
 /**
  * 로그인 후 화면의 공통 틀.
@@ -43,8 +44,10 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
       )}
 
       <main className="lg:pl-[272px]">
+        {isGuestUser(user) && <GuestBanner />}
         <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</div>
       </main>
+      <LoginRequiredDialog />
     </div>
   )
 }

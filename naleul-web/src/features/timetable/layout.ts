@@ -94,6 +94,8 @@ export interface Placed<T> {
   /** 잘리기 전 원래 시각(분) — 글자로 보여줄 때 */
   start: number
   end: number
+  /** 한 Task 를 여러 구간으로 나눠 그릴 때 몇 번째 조각인지 (나눠서 한 실제 시간) */
+  part?: number
   /** 원래 시간이 화면 범위 밖까지 이어지는지 */
   clippedTop: boolean
   clippedBottom: boolean
@@ -155,15 +157,22 @@ export function placeTasks(
 ): Placed<TimeBlockTask>[] {
   const items = day.tasks
     .filter((t) => basis !== 'done' || t.taskStatus === 'COMPLETED')
-    .map((t) => {
-      const m = basis === 'planned' ? plannedMinutes(day.date, t) : shownMinutes(day.date, t)
-      if (!m) return { t, c: null }
-      const c = clip(m.start, Math.max(m.end, m.start + MIN_TASK_MINUTES), from, to)
-      return { t, c: c && { ...c, end: m.end } }
+    .flatMap((t) => {
+      // 여러 번 나눠서 한 완료 Task 는 실제로 한 구간마다 블록 하나씩 (계획 기준일 땐 계획 자리 하나)
+      const segs = basis !== 'planned' && t.taskStatus === 'COMPLETED' ? (t.actualSegments ?? []) : []
+      const ranges =
+        segs.length > 1
+          ? segs.map((g) => ({ start: minutesFrom(day.date, g.start), end: minutesFrom(day.date, g.end) }))
+          : [basis === 'planned' ? plannedMinutes(day.date, t) : shownMinutes(day.date, t)]
+      return ranges.map((m, part) => {
+        if (!m) return { t, part, c: null }
+        const c = clip(m.start, Math.max(m.end, m.start + MIN_TASK_MINUTES), from, to)
+        return { t, part, c: c && { ...c, end: m.end } }
+      })
     })
-    .filter((x): x is { t: TimeBlockTask; c: NonNullable<ReturnType<typeof clip>> } => !!x.c)
+    .filter((x): x is { t: TimeBlockTask; part: number; c: NonNullable<ReturnType<typeof clip>> } => !!x.c)
 
-  return layoutColumns(items.map(({ t, c }) => ({ item: t, ...c, col: 0, cols: 1 })))
+  return layoutColumns(items.map(({ t, part, c }) => ({ item: t, part, ...c, col: 0, cols: 1 })))
 }
 
 /**

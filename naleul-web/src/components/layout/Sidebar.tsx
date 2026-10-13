@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, CalendarDays, Home, LogOut, Plus, Settings, Target, type LucideIcon } from 'lucide-react'
+import { BarChart3, CalendarDays, Home, LogIn, LogOut, Plus, Settings, Target, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { logout } from '@/lib/client/api'
 import { Logo } from '@/components/brand/Logo'
 import { buttonClass } from '@/components/ui/Button'
 import { GoalNavList } from '@/features/goal/ui/GoalNavList'
-import type { SessionUserView } from './types'
+import { AdSlot } from '@/components/ads/AdSlot'
+import { isGuestUser, type SessionUserView } from './types'
 
 interface NavItem {
   href: string
@@ -26,7 +27,7 @@ const NAV: NavItem[] = [
 const isActive = (pathname: string, href: string) =>
   href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
 
-const PLAN_LABEL: Record<string, string> = { FREE: 'Free plan', PRO: 'Pro plan', ADMIN: 'Admin' }
+const PLAN_LABEL: Record<string, string> = { FREE: 'Free plan', PRO: 'Pro plan', ADMIN: 'Admin', GUEST: '로그인 전' }
 
 function NavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate?: () => void }) {
   const active = isActive(pathname, item.href)
@@ -93,24 +94,38 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
         />
       </div>
 
-      <div className="border-line mt-auto flex items-center gap-3 border-t px-2 pt-4">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#8EA2FF] to-[#B49CFF] text-sm font-bold text-white">
-          {user.name.slice(0, 1)}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold">{user.name}</p>
-          <p className="text-ink-3 text-xs">{PLAN_LABEL[user.role ?? 'FREE'] ?? 'Free plan'}</p>
+      {/* 아래 프로필을 바닥으로 밀어요 (광고가 안 보일 때도) */}
+      <div className="mt-auto" />
+      <AdSlot placement="sidebar" role={user.role} className="mb-3" />
+
+      {isGuestUser(user) ? (
+        <div className="border-line border-t px-1 pt-4">
+          <p className="text-ink-3 px-1 text-[13px]">둘러보는 중이에요. 로그인하면 만든 목표와 Task가 저장돼요.</p>
+          <a href="/login" className={cn(buttonClass('primary', 'md', true), 'mt-3')}>
+            <LogIn className="size-4" />
+            로그인하고 시작하기
+          </a>
         </div>
-        <button
-          type="button"
-          onClick={logout}
-          aria-label="로그아웃"
-          title="로그아웃"
-          className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-2"
-        >
-          <LogOut className="size-4" />
-        </button>
-      </div>
+      ) : (
+        <div className="border-line flex items-center gap-3 border-t px-2 pt-4">
+          <span className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#8EA2FF] to-[#B49CFF] text-sm font-bold text-white">
+            {user.name.slice(0, 1)}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[15px] font-bold">{user.name}</p>
+            <p className="text-ink-3 text-xs">{PLAN_LABEL[user.role ?? 'FREE'] ?? 'Free plan'}</p>
+          </div>
+          <button
+            type="button"
+            onClick={logout}
+            aria-label="로그아웃"
+            title="로그아웃"
+            className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-2"
+          >
+            <LogOut className="size-4" />
+          </button>
+        </div>
+      )}
     </div>
   )
 }

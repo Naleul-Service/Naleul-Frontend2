@@ -33,7 +33,10 @@ export function UsageLine({
           {i.label} <b className={tone === 'onDark' ? 'text-white' : 'text-ink-2'}>{i.remaining}</b>/{i.limit}회 남음
         </span>
       ))}
-      <span className="opacity-70">(매일 0시에 다시 채워져요)</span>
+      <span className="opacity-70">
+        ({limited.some((i) => i.key.endsWith('_WEEK')) ? '하루 횟수는 매일, 주간 횟수는 월요일 0시에' : '매일 0시에'}{' '}
+        다시 채워져요)
+      </span>
     </p>
   )
 }

@@ -37,6 +37,10 @@ export const isApiError = (e: unknown): e is ApiError => e instanceof ApiError
 
 const NETWORK_MESSAGE = '네트워크 연결을 확인해 주세요.'
 
+/** 둘러보기 중 저장하려고 할 때 — LoginRequiredDialog 가 이 이벤트를 듣고 로그인 안내를 띄워요 */
+export const LOGIN_REQUIRED_EVENT = 'naleul:login-required'
+export const isGuestLoginRequired = (e: unknown) => isApiError(e) && e.status === 'GUEST_LOGIN_REQUIRED'
+
 function goToLogin() {
   if (typeof window === 'undefined') return
   const here = window.location.pathname + window.location.search
@@ -62,7 +66,9 @@ async function request<T>(method: string, path: string, body?: unknown, init?: R
   const json = (await res.json().catch(() => null)) as ApiEnvelope<T> | null
 
   if (!res.ok || !json?.success) {
-    if (res.status === 401) goToLogin()
+    if (res.status === 401 && json?.status === 'GUEST_LOGIN_REQUIRED') {
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(LOGIN_REQUIRED_EVENT))
+    } else if (res.status === 401) goToLogin()
     throw new ApiError(res.status, json?.message ?? '문제가 생겼어요. 다시 시도해 주세요.', json?.status, json?.data)
   }
 

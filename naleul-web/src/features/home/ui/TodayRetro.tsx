@@ -35,10 +35,13 @@ export function RetroPanel({
   goals,
   today,
   failed,
+  bare = false,
 }: {
   goals: HomeGoalToday[] | undefined
   today: string
   failed: boolean
+  /** 오른쪽 패널 안에 넣을 때 — 카드 · 제목 없이 */
+  bare?: boolean
 }) {
   const create = useCreateTodayRetro()
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -49,9 +52,9 @@ export function RetroPanel({
   const [text, setText] = useState('')
   const [showIdle, setShowIdle] = useState(false)
 
-  if (failed) return null
+  if (failed) return <p className="text-ink-3 text-sm">회고할 목표를 불러오지 못했어요.</p>
   if (!goals) return <div className="bg-subtle h-60 animate-pulse rounded-[20px]" />
-  if (goals.length === 0) return null
+  if (goals.length === 0) return <p className="text-ink-3 text-sm">진행 중인 목표가 없어요.</p>
 
   const hasRetro = (g: HomeGoalToday) => g.retros.length > 0 || written.has(g.goalCategoryId)
   const auto = nextGoal(goals, null, written) ?? goals.find((g) => g.activeToday) ?? goals[0]
@@ -60,6 +63,7 @@ export function RetroPanel({
   const idle = goals.filter((g) => !g.activeToday)
   const doneCount = active.filter(hasRetro).length
 
+  const Wrap = bare ? 'div' : Card
   const focus = () => requestAnimationFrame(() => inputRef.current?.focus())
   const pick = (id: number) => {
     setPicked(id)
@@ -119,12 +123,15 @@ export function RetroPanel({
   )
 
   return (
-    <Card id="home-retro" className="p-4 sm:p-5">
+    <Wrap id="home-retro" className={bare ? undefined : 'p-4 sm:p-5'}>
       <div className="flex items-baseline gap-2">
-        <h2 className="flex items-center gap-1.5 text-[17px] font-bold">
-          <PencilLine className="size-4" />
-          오늘 회고
-        </h2>
+        {!bare && (
+          <h2 className="flex items-center gap-1.5 text-[17px] font-bold">
+            <PencilLine className="size-4" />
+            오늘 회고
+          </h2>
+        )}
+        {bare && <p className="text-ink-3 text-[13px]">오늘 한 일을 보면서 목표마다 한 줄씩</p>}
         {active.length > 0 && (
           <span className="text-ink-3 ml-auto text-[12px] tabular-nums">
             {doneCount} / {active.length} 목표
@@ -229,7 +236,7 @@ export function RetroPanel({
           <p className="text-ink-3 mt-1 text-[13px]">더 쓰고 싶은 목표가 있으면 위에서 골라 주세요.</p>
         </div>
       )}
-    </Card>
+    </Wrap>
   )
 }
 

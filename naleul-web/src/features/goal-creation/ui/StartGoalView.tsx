@@ -38,8 +38,10 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
   const usage = useAiUsage()
   const refreshUsage = useRefreshUsage()
   const sessionLeft = usageItem(usage.data, 'GOAL_SESSION')
+  const weekLeft = usageItem(usage.data, 'GOAL_SESSION_WEEK')
   const draftLeft = usageItem(usage.data, 'GOAL_DRAFT')
-  const outOfQuota = sessionLeft?.remaining === 0 || draftLeft?.remaining === 0
+  const outOfWeek = weekLeft?.remaining === 0
+  const outOfQuota = sessionLeft?.remaining === 0 || draftLeft?.remaining === 0 || outOfWeek
 
   const start = useMutation({
     mutationFn: (initialMessage?: string) =>
@@ -90,7 +92,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             href="/goal/add?mode=record"
             className="border-line bg-surface hover:border-line-strong group mt-6 flex items-center gap-3 rounded-2xl border px-4 py-3"
           >
-            <span className="bg-ink grid size-9 shrink-0 place-items-center rounded-xl text-on-ink">
+            <span className="bg-ink text-on-ink grid size-9 shrink-0 place-items-center rounded-xl">
               <NotebookPen className="size-4" />
             </span>
             <span className="min-w-0 flex-1">
@@ -104,7 +106,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
         )}
 
         {sourceGoalId && (
-          <div className="bg-warning-soft mt-6 rounded-2xl px-4 py-3.5 text-sm text-warning-ink-strong">
+          <div className="bg-warning-soft text-warning-ink-strong mt-6 rounded-2xl px-4 py-3.5 text-sm">
             <p>
               임시 목표{' '}
               <b>
@@ -200,10 +202,16 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
           <Sparkles className="size-4" />
           AI와 목표 설계 시작하기
         </Button>
-        <UsageLine className="mt-2 justify-center" items={[sessionLeft, draftLeft]} />
+        <UsageLine className="mt-2 justify-center" items={[sessionLeft, weekLeft, draftLeft]} />
         {outOfQuota && (
           <p className="text-danger mt-1 text-center text-[13px] font-semibold">
-            오늘 AI 목표 만들기 횟수를 모두 썼어요. 내일 0시에 다시 채워져요 — 지금은 직접 만들기를 쓸 수 있어요.
+            {outOfWeek
+              ? '이번 주 AI 목표 만들기를 모두 썼어요. 월요일 0시에 다시 채워져요'
+              : '오늘 AI 목표 만들기 횟수를 모두 썼어요. 내일 0시에 다시 채워져요'}{' '}
+            — 지금은 직접 만들기를 쓸 수 있어요.{' '}
+            <Link href="/settings/membership" className="text-brand underline">
+              Pro로 더 많이
+            </Link>
           </p>
         )}
 

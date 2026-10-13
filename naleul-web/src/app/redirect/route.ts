@@ -8,7 +8,7 @@
  */
 import { NextResponse, type NextRequest } from 'next/server'
 import { kakaoLogin } from '@/lib/server/authApi'
-import { setTokenCookies, setUserCookies } from '@/lib/server/session'
+import { clearSessionCookies, setTokenCookies, setUserCookies } from '@/lib/server/session'
 import { safeRedirectPath } from '@/lib/redirectPath'
 
 export async function GET(request: NextRequest) {
@@ -26,7 +26,9 @@ export async function GET(request: NextRequest) {
   if (!result) return toLogin('login_failed')
 
   const response = NextResponse.redirect(new URL(next, origin))
+  // 둘러보기 쿠키(userRole=GUEST, 이름 "둘러보기")가 남지 않게 먼저 모두 지우고 새로 넣어요
+  clearSessionCookies(response.cookies)
   setTokenCookies(response.cookies, { accessToken: result.accessToken, refreshToken: result.refreshToken })
-  setUserCookies(response.cookies, result, result.refreshToken)
+  setUserCookies(response.cookies, { ...result, userRole: result.userRole ?? 'FREE' })
   return response
 }

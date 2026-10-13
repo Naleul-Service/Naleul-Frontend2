@@ -1,15 +1,15 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Flame } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Flame } from 'lucide-react'
+import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { addDays, addMonths, weekdayIndex, WEEKDAY_LABEL } from '@/features/timetable/time'
-import { Section } from '@/features/goal/ui/sections'
 import { useHabitHeatmap, type Habit, type HabitDayState } from '../api'
 
 /** 칸 크기 · 간격 (px) */
-const CELL = 14
+const CELL = 20
 const GAP = 3
 /** 서버가 한 번에 주는 최대 기간(400일) 안에서 — 최근 12달 + 이번 달 */
 const MAX_MONTHS_BACK = 12
@@ -37,15 +37,26 @@ const STATE_LABEL: Record<HabitDayState, string> = {
 const firstOfMonth = (ymd: string) => `${ymd.slice(0, 8)}01`
 const lastOfMonth = (ymd: string) => addDays(addMonths(firstOfMonth(ymd), 1), -1)
 
-/** start 달부터 end 달까지 매달 1일 */
-function monthsBetween(start: string, end: string) {
-  const out: string[] = []
-  for (let m = firstOfMonth(start); m <= end; m = addMonths(m, 1)) out.push(m)
-  return out
+/** 그 달을 월요일부터 시작하는 주(열)로 — 각 주는 월~일 7칸, 그 달이 아닌 날은 null */
+function monthWeeks(month: string) {
+  const last = lastOfMonth(month)
+  const weeks: (string | null)[][] = []
+  let d = addDays(month, -weekdayIndex(month))
+  while (d <= last) {
+    const col: (string | null)[] = []
+    for (let i = 0; i < 7; i++) {
+      const x = addDays(d, i)
+      col.push(x >= month && x <= last ? x : null)
+    }
+    weeks.push(col)
+    d = addDays(d, 7)
+  }
+  return weeks
 }
 
 /**
- * 습관별 잔디 — 습관을 추가한 달부터 한 달에 한 장씩 달력처럼 쌓여요.
+ * 습관별 잔디 — 한 달씩 넘겨 봐요 (‹ ›). 세로는 요일(월~일), 가로는 그 달의 주.
+ * 습관을 추가한 달부터 볼 수 있고, 그 달보다 앞은 비어 있어요.
  * (전체를 합친 잔디는 없앴어요: 습관마다 시작한 날이 달라서 합치면 "언제부터 했는지"가 안 보여요)
  */
 export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string }) {
@@ -57,10 +68,12 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
     [habits]
   )
   // 가장 먼저 시작한 습관의 그 달 1일부터 (최근 12달까지)
-  const limit = addMonths(firstOfMonth(today), -MAX_MONTHS_BACK)
+  const thisMonth = firstOfMonth(today)
+  const limit = addMonths(thisMonth, -MAX_MONTHS_BACK)
   const earliest = shown.reduce((m, h) => (h.startDate < m ? h.startDate : m), today)
   const from = firstOfMonth(earliest) < limit ? limit : firstOfMonth(earliest)
   const { data, isPending } = useHabitHeatmap(from, shown.length > 0)
+  const [month, setMonth] = useState(thisMonth)
 
   const stateOf = useMemo(() => {
     const map = new Map<number, Map<string, HabitDayState>>()
@@ -71,19 +84,67 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
     }
     return map
   }, [data])
+  const weeks = useMemo(() => monthWeeks(month), [month])
 
   if (shown.length === 0) return null
+  const canPrev = month > from
+  const canNext = month < thisMonth
+  const sameYear = month.slice(0, 4) === today.slice(0, 4)
 
   return (
-    <Section title="습관별 잔디" aside="추가한 달부터 한 달씩">
+    <Card className="p-5 sm:p-6">
+      <div className="mb-4 flex items-center gap-2">
+        <h2 className="text-[17px] font-bold">습관별 잔디</h2>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setMonth(addMonths(month, -1))}
+            disabled={!canPrev}
+            aria-label="지난달"
+            className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-1 disabled:opacity-30"
+          >
+            <ChevronLeft className="size-5" />
+          </button>
+          <span className="min-w-[72px] text-center text-[15px] font-bold tabular-nums">
+            {sameYear ? '' : `${month.slice(0, 4)}년 `}
+            {Number(month.slice(5, 7))}월
+          </span>
+          <button
+            type="button"
+            onClick={() => setMonth(addMonths(month, 1))}
+            disabled={!canNext}
+            aria-label="다음 달"
+            className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-1 disabled:opacity-30"
+          >
+            <ChevronRight className="size-5" />
+          </button>
+          {month !== thisMonth && (
+            <button
+              type="button"
+              onClick={() => setMonth(thisMonth)}
+              className="text-brand ml-1 text-[13px] font-semibold"
+            >
+              이번 달
+            </button>
+          )}
+        </div>
+      </div>
+
       {isPending ? (
         <div className="grid h-32 place-items-center">
           <Spinner className="text-ink-3 size-5" />
         </div>
       ) : (
-        <ul className="divide-line -my-2 divide-y">
+        <ul className="divide-line -my-3 divide-y">
           {shown.map((h) => (
-            <HabitMonths key={h.habitId} habit={h} today={today} from={from} states={stateOf.get(h.habitId)} />
+            <HabitMonth
+              key={h.habitId}
+              habit={h}
+              today={today}
+              month={month}
+              weeks={weeks}
+              states={stateOf.get(h.habitId)}
+            />
           ))}
         </ul>
       )}
@@ -93,121 +154,96 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
         <Legend className="bg-subtle">안 하는 날</Legend>
         <Legend className="bg-hatch ring-hatch-line ring-1 ring-inset">쉬는 중</Legend>
       </p>
-    </Section>
+    </Card>
   )
 }
 
-function HabitMonths({
+/** 습관 한 줄 — 왼쪽 이름 · 기록, 오른쪽 그 달 잔디 (세로 요일 × 가로 주) */
+function HabitMonth({
   habit: h,
   today,
-  from,
+  month,
+  weeks,
   states,
 }: {
   habit: Habit
   today: string
-  from: string
+  month: string
+  weeks: (string | null)[][]
   states: Map<string, HabitDayState> | undefined
 }) {
-  const start = h.startDate > from ? h.startDate : from
-  const months = monthsBetween(start, today)
+  const stateAt = (d: string): HabitDayState =>
+    d > today ? 'FUTURE' : d < h.startDate ? 'BEFORE_START' : (states?.get(d) ?? 'BEFORE_START')
+  const days = weeks.flat().filter((d): d is string => d !== null)
+  const cells = days.map(stateAt)
+  const doneDays = cells.filter((s) => s === 'DONE').length
+  const dueDays = cells.filter((s) => s === 'DONE' || s === 'MISSED' || s === 'TODO').length
+  const notYet = h.startDate > lastOfMonth(month)
 
   return (
-    <li className={cn('py-4', h.status === 'PAUSED' && 'opacity-60')}>
-      <div className="mb-2.5 flex flex-wrap items-baseline gap-x-2 text-[14px]">
-        <span className="font-bold">
+    <li className={cn('flex flex-wrap items-start gap-x-4 gap-y-2 py-3', h.status === 'PAUSED' && 'opacity-60')}>
+      <div className="w-[150px] min-w-0 shrink-0">
+        <p className="truncate text-[14px] font-bold">
           {h.emoji ? `${h.emoji} ` : ''}
           {h.name}
-        </span>
-        <span className="text-ink-3 text-[12px]">
+        </p>
+        <p className="text-ink-3 mt-0.5 text-[12px] tabular-nums">
+          {notYet ? '아직 시작 전' : dueDays > 0 ? `이 달 ${doneDays}/${dueDays}일` : '이 달 할 날 없음'}
+        </p>
+        <p className="text-ink-4 text-[11px]">
           {Number(h.startDate.slice(5, 7))}월 {Number(h.startDate.slice(8, 10))}일부터
-        </span>
-        {h.rate30 !== null && <span className="text-ink-3 text-[12px] tabular-nums">최근 30일 {h.rate30}%</span>}
+        </p>
         {h.streak > 1 && (
-          <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-[#ea580c]">
+          <p className="mt-0.5 inline-flex items-center gap-0.5 text-[12px] font-semibold text-[#ea580c]">
             <Flame className="size-3.5" />
             {h.streak}일 연속
-          </span>
+          </p>
         )}
-        {h.status === 'PAUSED' && <span className="text-ink-3 text-[12px]">쉬는 중</span>}
+        {h.status === 'PAUSED' && <p className="text-ink-3 text-[12px]">쉬는 중</p>}
       </div>
-      <div className="flex flex-wrap gap-x-5 gap-y-4">
-        {months.map((m) => (
-          <Month key={m} month={m} today={today} start={h.startDate} states={states} />
+
+      <div className="flex" style={{ gap: GAP }} role="grid" aria-label={`${h.name} ${Number(month.slice(5, 7))}월`}>
+        {/* 요일 눈금 */}
+        <div className="flex flex-col" style={{ gap: GAP }} aria-hidden>
+          {WEEKDAY_LABEL.map((w, i) => (
+            <span
+              key={w}
+              className="text-ink-4 pr-1 text-right text-[10px]"
+              style={{ height: CELL, lineHeight: `${CELL}px` }}
+            >
+              {i % 2 === 0 ? w : ''}
+            </span>
+          ))}
+        </div>
+        {weeks.map((col, wi) => (
+          <div key={wi} className="flex flex-col" style={{ gap: GAP }} role="row">
+            {col.map((d, di) =>
+              d === null ? (
+                <span key={di} style={{ width: CELL, height: CELL }} />
+              ) : (
+                <Cell key={d} date={d} state={stateAt(d)} today={today} />
+              )
+            )}
+          </div>
         ))}
       </div>
     </li>
   )
 }
 
-/** 한 달 달력 — 월요일부터 7칸 */
-function Month({
-  month,
-  today,
-  start,
-  states,
-}: {
-  month: string
-  today: string
-  start: string
-  states: Map<string, HabitDayState> | undefined
-}) {
-  const last = lastOfMonth(month)
-  const lead = weekdayIndex(month)
-  const days: string[] = []
-  for (let d = month; d <= last; d = addDays(d, 1)) days.push(d)
-
-  const stateAt = (d: string): HabitDayState =>
-    d > today ? 'FUTURE' : d < start ? 'BEFORE_START' : (states?.get(d) ?? 'BEFORE_START')
-  const cells = days.map((d) => ({ d, s: stateAt(d) }))
-  const doneDays = cells.filter((c) => c.s === 'DONE').length
-  const dueDays = cells.filter((c) => c.s === 'DONE' || c.s === 'MISSED' || c.s === 'TODO').length
-  const sameYear = month.slice(0, 4) === today.slice(0, 4)
-
+function Cell({ date: d, state: s, today }: { date: string; state: HabitDayState; today: string }) {
   return (
-    <div>
-      <p className="mb-1 flex items-baseline justify-between gap-2 text-[12px]">
-        <span className="font-semibold">
-          {sameYear ? '' : `${month.slice(0, 4)}년 `}
-          {Number(month.slice(5, 7))}월
-        </span>
-        {dueDays > 0 && (
-          <span className="text-ink-3 tabular-nums">
-            {doneDays}/{dueDays}일
-          </span>
-        )}
-      </p>
-      <div
-        className="grid"
-        style={{ gridTemplateColumns: `repeat(7, ${CELL}px)`, gap: GAP }}
-        role="grid"
-        aria-label={`${Number(month.slice(5, 7))}월 ${doneDays}일 했어요`}
-      >
-        {WEEKDAY_LABEL.map((w) => (
-          <span key={w} className="text-ink-4 text-center text-[9px] leading-[12px]" aria-hidden>
-            {w}
-          </span>
-        ))}
-        {Array.from({ length: lead }, (_, i) => (
-          <span key={`l${i}`} />
-        ))}
-        {cells.map(({ d, s }) => (
-          <span
-            key={d}
-            role="gridcell"
-            title={
-              STATE_LABEL[s] ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))} · ${STATE_LABEL[s]}` : undefined
-            }
-            className={cn(
-              'rounded-[3px]',
-              STATE_CLASS[s],
-              s === 'BEFORE_START' && 'bg-subtle/40',
-              d === today && 'ring-ink-2 ring-1 ring-offset-1'
-            )}
-            style={{ width: CELL, height: CELL }}
-          />
-        ))}
-      </div>
-    </div>
+    <span
+      role="gridcell"
+      title={STATE_LABEL[s] ? `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))} · ${STATE_LABEL[s]}` : undefined}
+      className={cn(
+        'rounded-[3px]',
+        STATE_CLASS[s],
+        s === 'BEFORE_START' && 'bg-subtle/40',
+        d === today && 'ring-ink-2 ring-1 ring-offset-1'
+      )}
+      style={{ width: CELL, height: CELL }}
+    />
   )
 }
 

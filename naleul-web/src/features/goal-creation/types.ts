@@ -29,6 +29,8 @@ export interface MetricValue {
 export interface DeadlineValue {
   endDate: string // yyyy-MM-dd
   isFlexible: boolean
+  /** 사용자가 말한 시작일 (없으면 오늘부터) */
+  startDate?: string | null
 }
 
 export interface PracticePreferenceValue {

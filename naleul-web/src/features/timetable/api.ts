@@ -78,8 +78,19 @@ export function useToggleComplete() {
  */
 export function useCompleteWithActual() {
   return useTimetableMutation(
-    (v: { taskId: number; actualStartAt: string; actualEndAt: string }) =>
-      api.patch(`/v1/task-actuals/${v.taskId}/actual`, { actualStartAt: v.actualStartAt, actualEndAt: v.actualEndAt }),
+    (v: {
+      taskId: number
+      actualStartAt: string
+      actualEndAt: string
+      /** 여러 번 나눠서 했으면 각 구간 (2개 이상일 때만 보내요) */
+      segments?: { start: string; end: string }[]
+    }) =>
+      api.patch(
+        `/v1/task-actuals/${v.taskId}/actual`,
+        v.segments && v.segments.length > 1
+          ? { segments: v.segments }
+          : { actualStartAt: v.actualStartAt, actualEndAt: v.actualEndAt }
+      ),
     { success: () => '완료했어요. 실제로 한 시간도 남겼어요.' }
   )
 }
@@ -423,5 +434,21 @@ export function useDeleteActivity() {
     onSuccess: () => toast.success('기록을 지웠어요.'),
     onError: (e) => toast.error(errorMessage(e)),
     onSettled: () => qc.invalidateQueries({ queryKey: activityKeys.all }),
+  })
+}
+
+// ── 캘린더의 습관 블록 체크 (V56) ─────────────────────────
+/** 습관 블록을 눌러 체크 · 체크 풀기 → 캘린더 · 습관 · 홈을 다시 불러와요 */
+export function useToggleHabitBlock() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ habitId, date, checked }: { habitId: number; date: string; checked: boolean }) =>
+      checked ? api.delete(`/v1/habits/${habitId}/checks/${date}`) : api.put(`/v1/habits/${habitId}/checks/${date}`),
+    onError: (e) => toast.error(isApiError(e) ? e.message : '체크하지 못했어요. 다시 시도해 주세요.'),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: timetableKeys.all })
+      qc.invalidateQueries({ queryKey: ['habits'] })
+      qc.invalidateQueries({ queryKey: ['home'] })
+    },
   })
 }

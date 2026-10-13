@@ -24,6 +24,7 @@ interface Props {
   tempGoals: TempGoalInput[]
   goals: GoalCategory[]
   aiFailed: boolean
+  aiLimited?: boolean
   /** clientKey → 겹친 일정 안내 (확정 시 409 성격의 conflicts) */
   conflicts: Record<string, string>
   today: string
@@ -46,6 +47,7 @@ export function StepGoals({
   tempGoals,
   goals,
   aiFailed,
+  aiLimited = false,
   conflicts,
   today,
   loading,
@@ -116,9 +118,11 @@ export function StepGoals({
       </p>
 
       {aiFailed && (
-        <p className="bg-warning-soft mt-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm text-warning-ink">
+        <p className="bg-warning-soft text-warning-ink mt-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm">
           <AlertCircle className="mt-0.5 size-4 shrink-0" />
-          AI 정리가 잠시 안 돼서, 적은 내용만 나눠 두었어요. 목표는 &quot;변경&quot;에서 직접 골라 주세요.
+          {aiLimited
+            ? '오늘 AI 정리 횟수를 다 써서 기본 정리로 나눠 두었어요. 목표는 "변경"에서 직접 골라 주세요. (내일 0시에 다시 채워져요 · Pro는 하루 30번)'
+            : 'AI 정리가 잠시 안 돼서, 적은 내용만 나눠 두었어요. 목표는 "변경"에서 직접 골라 주세요.'}
         </p>
       )}
       {Object.keys(conflicts).length > 0 && (
