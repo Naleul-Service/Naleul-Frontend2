@@ -61,13 +61,14 @@ export interface HomeToday {
 
 export const homeKeys = {
   all: ['home'] as const,
-  today: () => [...homeKeys.all, 'today'] as const,
+  today: (date?: string) => [...homeKeys.all, 'today', date ?? 'today'] as const,
 }
 
-export function useHomeToday() {
+/** date 를 주면 그날 (홈에서 날짜 ‹ › 로 지난날 · 앞날 보기). 안 주면 오늘 */
+export function useHomeToday(date?: string) {
   return useQuery({
-    queryKey: homeKeys.today(),
-    queryFn: () => api.get<HomeToday>('/v1/home/today'),
+    queryKey: homeKeys.today(date),
+    queryFn: () => api.get<HomeToday>(`/v1/home/today${date ? `?date=${date}` : ''}`),
     // 아직 배포 전인 서버(404)에서도 홈의 나머지는 보여야 해서 재시도하지 않아요
     retry: false,
   })

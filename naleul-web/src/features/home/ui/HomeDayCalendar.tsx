@@ -18,7 +18,16 @@ import { useTimetableInteractions } from '@/features/timetable/ui/useTimetableIn
  * 홈의 오늘 일간 캘린더 — 캘린더 화면의 일간 보기(계획 | 실제)를 그대로 넣었어요.
  * 블록을 눌러 상세 · 완료, 끌어서 시간 바꾸기, 지난 빈 시간을 눌러 실제로 한 일 남기기까지 똑같이 돼요.
  */
-export function HomeDayCalendar({ day, className }: { day: TimetableDay; className?: string }) {
+export function HomeDayCalendar({
+  day,
+  className,
+  dayLabel = '오늘',
+}: {
+  day: TimetableDay
+  className?: string
+  /** 홈에서 다른 날을 보고 있으면 "이날" */
+  dayLabel?: string
+}) {
   const activities = useActivities(day.date, day.date)
   const acts = useMemo(() => activities.data ?? [], [activities.data])
   const rawDays = useMemo(() => [day], [day])
@@ -42,7 +51,7 @@ export function HomeDayCalendar({ day, className }: { day: TimetableDay; classNa
   return (
     <Card className={cn('flex min-h-0 flex-col overflow-hidden p-0', className)}>
       <div className="flex shrink-0 flex-wrap items-center gap-1 px-4 pt-4 pb-2 sm:px-5">
-        <h2 className="text-[17px] font-bold">오늘 일정</h2>
+        <h2 className="text-[17px] font-bold">{dayLabel} 일정</h2>
         <div className="ml-auto flex items-center gap-1">
           <Button
             variant="ghost"

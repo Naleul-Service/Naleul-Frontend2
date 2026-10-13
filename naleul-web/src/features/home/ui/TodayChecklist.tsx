@@ -20,8 +20,11 @@ export function TodayTasks({
   onToggle,
   togglingId,
   className,
+  dayLabel = '오늘',
 }: {
   className?: string
+  /** 홈에서 다른 날을 보고 있으면 "이날" */
+  dayLabel?: string
   today: string
   tasks: TimeBlockTask[]
   onToggle: (t: TimeBlockTask) => void
@@ -46,7 +49,7 @@ export function TodayTasks({
       <div className={BODY}>
         {tasks.length === 0 ? (
           <p className="text-ink-3 py-4 text-sm">
-            오늘로 정한 할 일이 없어요.{' '}
+            {dayLabel}로 정한 할 일이 없어요.{' '}
             <Link href="/tasks/new" className="text-brand font-semibold">
               할 일을 추가해 보세요
             </Link>
@@ -54,7 +57,7 @@ export function TodayTasks({
         ) : (
           <>
             {todo.length === 0 ? (
-              <p className="text-success py-2 text-[14px] font-semibold">오늘 할 일을 모두 끝냈어요 🎉</p>
+              <p className="text-success py-2 text-[14px] font-semibold">{dayLabel} 할 일을 모두 끝냈어요 🎉</p>
             ) : (
               <ul className="-my-1">
                 {todo.map((t) => (
@@ -98,8 +101,10 @@ export function TodayRoutines({
   onToggleHabit,
   togglingId,
   className,
+  dayLabel = '오늘',
 }: {
   className?: string
+  dayLabel?: string
   today: string
   routines: TimeBlockTask[]
   habits: HabitHome | undefined
@@ -120,7 +125,7 @@ export function TodayRoutines({
       <div className={BODY}>
         {total === 0 ? (
           <p className="text-ink-3 py-4 text-sm">
-            오늘 할 루틴이 없어요.{' '}
+            {dayLabel} 할 루틴이 없어요.{' '}
             <Link href="/goal" className="text-brand font-semibold">
               생활 습관 추가하기
             </Link>
