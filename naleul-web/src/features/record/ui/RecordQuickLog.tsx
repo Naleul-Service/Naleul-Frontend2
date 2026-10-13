@@ -20,7 +20,7 @@ const EXAMPLES = ['주간 회의 1시간', '오후 2시 기획서 작성 2시간
  *  - "어제 코드 리뷰 30분"       → 어제
  * 목표가 이미 정해져 있으니 AI 없이 바로 저장해요 (그래서 빨라요).
  */
-export function RecordQuickLog({ goal }: { goal: GoalCategory }) {
+export function RecordQuickLog({ goal, bare = false }: { goal: GoalCategory; bare?: boolean }) {
   const [text, setText] = useState('')
   const log = useLogActivities()
   const value = text.trim()
@@ -56,10 +56,12 @@ export function RecordQuickLog({ goal }: { goal: GoalCategory }) {
     }
   }
 
+  // bare: 다른 카드(업무형 보드의 "적기" 패널) 안에 넣을 때 — 카드 · 제목 없이
+  const Wrap = bare ? 'div' : Card
   return (
-    <Card className="p-5 sm:p-6">
-      <h2 className="text-[17px] font-bold">오늘 한 일 기록하기</h2>
-      <p className="text-ink-3 mt-1 text-[13px]">
+    <Wrap className={bare ? undefined : 'p-5 sm:p-6'}>
+      {!bare && <h2 className="text-[17px] font-bold">오늘 한 일 기록하기</h2>}
+      <p className={bare ? 'text-ink-3 text-[13px]' : 'text-ink-3 mt-1 text-[13px]'}>
         한 줄로 적으면 시각·걸린 시간을 알아서 읽어요. 시각이 없으면 방금 끝낸 일로 기록돼요.
       </p>
 
@@ -112,6 +114,6 @@ export function RecordQuickLog({ goal }: { goal: GoalCategory }) {
           ))
         )}
       </div>
-    </Card>
+    </Wrap>
   )
 }

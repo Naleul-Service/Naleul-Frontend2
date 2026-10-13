@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useState, type DragEvent, type KeyboardEvent } from 'react'
+import { Fragment, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type RefObject } from 'react'
 import {
   AlertTriangle,
   Check,
@@ -9,7 +9,10 @@ import {
   Flag,
   ListTodo,
   Loader,
+  MessageSquareText,
   Pencil,
+  PencilLine,
+  PenLine,
   Plus,
   Share2,
   Trash2,
@@ -22,6 +25,10 @@ import { cn } from '@/lib/cn'
 import type { GoalCategory } from '@/features/goal/api'
 import { inlineInput } from '@/features/goal/edit/inline'
 import { Section } from '@/features/goal/ui/sections'
+import { GoalNotes } from '@/features/goal/ui/GoalHeader'
+import { RoutinesSection } from '@/features/goal/ui/RoutinesSection'
+import { RecordJournal } from '@/features/record/ui/RecordJournal'
+import { RecordQuickLog } from '@/features/record/ui/RecordQuickLog'
 import { todayKst, weekdayIndex, WEEKDAY_LABEL } from '@/features/timetable/time'
 import {
   useCreateWorkRetro,
@@ -268,16 +275,124 @@ function TopicEditor({ goalId, topic, onDone }: { goalId: number; topic: WorkTop
   )
 }
 
+/** 로드맵 주제 아래 할 일 한 줄 — 체크하면 완료, 이름을 누르면 자세히 */
+function RoadmapTask({
+  task,
+  today,
+  onOpen,
+  onToggle,
+}: {
+  task: WorkTask
+  today: string
+  onOpen: () => void
+  onToggle: () => void
+}) {
+  const done = task.status === 'DONE'
+  return (
+    <li className="flex items-start gap-2.5 py-1">
+      <span className="pt-px">
+        <CheckButton task={task} onToggle={onToggle} small />
+      </span>
+      <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+        <span className={cn('block text-[14px] leading-5', done ? 'text-ink-3 line-through' : 'font-medium')}>
+          {task.emoji ? `${task.emoji} ` : ''}
+          {task.taskName}
+        </span>
+        {!done && <TaskMeta task={task} today={today} showTopic={false} />}
+      </button>
+    </li>
+  )
+}
+
+/** 주제에 딸린 할 일 — 남은 일은 펼치고, 끝낸 일은 접어 둬요 */
+function TopicTasks({
+  open,
+  done,
+  today,
+  collapsed,
+  onOpen,
+  onToggle,
+  onAdd,
+}: {
+  open: WorkTask[]
+  done: WorkTask[]
+  today: string
+  /** 끝난 주제는 할 일을 접어서 시작 */
+  collapsed: boolean
+  onOpen: (t: WorkTask) => void
+  onToggle: (t: WorkTask) => void
+  onAdd: () => void
+}) {
+  const [showOpen, setShowOpen] = useState(!collapsed)
+  const [showDone, setShowDone] = useState(false)
+  return (
+    <div className="mt-2">
+      {open.length > 0 &&
+        (showOpen ? (
+          <ul className="border-line bg-subtle/40 rounded-xl border px-3 py-1.5">
+            {open.map((t) => (
+              <RoadmapTask
+                key={t.taskId}
+                task={t}
+                today={today}
+                onOpen={() => onOpen(t)}
+                onToggle={() => onToggle(t)}
+              />
+            ))}
+          </ul>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setShowOpen(true)}
+            className="text-ink-3 hover:text-ink text-[12px] font-semibold"
+          >
+            남은 할 일 {open.length}개 보기
+          </button>
+        ))}
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <button
+          type="button"
+          onClick={onAdd}
+          className="text-ink-3 hover:text-brand flex items-center gap-0.5 text-[12px] font-semibold"
+        >
+          <Plus className="size-3.5" />할 일
+        </button>
+        {done.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowDone((v) => !v)}
+            aria-expanded={showDone}
+            className="text-success flex items-center gap-0.5 text-[12px] font-semibold"
+          >
+            끝낸 일 {done.length}
+            <ChevronDown className={cn('size-3.5 transition-transform', showDone && 'rotate-180')} />
+          </button>
+        )}
+      </div>
+      {showDone && done.length > 0 && (
+        <ul className="mt-1">
+          {done.map((t) => (
+            <RoadmapTask key={t.taskId} task={t} today={today} onOpen={() => onOpen(t)} onToggle={() => onToggle(t)} />
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function RoadmapItem({
   goalId,
   topic: t,
   selected,
   onSelect,
+  children,
 }: {
   goalId: number
   topic: WorkTopic
   selected: boolean
   onSelect: () => void
+  /** 주제 아래 할 일 목록 (로드맵 점과 점 사이) */
+  children?: React.ReactNode
 }) {
   const update = useUpdateWorkTopic(goalId)
   const [editing, setEditing] = useState(false)
@@ -372,6 +487,22 @@ function RoadmapItem({
           </div>
         )}
         {editing && <TopicEditor goalId={goalId} topic={t} onDone={() => setEditing(false)} />}
+        {children}
+      </div>
+    </li>
+  )
+}
+
+/** "주제 없음" 할 일 — 로드맵 맨 끝(🏁 앞)에 점선 점으로 */
+function NoTopicItem({ children, count }: { children: React.ReactNode; count: number }) {
+  return (
+    <li className="relative flex gap-3 pb-5">
+      <span aria-hidden className="bg-line absolute top-7 bottom-0 left-[13px] w-0.5" />
+      <span className="border-line-strong bg-surface relative z-[1] size-7 shrink-0 rounded-full border-2 border-dotted" />
+      <div className="min-w-0 flex-1 pt-0.5">
+        <p className="text-ink-2 text-[15px] leading-snug font-bold">주제 없음</p>
+        <p className="text-ink-3 mt-0.5 text-[12px]">아직 주제를 정하지 않은 할 일 {count}개</p>
+        {children}
       </div>
     </li>
   )
@@ -475,13 +606,31 @@ function Roadmap({
   board,
   filter,
   onFilter,
+  onOpen,
+  onToggle,
+  onAdd,
 }: {
   goalId: number
   board: WorkBoard
   filter: TopicFilter
   onFilter: (f: TopicFilter) => void
+  onOpen: (t: WorkTask) => void
+  onToggle: (t: WorkTask) => void
+  /** 이 주제(null = 주제 없음)에 할 일 적기 — 오른쪽 "적기" 패널로 */
+  onAdd: (topicId: number | null) => void
 }) {
   const { timeline, today, summary: s } = board
+  // 주제별 할 일 — 진행 중을 위로, 그다음 마감 · 하는 날 순 (보드 칸 순서 그대로)
+  const byTopic = useMemo(() => {
+    const open = new Map<number | null, WorkTask[]>()
+    const done = new Map<number | null, WorkTask[]>()
+    const push = (m: Map<number | null, WorkTask[]>, t: WorkTask) => m.set(t.topicId, [...(m.get(t.topicId) ?? []), t])
+    board.board.inProgress.forEach((t) => push(open, t))
+    board.board.notStarted.forEach((t) => push(open, t))
+    board.board.done.forEach((t) => push(done, t))
+    return { open, done }
+  }, [board])
+  const noTopicOpen = byTopic.open.get(null) ?? []
   // "오늘" 표시는 마감이 오늘 이후인 첫 주제 앞 (마감 없는 주제는 맨 뒤라 그 앞)
   const todayAt = (() => {
     const i = timeline.findIndex((t) => t.dueDate === null || t.dueDate >= today)
@@ -504,10 +653,33 @@ function Roadmap({
                 topic={t}
                 selected={filter === t.topicId}
                 onSelect={() => onFilter(filter === t.topicId ? 'ALL' : t.topicId!)}
-              />
+              >
+                <TopicTasks
+                  open={byTopic.open.get(t.topicId) ?? []}
+                  done={byTopic.done.get(t.topicId) ?? []}
+                  today={today}
+                  collapsed={t.status === 'DONE'}
+                  onOpen={onOpen}
+                  onToggle={onToggle}
+                  onAdd={() => onAdd(t.topicId)}
+                />
+              </RoadmapItem>
             </Fragment>
           ))}
           {todayAt === timeline.length && <TodayMarker />}
+          {noTopicOpen.length > 0 && (
+            <NoTopicItem count={noTopicOpen.length}>
+              <TopicTasks
+                open={noTopicOpen}
+                done={[]}
+                today={today}
+                collapsed={false}
+                onOpen={onOpen}
+                onToggle={onToggle}
+                onAdd={() => onAdd(null)}
+              />
+            </NoTopicItem>
+          )}
           <li className="flex items-center gap-3">
             <span className="bg-ink text-on-ink grid size-7 shrink-0 place-items-center rounded-full">
               <Flag className="size-3.5" />
@@ -523,7 +695,7 @@ function Roadmap({
       </div>
       {timeline.length > 0 && (
         <p className="text-ink-4 mt-2 text-[11px]">
-          점을 누르면 &lsquo;끝냈어요&rsquo;로 표시돼요 · 이름을 누르면 보드에서 그 주제만 봐요
+          주제 점을 누르면 &lsquo;끝냈어요&rsquo;로 표시돼요 · 주제 이름을 누르면 아래 보드에서 그 주제만 봐요
         </p>
       )}
     </Section>
@@ -532,7 +704,7 @@ function Roadmap({
 
 // ─── 2. Task 한 줄 (오늘 · 마감 임박 · 할 일 목록) ───────────────────
 
-function CheckButton({ task, onToggle }: { task: WorkTask; onToggle: () => void }) {
+function CheckButton({ task, onToggle, small = false }: { task: WorkTask; onToggle: () => void; small?: boolean }) {
   const done = task.status === 'DONE'
   return (
     <button
@@ -541,11 +713,12 @@ function CheckButton({ task, onToggle }: { task: WorkTask; onToggle: () => void 
       aria-pressed={done}
       aria-label={`${task.taskName} ${done ? '완료 취소' : '완료'}`}
       className={cn(
-        'grid size-6 shrink-0 place-items-center rounded-full border-2 transition-colors',
+        'grid shrink-0 place-items-center rounded-full border-2 transition-colors',
+        small ? 'size-5' : 'size-6',
         done ? 'border-brand bg-brand text-white' : 'border-line-strong hover:border-brand text-transparent'
       )}
     >
-      <Check className="size-3.5" strokeWidth={3} />
+      <Check className={small ? 'size-3' : 'size-3.5'} strokeWidth={3} />
     </button>
   )
 }
@@ -570,50 +743,27 @@ function TaskMeta({ task, today, showTopic = true }: { task: WorkTask; today: st
   )
 }
 
-function TaskLine({
-  task,
-  today,
-  onOpen,
-  onToggle,
-}: {
-  task: WorkTask
-  today: string
-  onOpen: () => void
-  onToggle: () => void
-}) {
-  return (
-    <li className="flex items-start gap-3 py-2.5">
-      <span className="pt-0.5">
-        <CheckButton task={task} onToggle={onToggle} />
-      </span>
-      <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
-        <span className={cn('block text-[14px] font-semibold', task.status === 'DONE' && 'text-ink-3 line-through')}>
-          {task.emoji ? `${task.emoji} ` : ''}
-          {task.taskName}
-        </span>
-        <TaskMeta task={task} today={today} />
-      </button>
-    </li>
-  )
-}
-
-// ─── 3. 빠른 추가 (브레인덤프처럼 여러 줄) ────────────────────────────
+// ─── 3. 적기 패널 (할 일 · 한 일 · 회고) ─────────────────────────────
 
 type WhenOption = 'BACKLOG' | 'TODAY' | 'DATE'
 
-function QuickAdd({
+/** 할 일 적기 — 브레인덤프처럼 여러 줄을 붙여 넣으면 한 번에 추가 */
+function TaskCompose({
   goalId,
   topics,
-  defaultTopic,
+  topicId,
+  onTopic,
+  inputRef,
 }: {
   goalId: number
   topics: WorkTopic[]
-  defaultTopic: TopicFilter
+  topicId: number | null
+  onTopic: (id: number | null) => void
+  inputRef: RefObject<HTMLTextAreaElement | null>
 }) {
   const one = useCreateWorkTask(goalId)
   const many = useCreateWorkTasks(goalId)
   const [text, setText] = useState('')
-  const [topicId, setTopicId] = useState<number | null>(typeof defaultTopic === 'number' ? defaultTopic : null)
   const [when, setWhen] = useState<WhenOption>('BACKLOG')
   const [date, setDate] = useState('')
   const [dueDate, setDueDate] = useState('')
@@ -640,34 +790,34 @@ function QuickAdd({
   }
 
   return (
-    <Card className="p-4 sm:p-5">
-      <label htmlFor="work-quick-add" className="flex items-center gap-1.5 text-[15px] font-bold">
-        <ListTodo className="size-4" />
-        해야 할 일 적기
-      </label>
+    <div>
+      <select
+        value={topicId ?? ''}
+        onChange={(e) => onTopic(e.target.value ? Number(e.target.value) : null)}
+        aria-label="주제"
+        className="border-line-strong bg-surface h-9 w-full rounded-xl border px-2.5 text-[14px] font-semibold"
+      >
+        <option value="">주제 없음</option>
+        {realTopics.map((t) => (
+          <option key={t.topicId} value={t.topicId!}>
+            {t.emoji ? `${t.emoji} ` : ''}
+            {t.name}
+            {t.dueDate ? ` (~${shortDate(t.dueDate)})` : ''}
+          </option>
+        ))}
+      </select>
       <textarea
+        ref={inputRef}
         id="work-quick-add"
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKey}
-        rows={Math.min(Math.max(lines.length + 1, 3), 8)}
-        placeholder={'떠오르는 대로 한 줄에 하나씩 적어 주세요\n여러 줄을 붙여 넣으면 한 번에 추가돼요'}
+        rows={Math.min(Math.max(lines.length + 1, 4), 10)}
+        placeholder={'해야 할 일을 한 줄에 하나씩 적어 주세요\n여러 줄을 붙여 넣으면 한 번에 추가돼요'}
+        aria-label="해야 할 일"
         className={`${inlineInput} mt-2 h-auto resize-none py-2.5 leading-relaxed`}
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <select
-          value={topicId ?? ''}
-          onChange={(e) => setTopicId(e.target.value ? Number(e.target.value) : null)}
-          aria-label="주제"
-          className="border-line-strong bg-surface h-8 rounded-lg border px-2 text-[13px]"
-        >
-          <option value="">주제 없음</option>
-          {realTopics.map((t) => (
-            <option key={t.topicId} value={t.topicId!}>
-              {t.name}
-            </option>
-          ))}
-        </select>
         <div className="bg-subtle inline-flex rounded-lg p-0.5" role="radiogroup" aria-label="언제 할지">
           {(
             [
@@ -709,19 +859,146 @@ function QuickAdd({
             className="border-line-strong bg-surface text-ink h-8 rounded-lg border px-2 text-[13px]"
           />
         </label>
-        <Button
-          size="sm"
-          className="ml-auto"
-          loading={saving}
-          disabled={!lines.length || (when === 'DATE' && !date)}
-          onClick={submit}
-        >
-          {lines.length > 1 ? `${lines.length}개 추가` : '추가'}
-        </Button>
       </div>
-      <p className="text-ink-4 mt-1.5 text-[11px]">
-        Enter 추가 · Shift+Enter 줄바꿈 · &lsquo;나중에&rsquo;는 캘린더에 안 올리고 할 일 목록에만 담아요
+      <Button
+        className="mt-3"
+        fullWidth
+        loading={saving}
+        disabled={!lines.length || (when === 'DATE' && !date)}
+        onClick={submit}
+      >
+        {lines.length > 1 ? `${lines.length}개 추가` : '할 일 추가'}
+      </Button>
+      <p className="text-ink-4 mt-1.5 text-[11px] leading-relaxed">
+        Enter 추가 · Shift+Enter 줄바꿈 · &lsquo;나중에&rsquo;는 캘린더에 안 올리고 로드맵 · 보드에만 담아요
       </p>
+    </div>
+  )
+}
+
+/** 회고 적기 + 최근 회고 */
+function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
+  const create = useCreateWorkRetro(goalId)
+  const remove = useDeleteWorkRetro(goalId)
+  const [text, setText] = useState('')
+  const submit = () => {
+    if (!text.trim() || create.isPending) return
+    create.mutate(text.trim(), { onSuccess: () => setText('') })
+  }
+  return (
+    <div>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault()
+            submit()
+          }
+        }}
+        rows={4}
+        aria-label="회고"
+        placeholder="오늘 일하며 배운 점 · 막힌 점 · 다음에 바꿀 점"
+        className={`${inlineInput} h-auto resize-none py-2.5 leading-relaxed`}
+      />
+      <Button className="mt-3" fullWidth loading={create.isPending} disabled={!text.trim()} onClick={submit}>
+        회고 남기기
+      </Button>
+      {board.retrospectives.length > 0 && (
+        <>
+          <p className="text-ink-3 mt-4 mb-1 text-[12px] font-semibold">최근 회고</p>
+          <ul className="divide-line divide-y">
+            {board.retrospectives.map((r) => (
+              <li key={r.retrospectiveId} className="group flex gap-2 py-2">
+                <span className="text-ink-3 w-12 shrink-0 text-[12px] leading-5">
+                  {dayLabel(r.reviewDate, board.today)}
+                </span>
+                <p className="min-w-0 flex-1 text-[13px] leading-5 whitespace-pre-wrap">{r.content}</p>
+                <button
+                  type="button"
+                  onClick={() => remove.mutate(r.retrospectiveId)}
+                  aria-label="회고 지우기"
+                  className="text-ink-4 hover:text-danger shrink-0 self-start p-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                >
+                  <Trash2 className="size-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
+type ComposeTab = 'task' | 'log' | 'retro'
+
+const COMPOSE_TABS: { value: ComposeTab; label: string; icon: typeof Check }[] = [
+  { value: 'task', label: '할 일', icon: ListTodo },
+  { value: 'log', label: '한 일', icon: PenLine },
+  { value: 'retro', label: '회고', icon: MessageSquareText },
+]
+
+/**
+ * 적기 패널 — 할 일 · 실제로 한 일 · 회고를 한곳에서 적어요 (넓은 화면에선 오른쪽에 붙어 있어요).
+ * 화면 가운데에 입력창이 흩어져 있으면 "여기에 적는 건가?" 헷갈려서 한데 모았어요.
+ */
+function ComposePanel({
+  goal,
+  board,
+  tab,
+  onTab,
+  topicId,
+  onTopic,
+  inputRef,
+}: {
+  goal: GoalCategory
+  board: WorkBoard
+  tab: ComposeTab
+  onTab: (t: ComposeTab) => void
+  topicId: number | null
+  onTopic: (id: number | null) => void
+  inputRef: RefObject<HTMLTextAreaElement | null>
+}) {
+  return (
+    <Card id="work-compose" className="scroll-mt-4 p-4 sm:p-5">
+      <h2 className="flex items-center gap-1.5 text-[17px] font-bold">
+        <PencilLine className="size-4" />
+        적기
+      </h2>
+      <div className="bg-subtle mt-3 grid grid-cols-3 rounded-xl p-1" role="tablist" aria-label="무엇을 적을지">
+        {COMPOSE_TABS.map(({ value, label, icon: Icon }) => (
+          <button
+            key={value}
+            type="button"
+            role="tab"
+            aria-selected={tab === value}
+            onClick={() => onTab(value)}
+            className={cn(
+              'flex h-9 items-center justify-center gap-1 rounded-lg text-[13px] font-semibold transition-colors',
+              tab === value ? 'bg-surface text-ink shadow-sm' : 'text-ink-3 hover:text-ink-2'
+            )}
+          >
+            <Icon className="size-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-4">
+        {tab === 'task' ? (
+          <TaskCompose
+            goalId={goal.goalCategoryId}
+            topics={board.topics}
+            topicId={topicId}
+            onTopic={onTopic}
+            inputRef={inputRef}
+          />
+        ) : tab === 'log' ? (
+          <RecordQuickLog goal={goal} bare />
+        ) : (
+          <RetroCompose goalId={goal.goalCategoryId} board={board} />
+        )}
+      </div>
     </Card>
   )
 }
@@ -922,125 +1199,17 @@ function Kanban({
   )
 }
 
-// ─── 6. 아카이브 · 회고 ──────────────────────────────────────────
-
-function ArchiveSection({ board, onOpen }: { board: WorkBoard; onOpen: (t: WorkTask) => void }) {
-  const [openDays, setOpenDays] = useState<Set<string>>(() => new Set(board.archive.slice(0, 2).map((d) => d.date)))
-  const total = board.archive.reduce((n, d) => n + d.count, 0)
-  return (
-    <Section title="해 온 일" aside={total ? `최근 30일 ${total}개` : undefined}>
-      {board.archive.length === 0 ? (
-        <p className="text-ink-3 text-sm">완료한 Task가 날짜별로 여기 쌓여요.</p>
-      ) : (
-        <ol className="space-y-1">
-          {board.archive.map((d) => {
-            const open = openDays.has(d.date)
-            return (
-              <li key={d.date}>
-                <button
-                  type="button"
-                  aria-expanded={open}
-                  onClick={() =>
-                    setOpenDays((s) => {
-                      const n = new Set(s)
-                      if (n.has(d.date)) n.delete(d.date)
-                      else n.add(d.date)
-                      return n
-                    })
-                  }
-                  className="hover:bg-subtle flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[13px]"
-                >
-                  <span className="font-semibold">{dayLabel(d.date, board.today)}</span>
-                  <span className="text-ink-3">{d.count}개</span>
-                  <ChevronDown className={cn('text-ink-3 ml-auto size-4 transition-transform', open && 'rotate-180')} />
-                </button>
-                {open && (
-                  <ul className="border-line mb-2 ml-3 border-l pl-3">
-                    {d.tasks.map((t) => (
-                      <li key={t.taskId}>
-                        <button
-                          type="button"
-                          onClick={() => onOpen(t)}
-                          className="text-ink-2 hover:text-ink flex w-full items-center gap-2 py-1 text-left text-[13px]"
-                        >
-                          <Check className="text-success size-3.5 shrink-0" strokeWidth={3} />
-                          <span className="min-w-0 flex-1 truncate">{t.taskName}</span>
-                          {t.topicName && <span className="text-ink-4 shrink-0 text-[11px]">{t.topicName}</span>}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </li>
-            )
-          })}
-        </ol>
-      )}
-    </Section>
-  )
-}
-
-function RetroSection({ goalId, board }: { goalId: number; board: WorkBoard }) {
-  const create = useCreateWorkRetro(goalId)
-  const remove = useDeleteWorkRetro(goalId)
-  const [text, setText] = useState('')
-  const submit = () => {
-    if (!text.trim() || create.isPending) return
-    create.mutate(text.trim(), { onSuccess: () => setText('') })
-  }
-  return (
-    <Section title="회고">
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-            e.preventDefault()
-            submit()
-          }
-        }}
-        rows={3}
-        placeholder="오늘 일하며 배운 점 · 막힌 점 · 다음에 바꿀 점"
-        className={`${inlineInput} h-auto resize-none py-2 leading-relaxed`}
-      />
-      <div className="mt-2 flex justify-end">
-        <Button size="sm" loading={create.isPending} disabled={!text.trim()} onClick={submit}>
-          회고 남기기
-        </Button>
-      </div>
-      {board.retrospectives.length > 0 && (
-        <ul className="divide-line mt-3 divide-y">
-          {board.retrospectives.map((r) => (
-            <li key={r.retrospectiveId} className="group flex gap-3 py-2.5">
-              <span className="text-ink-3 w-14 shrink-0 text-[12px] leading-5">
-                {dayLabel(r.reviewDate, board.today)}
-              </span>
-              <p className="min-w-0 flex-1 text-[13px] leading-5 whitespace-pre-wrap">{r.content}</p>
-              <button
-                type="button"
-                onClick={() => remove.mutate(r.retrospectiveId)}
-                aria-label="회고 지우기"
-                className="text-ink-4 hover:text-danger shrink-0 self-start p-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
-              >
-                <Trash2 className="size-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Section>
-  )
-}
-
 // ─── 화면 ──────────────────────────────────────────────────────
 
 /**
  * 업무형 목표의 "보드" 탭. 업무형은 목표 전체 마감이 없고 주제마다 마감이 있어요 (V53).
- *  1. 다음 마감 · 진행 요약 + 로드맵 (주제를 마감 순서대로 세로 선 위에)
- *  2. 오늘 할 일 · 마감 임박 — 상세를 열자마자 "오늘 뭘 해야 하지?"에 답해요
- *  3. 해야 할 일 적기 — 여러 줄을 붙여 넣으면 한 번에 추가
- *  4. 주제 + 보드 (시작 전 · 진행 중 · 완료) — 끌어서 옮기기
- *  5. 해 온 일 (날짜별 아카이브) · 회고
+ *  왼쪽(넓게)
+ *   1. 다음 마감 · 진행 요약
+ *   2. 로드맵 — 주제를 마감 순서대로 세로 선 위에, 점과 점 사이에 그 주제의 남은 할 일
+ *   3. 보드 (시작 전 · 진행 중 · 완료) — 끌어서 옮기기
+ *   4. 업무 일지 (완료한 Task + 직접 남긴 기록) · 루틴 · 메모
+ *  오른쪽(붙어 있는 패널): 적기 — 할 일 · 한 일 · 회고 입력을 한곳에
+ * 오늘 할 일 · 마감 임박은 홈에서 모든 목표를 모아 보여줘서 여기선 뺐어요.
  */
 export function WorkBoardView({ goal }: { goal: GoalCategory }) {
   const goalId = goal.goalCategoryId
@@ -1049,7 +1218,9 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
   const [filter, setFilter] = useState<TopicFilter>('ALL')
   const [opened, setOpened] = useState<WorkTask | null>(null)
   const [sharing, setSharing] = useState(false)
-  const [showDoneToday, setShowDoneToday] = useState(false)
+  const [composeTab, setComposeTab] = useState<ComposeTab>('task')
+  const [composeTopic, setComposeTopic] = useState<number | null>(null)
+  const composeInput = useRef<HTMLTextAreaElement>(null)
 
   if (isPending) {
     return (
@@ -1072,119 +1243,84 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
 
   const toggle = (t: WorkTask) => {
     if (t.routine) {
-      // 루틴 Task 는 보드 칸이 없어서 상세에서 처리 (업무 일지 탭)
+      // 루틴 Task 는 보드 칸이 없어서 상세 창에서 처리
       setOpened(t)
       return
     }
     move.mutate({ task: t, to: t.status === 'DONE' ? 'NOT_STARTED' : 'DONE' })
   }
-  const today = board.today
   // 로드맵에서 주제를 고르면 보드가 그 주제만 보여주고, 보드로 내려가요
   const pickTopic = (f: TopicFilter) => {
     setFilter(f)
     if (f !== 'ALL') document.getElementById('work-board')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  // 로드맵 "+ 할 일" → 적기 패널을 그 주제로 맞추고 입력창에 커서
+  const composeFor = (topicId: number | null) => {
+    setComposeTab('task')
+    setComposeTopic(topicId)
+    requestAnimationFrame(() => {
+      const el = composeInput.current
+      if (!el) return
+      // 넓은 화면은 패널이 옆에 붙어 있어 바로 보이고, 좁은 화면은 위에 있어서 올라가요
+      if (el.getBoundingClientRect().top < 0 || el.getBoundingClientRect().bottom > window.innerHeight) {
+        document.getElementById('work-compose')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+      el.focus({ preventScroll: true })
+    })
   }
 
   return (
     <div className="space-y-5">
       <SummaryHero board={board} onShare={() => setSharing(true)} />
 
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <Roadmap goalId={goalId} board={board} filter={filter} onFilter={pickTopic} />
-        <div className="space-y-5">
-          <Section title="오늘 할 일" aside={board.todayTasks.length ? `${board.todayTasks.length}개` : undefined}>
-            {board.todayTasks.length === 0 ? (
-              <p className="text-ink-3 text-sm">
-                오늘로 정한 일이 없어요. 아래 보드에서 할 일을 골라 &lsquo;오늘 하기&rsquo;로 정해 보세요.
-              </p>
-            ) : (
-              <ul className="divide-line -my-1 divide-y">
-                {board.todayTasks.map((t) => (
-                  <TaskLine
-                    key={t.taskId}
-                    task={t}
-                    today={today}
-                    onOpen={() => setOpened(t)}
-                    onToggle={() => toggle(t)}
-                  />
-                ))}
-              </ul>
-            )}
-            {board.doneToday.length > 0 && (
-              <div className="border-line mt-3 border-t pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowDoneToday((v) => !v)}
-                  aria-expanded={showDoneToday}
-                  className="text-success flex items-center gap-1 text-[13px] font-semibold"
-                >
-                  오늘 끝낸 일 {board.doneToday.length}
-                  <ChevronDown className={cn('size-4 transition-transform', showDoneToday && 'rotate-180')} />
-                </button>
-                {showDoneToday && (
-                  <ul className="divide-line divide-y">
-                    {board.doneToday.map((t) => (
-                      <TaskLine
-                        key={t.taskId}
-                        task={t}
-                        today={today}
-                        onOpen={() => setOpened(t)}
-                        onToggle={() => toggle(t)}
-                      />
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-          </Section>
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        {/* 적기 — 좁은 화면에선 맨 위, 넓은 화면에선 오른쪽에 붙어서 따라와요 */}
+        <aside className="lg:sticky lg:top-4 lg:order-last">
+          <ComposePanel
+            goal={goal}
+            board={board}
+            tab={composeTab}
+            onTab={setComposeTab}
+            topicId={composeTopic}
+            onTopic={setComposeTopic}
+            inputRef={composeInput}
+          />
+        </aside>
 
-          <Section title="마감 임박" aside="앞으로 2주">
-            {board.upcoming.length === 0 ? (
-              <p className="text-ink-3 text-sm">2주 안에 마감인 일이 없어요. Task에 마감을 정하면 여기 보여요.</p>
-            ) : (
-              <ul className="divide-line -my-1 divide-y">
-                {board.upcoming.map((t) => (
-                  <li key={t.taskId} className="flex items-center gap-3 py-2.5">
-                    <span
-                      className={cn(
-                        'grid h-9 w-12 shrink-0 place-items-center rounded-lg text-[12px] font-bold tabular-nums',
-                        t.dueInDays! <= 2 ? 'bg-warning-soft text-warning-ink' : 'bg-subtle text-ink-2'
-                      )}
-                    >
-                      D-{t.dueInDays}
-                    </span>
-                    <button type="button" onClick={() => setOpened(t)} className="min-w-0 flex-1 text-left">
-                      <span className="block truncate text-[14px] font-semibold">{t.taskName}</span>
-                      <span className="text-ink-3 text-[12px]">
-                        {t.dueDate && `${dayLabel(t.dueDate, today)} 마감`}
-                        {t.topicName && ` · ${t.topicName}`}
-                        {t.status === 'IN_PROGRESS' && ' · 진행 중'}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
+        <div className="min-w-0 space-y-5">
+          <Roadmap
+            goalId={goalId}
+            board={board}
+            filter={filter}
+            onFilter={pickTopic}
+            onOpen={setOpened}
+            onToggle={toggle}
+            onAdd={composeFor}
+          />
+
+          <Card id="work-board" className="scroll-mt-4 p-4 sm:p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-[17px] font-bold">보드</h2>
+              <span className="text-ink-3 text-[12px]">카드를 끌어서 칸을 옮기거나, 눌러서 자세히 고쳐요</span>
+            </div>
+            <TopicBar topics={board.topics} filter={filter} onFilter={setFilter} />
+            <div className="mt-4">
+              <Kanban
+                board={board}
+                filter={filter}
+                onOpen={setOpened}
+                onMove={(task, to) => move.mutate({ task, to })}
+              />
+            </div>
+          </Card>
+
+          <RecordJournal goalId={goalId} goalName={goal.goalCategoryName} />
+
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 xl:grid-cols-2">
+            <RoutinesSection goal={goal} />
+            <GoalNotes goal={goal} />
+          </div>
         </div>
-      </div>
-
-      <QuickAdd key={String(filter)} goalId={goalId} topics={board.topics} defaultTopic={filter} />
-
-      <Card id="work-board" className="scroll-mt-4 p-4 sm:p-5">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-[17px] font-bold">보드</h2>
-          <span className="text-ink-3 text-[12px]">카드를 끌어서 칸을 옮기거나, 눌러서 자세히 고쳐요</span>
-        </div>
-        <TopicBar topics={board.topics} filter={filter} onFilter={setFilter} />
-        <div className="mt-4">
-          <Kanban board={board} filter={filter} onOpen={setOpened} onMove={(task, to) => move.mutate({ task, to })} />
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <ArchiveSection board={board} onOpen={setOpened} />
-        <RetroSection goalId={goalId} board={board} />
       </div>
 
       {opened && (

@@ -94,7 +94,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
               <NotebookPen className="size-4" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[14px] font-semibold">회사 업무나 사이드 프로젝트인가요?</span>
+              <span className="block text-[14px] font-semibold">회사 업무 · 취업 준비 · 동아리 활동인가요?</span>
               <span className="text-ink-3 block text-[13px]">
                 AI 설계 없이 바로 만들고, 완료한 Task로 업무 일지를 쌓는 업무형 목표가 더 잘 맞아요.
               </span>

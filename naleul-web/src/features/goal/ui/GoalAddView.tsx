@@ -189,7 +189,7 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
 }
 
 const HABIT_EXAMPLES = ['영양제 먹기', '물 2L 마시기', '샤워하기', '집안일 하기', '금연 · 금주', '일기 쓰기']
-const WORK_EXAMPLES = ['OO팀 업무', '신규 서비스 기획', '포트폴리오 앱 만들기', '취업 준비']
+const WORK_EXAMPLES = ['취업 준비', 'OO팀 업무', '동아리 활동', '사이드 프로젝트']
 const GOAL_EXAMPLES = ['3개월에 5kg 감량', 'SQLD 합격', '토익 900점', '1000만원 모으기', '올해 책 24권']
 
 function Examples({ items }: { items: string[] }) {
@@ -225,7 +225,7 @@ function HabitCardAction() {
 /**
  * /goal/add — 목표는 성격에 따라 세 가지 (V52)
  *  - 기본 생활 습관: 했는지만 체크하는 루틴. 모든 사용자에게 하나씩 이미 있어서 습관만 추가해요 (goal_mode = HABIT)
- *  - 업무형: 회사 업무 · 사이드 프로젝트. 마감(선택)까지 주제별 Task 보드로 관리 (goal_mode = RECORD)
+ *  - 업무형: 회사 업무 · 취업 준비 · 동아리 등. 주제마다 마감을 둔 로드맵 + Task 보드 (goal_mode = RECORD)
  *  - 목표형: 수치로 잴 수 있는 목표. AI 가 대화로 "어떻게 이룰지"를 묻고 기간별 루틴까지 계획 (/goal/new), 계획이 있으면 직접 입력
  */
 export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | 'record' | null }) {
@@ -264,7 +264,8 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
             업무형 <Badge tone="neutral">Task 관리</Badge>
           </p>
           <p className="text-ink-3 mt-1.5 text-sm leading-relaxed">
-            수치보다 해야 할 일이 많은 일이에요. 마감까지 오늘 할 일과 남은 일을 주제별 보드로 정리하고, 팀에 공유해요.
+            수치보다 해야 할 일이 많은 일이에요. 취업 준비 · 동아리 · 회사 업무처럼 단계(주제)마다 마감을 정하고 남은
+            일을 체크해요.
           </p>
           <Examples items={WORK_EXAMPLES} />
           <div className="mt-auto pt-5">

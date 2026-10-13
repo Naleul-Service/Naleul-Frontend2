@@ -11,7 +11,6 @@ import { HabitSummaryCard } from '@/features/habit/ui/HabitSummaryCard'
 import { useRecordPattern } from '@/features/record/api'
 import { useGoalCategories, type GoalCategory } from '../api'
 import { dDayLabel, formatDot, goalColor, isOngoing, periodProgress, statusLabel } from '../format'
-import { subOption } from '../kind'
 import { refineHref } from './RefineWithAiCard'
 
 /** 임시 목표 카드 — 보기 / AI로 구체화하기 */
@@ -206,7 +205,7 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
       )}
       <p className="text-ink-3 mt-3 text-xs">
         {goal.goalMode === 'RECORD'
-          ? `${goal.goalType === 'WORK' && goal.goalSubType ? subOption(goal.goalSubType).label : '업무형'} · 주제별 Task 보드${routineCount ? ` · 루틴 ${routineCount}개` : ''}`
+          ? `업무형 · 주제별 로드맵${routineCount ? ` · 루틴 ${routineCount}개` : ''}`
           : `목표형 · 루틴 ${routineCount}개`}
       </p>
     </Link>

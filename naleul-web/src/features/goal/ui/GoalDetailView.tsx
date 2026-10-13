@@ -3,14 +3,12 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { BarChart3, KanbanSquare, NotebookPen } from 'lucide-react'
+import { BarChart3, KanbanSquare } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { isApiError } from '@/lib/client/api'
 import { cn } from '@/lib/cn'
-import { RecordQuickLog } from '@/features/record/ui/RecordQuickLog'
-import { RecordJournal } from '@/features/record/ui/RecordJournal'
 import { RecordPatternSection } from '@/features/record/ui/pattern/RecordPatternSection'
 import { HabitView } from '@/features/habit/ui/HabitView'
 import { WorkBoardView } from '@/features/work/ui/WorkBoardView'
@@ -109,27 +107,25 @@ function Hero({ goal }: { goal: GoalCategory }) {
 
 // ─── 기록형 목표 ───────────────────────────────────────────────
 
-type RecordTab = 'board' | 'journal' | 'stats'
+type RecordTab = 'board' | 'stats'
 
-const RECORD_TABS: { value: RecordTab; label: string; icon: typeof NotebookPen }[] = [
+const RECORD_TABS: { value: RecordTab; label: string; icon: typeof KanbanSquare }[] = [
   { value: 'board', label: '보드', icon: KanbanSquare },
-  { value: 'journal', label: '업무 일지', icon: NotebookPen },
   { value: 'stats', label: '통계', icon: BarChart3 },
 ]
 
 /**
- * 업무형 목표 — 탭 세 개.
- *  - 보드(기본): 마감 · 오늘 할 일 · 마감 임박 · 주제별 Task 보드 · 해 온 일 · 회고 (V52)
- *  - 업무 일지: 오늘 한 일 한 줄 기록 + 업무 일지 | (선택) 메모 · 반복 루틴 · Task
- *  - 통계: 이 목표에 대한 나의 패턴 (완료한 Task 기준 그래프, 넓게)
- * 고른 탭은 주소(?tab=journal)에 남겨서 새로고침·공유해도 그대로예요.
+ * 업무형 목표 — 탭 두 개.
+ *  - 보드(기본): 다음 마감 · 로드맵(주제별 남은 할 일) · Task 보드 · 업무 일지 · 루틴 · 메모 + 오른쪽 "적기" 패널
+ *  - 통계: 이 목표에 대한 나의 패턴 + 루틴 실천
+ * 고른 탭은 주소(?tab=stats)에 남겨서 새로고침·공유해도 그대로예요. (예전 ?tab=journal 은 보드로)
  */
 function RecordGoalBody({ goal }: { goal: GoalCategory }) {
   const params = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
   const raw = params.get('tab')
-  const tab: RecordTab = raw === 'stats' || raw === 'journal' ? raw : 'board'
+  const tab: RecordTab = raw === 'stats' ? 'stats' : 'board'
 
   const setTab = (t: RecordTab) => {
     const next = new URLSearchParams(params)
@@ -166,28 +162,13 @@ function RecordGoalBody({ goal }: { goal: GoalCategory }) {
         <div id="record-panel-board" role="tabpanel" aria-labelledby="record-tab-board" className="mt-5">
           <WorkBoardView goal={goal} />
         </div>
-      ) : tab === 'journal' ? (
-        <div
-          id="record-panel-journal"
-          role="tabpanel"
-          aria-labelledby="record-tab-journal"
-          className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]"
-        >
-          <div className="space-y-5">
-            <RecordQuickLog goal={goal} />
-            <RecordJournal goalId={goal.goalCategoryId} goalName={goal.goalCategoryName} />
-          </div>
-          <div className="space-y-5">
-            <GoalNotes goal={goal} />
-            <RoutinesSection goal={goal} />
-            <RoutineHeatmapSection goal={goal} />
-            <GoalTaskList goal={goal} />
-          </div>
-        </div>
       ) : (
         <section id="record-panel-stats" role="tabpanel" aria-labelledby="record-tab-stats" className="mt-5">
           <h2 className="sr-only">이 목표에 대한 나의 패턴</h2>
-          <RecordPatternSection goalId={goal.goalCategoryId} />
+          <div className="space-y-5">
+            <RecordPatternSection goalId={goal.goalCategoryId} />
+            <RoutineHeatmapSection goal={goal} />
+          </div>
         </section>
       )}
     </>
