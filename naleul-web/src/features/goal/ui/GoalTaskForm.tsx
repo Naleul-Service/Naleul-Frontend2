@@ -192,20 +192,23 @@ export function GoalTaskForm({
                 className={inlineInput}
               />
             </Field>
-            <Field label="마일스톤" className="col-span-2 @md:col-span-1">
-              <select
-                value={f.milestone ?? ''}
-                onChange={(e) => set('milestone', e.target.value ? Number(e.target.value) : null)}
-                className={inlineInput}
-              >
-                <option value="">없음</option>
-                {milestones.map((m) => (
-                  <option key={m.milestoneId} value={m.milestoneId}>
-                    {m.title}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            {/* 마일스톤이 없는 목표(기본 생활 습관 · 업무형 등)에선 빈 칸만 보여서 숨겨요 */}
+            {(milestones.length > 0 || f.milestone !== null) && (
+              <Field label="마일스톤" className="col-span-2 @md:col-span-1">
+                <select
+                  value={f.milestone ?? ''}
+                  onChange={(e) => set('milestone', e.target.value ? Number(e.target.value) : null)}
+                  className={inlineInput}
+                >
+                  <option value="">없음</option>
+                  {milestones.map((m) => (
+                    <option key={m.milestoneId} value={m.milestoneId}>
+                      {m.title}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
           </div>
         </div>
       )}

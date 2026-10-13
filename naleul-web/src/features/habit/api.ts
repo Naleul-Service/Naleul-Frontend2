@@ -82,7 +82,9 @@ export interface HabitInput {
 export const habitKeys = {
   all: ['habits'] as const,
   home: (date?: string) => [...habitKeys.all, 'home', date ?? 'today'] as const,
-  heatmap: () => [...habitKeys.all, 'heatmap'] as const,
+  /** from 을 안 넣으면 접두사 — 체크하면 모든 기간의 잔디를 다시 불러와요 */
+  heatmap: (from?: string) =>
+    from ? ([...habitKeys.all, 'heatmap', from] as const) : ([...habitKeys.all, 'heatmap'] as const),
 }
 
 const errorMessage = (e: unknown) => (isApiError(e) ? e.message : '문제가 생겼어요. 다시 시도해 주세요.')
@@ -95,10 +97,12 @@ export function useHabitHome(date?: string) {
   })
 }
 
-export function useHabitHeatmap() {
+/** 잔디맵 — from(포함) ~ 오늘. 서버는 최대 400일까지 받아요 */
+export function useHabitHeatmap(from?: string, enabled = true) {
   return useQuery({
-    queryKey: habitKeys.heatmap(),
-    queryFn: () => api.get<HabitHeatmap>('/v1/habits/heatmap'),
+    queryKey: habitKeys.heatmap(from),
+    queryFn: () => api.get<HabitHeatmap>(`/v1/habits/heatmap${from ? `?from=${from}` : ''}`),
+    enabled,
   })
 }
 

@@ -35,6 +35,7 @@ import {
   type HabitDayState,
 } from '../api'
 import { HABIT_SUGGESTIONS, HabitForm } from './HabitForm'
+import { GoalTaskList } from '@/features/goal/ui/GoalTaskList'
 import { HabitHeatmap } from './HabitHeatmap'
 
 // ─── 표시 도우미 ───────────────────────────────────────────────
@@ -254,8 +255,9 @@ function AddHabit({ existing }: { existing: Habit[] }) {
 /**
  * 기본 생활 습관 (goalMode = HABIT) — 목표 상세 대신 이 화면을 보여줘요.
  *  - 위: 날짜(어제 · 그제도 체크할 수 있어요) + 오늘 몇 개 했는지
- *  - 가운데: 해야 하는 습관 체크 목록 · 오늘은 안 해도 되는 습관 · 쉬는 습관
- *  - 아래: 잔디맵
+ *  - 왼쪽: 해야 하는 습관 체크 목록 · 오늘은 안 해도 되는 습관 · 쉬는 습관
+ *  - 오른쪽: 일회성 할 일 (병원 가기 · 친구 만나기) — 습관과 달리 한 번 하고 끝나요
+ *  - 아래: 습관별 잔디 (추가한 달부터 한 달씩)
  */
 export function HabitView({ goal }: { goal: GoalCategory }) {
   const today = todayKst()
@@ -283,9 +285,11 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
         {goal.emoji ? `${goal.emoji} ` : ''}
         {goal.goalCategoryName}
       </h1>
-      <p className="text-ink-3 mt-1.5 text-sm">했는지만 체크하는 생활 루틴이에요. 잊기 쉬운 것들을 여기서 챙겨요.</p>
+      <p className="text-ink-3 mt-1.5 text-sm">
+        했는지만 체크하는 생활 습관과, 병원 가기처럼 한 번만 할 일을 여기서 챙겨요.
+      </p>
 
-      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card className="p-5 sm:p-6">
           {/* 날짜 + 진행 */}
           <div className="flex items-center gap-2">
@@ -392,8 +396,21 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
           {!isPending && !isError && <AddHabit existing={habits} />}
         </Card>
 
-        <HabitHeatmap />
+        <GoalTaskList
+          goal={goal}
+          title="할 일"
+          hint="병원 가기 · 친구 만나기처럼 한 번만 할 일이에요. 날짜만 정하면 캘린더 빈 시간에 넣어 드려요."
+          addLabel="할 일 추가"
+          emptyText="아직 할 일이 없어요. 위에서 바로 추가해 보세요."
+          initialPeriod="ALL"
+        />
       </div>
+
+      {!isPending && !isError && (
+        <div className="mt-5">
+          <HabitHeatmap habits={habits} today={today} />
+        </div>
+      )}
     </>
   )
 }

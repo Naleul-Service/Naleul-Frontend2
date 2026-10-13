@@ -188,12 +188,27 @@ function TaskRow({
  * AI 가 만든 Task · 직접 추가한 Task · 루틴 Task 를 한 번에 보고, 완료/미완료 · 할 일/루틴으로 거를 수 있어요.
  * 정렬은 서버 순서 그대로: 미완료 위 · 오늘과 가까운 날짜일수록 위 · 완료는 아래.
  */
-export function GoalTaskList({ goal }: { goal: GoalCategory }) {
+export function GoalTaskList({
+  goal,
+  title = '관련 Task',
+  hint,
+  addLabel = 'Task 추가',
+  emptyText = '이 목표에 연결된 Task가 아직 없어요. 위에서 바로 추가해 보세요.',
+  initialPeriod = 'WEEK',
+}: {
+  goal: GoalCategory
+  title?: string
+  /** 제목 아래 한 줄 설명 */
+  hint?: string
+  addLabel?: string
+  emptyText?: string
+  initialPeriod?: PeriodFilter
+}) {
   const goalId = goal.goalCategoryId
   const { data, isPending, isError, refetch } = useGoalTasks(goalId)
   const add = useEditing('task:new')
   const toggle = useToggleGoalTask(goalId)
-  const [period, setPeriod] = useState<PeriodFilter>('WEEK')
+  const [period, setPeriod] = useState<PeriodFilter>(initialPeriod)
   const [status, setStatus] = useState<StatusFilter>('ALL')
   const [kind, setKind] = useState<KindFilter>('ALL')
   const [limit, setLimit] = useState(PAGE)
@@ -240,7 +255,7 @@ export function GoalTaskList({ goal }: { goal: GoalCategory }) {
   return (
     <Card className="p-5 sm:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[17px] font-bold">관련 Task</h2>
+        <h2 className="text-[17px] font-bold">{title}</h2>
         {data && (
           <span className="text-ink-3 text-[13px]">
             {data.completedCount} / {data.totalCount} 완료
@@ -248,12 +263,14 @@ export function GoalTaskList({ goal }: { goal: GoalCategory }) {
         )}
       </div>
 
+      {hint && <p className="text-ink-3 -mt-2 mb-3 text-[13px] leading-relaxed">{hint}</p>}
+
       {/* 추가: 이름·날짜만 넣고 Enter */}
       <div className="mb-4">
         {add.isOpen ? (
           <GoalTaskForm goal={goal} onDone={add.close} />
         ) : (
-          <AddButton onClick={add.open}>Task 추가</AddButton>
+          <AddButton onClick={add.open}>{addLabel}</AddButton>
         )}
       </div>
 
@@ -269,9 +286,7 @@ export function GoalTaskList({ goal }: { goal: GoalCategory }) {
           </button>
         </div>
       ) : all.length === 0 ? (
-        <p className="text-ink-3 py-4 text-center text-sm">
-          이 목표에 연결된 Task가 아직 없어요. 위에서 바로 추가해 보세요.
-        </p>
+        <p className="text-ink-3 py-4 text-center text-sm">{emptyText}</p>
       ) : (
         <>
           {/* 기간: 오늘 · 이번 주(기본) · 전체 */}
