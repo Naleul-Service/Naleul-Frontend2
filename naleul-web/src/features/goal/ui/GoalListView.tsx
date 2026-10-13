@@ -191,10 +191,10 @@ function GoalCard({ goal }: { goal: GoalCategory }) {
       {goal.goalCategoryStartDate && (
         <p className="text-ink-3 mt-1 text-[13px]">
           {formatDot(goal.goalCategoryStartDate)} –{' '}
-          {goal.goalCategoryEndDate
-            ? formatDot(goal.goalCategoryEndDate)
-            : goal.goalMode === 'RECORD'
-              ? '마감 없음'
+          {goal.goalMode === 'RECORD'
+            ? '마감은 주제마다'
+            : goal.goalCategoryEndDate
+              ? formatDot(goal.goalCategoryEndDate)
               : '계속'}
         </p>
       )}

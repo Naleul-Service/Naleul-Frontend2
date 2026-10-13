@@ -7,7 +7,8 @@ import { timetableKeys } from '@/features/timetable/api'
 /**
  * 업무형 목표 상세 · 보드 (백엔드 V52 · /api/v1/goal-categories/{id}/work-*)
  *
- * 오늘 뭘 해야 하는지 · 언제까지 뭘 해야 하는지 · 마감이 언제인지를 한 화면에 보여줘요.
+ * 오늘 뭘 해야 하는지 · 다음 마감이 뭔지 · 언제까지 뭘 해야 하는지를 한 화면에 보여줘요.
+ * 업무형은 목표 전체 마감이 없고 주제마다 마감이 있어요 (V53) → 주제를 마감 순서대로 잇는 세로 로드맵.
  * Task 는 주제로 묶고, 시작 전 · 진행 중 · 완료 보드로 옮겨요. 날짜를 안 정한 Task 는 "할 일 목록"에 쌓여요.
  */
 
@@ -37,9 +38,6 @@ export interface WorkTask {
 
 export interface WorkSummary {
   startDate: string | null
-  deadline: string | null
-  /** 마감까지 남은 날 (오늘 0, 지났으면 음수) */
-  dDay: number | null
   total: number
   notStarted: number
   inProgress: number
@@ -49,20 +47,35 @@ export interface WorkSummary {
   dueThisWeek: number
   backlog: number
   progressPercent: number | null
-  /** 시작일 ~ 마감일 중 지난 기간 % */
-  timePercent: number | null
-  /** 마감까지 하루에 끝내야 하는 Task 수 */
-  remainingPerDay: number | null
+  /** 끝난 주제 수 / 전체 주제 수 */
+  topicsDone: number
+  topicsTotal: number
+  /** 아직 안 끝난 주제 중 마감이 가장 가까운 것 (지난 것 포함). 없으면 null */
+  nextTopic: WorkTopic | null
 }
 
+/** DONE 끝남 · OVERDUE 마감 지남 · NEXT 다음 마감 · UPCOMING 그 뒤 · NO_DUE 마감 없음 */
+export type TopicStatus = 'DONE' | 'OVERDUE' | 'NEXT' | 'UPCOMING' | 'NO_DUE'
+
+/** 주제 — 업무형은 목표 전체 마감 대신 주제마다 마감이 있어요 (V53) */
 export interface WorkTopic {
+  /** null = "주제 없음" (보드 필터에만) */
   topicId: number | null
   name: string
   emoji: string | null
   sortOrder: number
+  dueDate: string | null
+  /** 마감까지 남은 날 (오늘 0, 지났으면 음수) */
+  dDay: number | null
+  status: TopicStatus
+  /** 사용자가 "끝냈어요"로 표시했는지 */
+  completed: boolean
   total: number
   done: number
   remaining: number
+  progressPercent: number | null
+  /** 마감까지 하루에 끝내야 하는 Task 수 */
+  remainingPerDay: number | null
 }
 
 export interface WorkRetro {
@@ -79,6 +92,8 @@ export interface WorkBoard {
   description: string | null
   today: string
   summary: WorkSummary
+  /** 주제를 마감 순서대로 (마감 없는 주제는 맨 뒤) — 세로 로드맵 */
+  timeline: WorkTopic[]
   todayTasks: WorkTask[]
   doneToday: WorkTask[]
   upcoming: WorkTask[]
@@ -240,7 +255,7 @@ export const useDeleteWorkTask = (goalId: number) =>
 export const useCreateWorkTopic = (goalId: number) =>
   useWorkMutation(
     goalId,
-    (v: { name: string; emoji?: string | null }) =>
+    (v: { name: string; emoji?: string | null; dueDate?: string | null }) =>
       api.post<{ topicId: number; name: string }>(`/v1/goal-categories/${goalId}/work-topics`, v),
     (v) => `'${v.name}' 주제를 만들었어요.`
   )
@@ -248,10 +263,24 @@ export const useCreateWorkTopic = (goalId: number) =>
 export const useUpdateWorkTopic = (goalId: number) =>
   useWorkMutation(
     goalId,
-    ({ topicId, ...v }: { topicId: number; name?: string; emoji?: string }) =>
+    ({ topicId, ...v }: WorkTopicPatch & { topicId: number }) =>
       api.patch(`/v1/goal-categories/${goalId}/work-topics/${topicId}`, v),
-    '주제를 고쳤어요.'
+    (v) =>
+      v.completed === true
+        ? '주제를 끝냈어요. 수고했어요!'
+        : v.completed === false
+          ? '주제를 다시 열었어요.'
+          : '주제를 고쳤어요.'
   )
+
+export interface WorkTopicPatch {
+  name?: string
+  emoji?: string
+  dueDate?: string
+  clearDueDate?: boolean
+  /** true 끝냈어요 · false 다시 열기 */
+  completed?: boolean
+}
 
 export const useDeleteWorkTopic = (goalId: number) =>
   useWorkMutation(

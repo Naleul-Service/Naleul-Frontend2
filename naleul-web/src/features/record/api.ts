@@ -34,8 +34,6 @@ export interface RecordGoalInput {
   goalKindLabel?: string | null
   /** 한 줄 설명 — "내가 맡은 일" / "무엇을 만드는지" (100자, motive 에 저장) */
   description?: string | null
-  /** 마감일 (선택, V52) — 상세에 D-day · 남은 Task 가 보여요. 지나도 자동으로 끝나지 않아요 */
-  deadline?: string | null
 }
 
 export function useCreateRecordGoal() {
