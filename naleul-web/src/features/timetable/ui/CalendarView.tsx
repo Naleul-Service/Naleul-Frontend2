@@ -16,6 +16,7 @@ import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst }
 import { HATCH } from './Blocks'
 import { MonthView } from './MonthView'
 import { AutoPlaceBar } from './AutoPlaceBar'
+import { ScheduleAiBar } from './ScheduleAiBar'
 import { DayTaskList } from './DayTaskList'
 import { TimeGrid } from './TimeGrid'
 import { useTimetableInteractions } from './useTimetableInteractions'
@@ -228,6 +229,8 @@ export function CalendarView() {
         </Card>
       ) : (
         <>
+          {/* 여러 목표의 루틴 · 일정을 한 문장으로 옮기기 (보고 있는 주/날 기준) */}
+          <ScheduleAiBar startDate={start} endDate={end} />
           <AutoPlaceBar
             days={rawDays}
             today={today}

@@ -910,7 +910,7 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
           <div className="mt-4 mb-1 flex items-center">
             <p className="text-ink-3 text-[12px] font-semibold">최근 회고</p>
             <Link
-              href={`/reflections?goal=${goalId}`}
+              href={`/goal/${goalId}?tab=reflections`}
               className="text-brand ml-auto text-[12px] font-semibold hover:underline"
             >
               모두 보기

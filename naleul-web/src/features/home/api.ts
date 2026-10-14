@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
 import { goalKeys, type GoalMode, type ReflectionMood } from '@/features/goal/api'
@@ -194,17 +194,20 @@ export interface ReflectionFeedPage {
   hasMore: boolean
 }
 
-/** 30일씩, "더 보기"로 그 전 30일 */
-export function useReflectionFeed(goalCategoryId?: number) {
-  return useInfiniteQuery({
-    queryKey: homeKeys.reflections(goalCategoryId),
-    initialPageParam: null as string | null,
-    queryFn: ({ pageParam }) => {
-      const q = new URLSearchParams({ days: '30' })
-      if (pageParam) q.set('before', pageParam)
+/** 회고 모아보기 기간 — 일간(하루) · 주간(월~일) · 월간(1일~말일) */
+export type ReflectionPeriod = 'DAY' | 'WEEK' | 'MONTH'
+
+/** [from, to] 기간의 회고 (양 끝 포함, 최대 92일) */
+export function useReflectionRange(from: string, to: string, goalCategoryId?: number) {
+  return useQuery({
+    queryKey: [...homeKeys.reflections(goalCategoryId), from, to] as const,
+    queryFn: () => {
+      const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1
+      const before = new Date(Date.parse(to) + 86_400_000).toISOString().slice(0, 10)
+      const q = new URLSearchParams({ before, days: String(days) })
       if (goalCategoryId) q.set('goalCategoryId', String(goalCategoryId))
       return api.get<ReflectionFeedPage>(`/v1/home/reflections?${q}`)
     },
-    getNextPageParam: (last) => (last.hasMore ? last.from : null),
+    placeholderData: (prev) => prev,
   })
 }

@@ -1,8 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Library, NotebookPen, PencilLine } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Library, NotebookPen, PencilLine } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -10,9 +11,18 @@ import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { useGoalCategories, type GoalCategory } from '@/features/goal/api'
 import { MOODS, moodOf } from '@/features/goal/ui/progress/DailyCheckInCard'
-import { useReflectionFeed, type ReflectionEntry } from '@/features/home/api'
+import { useReflectionRange, type ReflectionEntry, type ReflectionPeriod } from '@/features/home/api'
 import { hexOf } from '@/features/timetable/layout'
-import { formatMonthDay, todayKst } from '@/features/timetable/time'
+import {
+  addDays,
+  addMonths,
+  dayOfMonth,
+  formatMonthDay,
+  monthOf,
+  startOfWeek,
+  todayKst,
+  yearOf,
+} from '@/features/timetable/time'
 
 const fmt = (v: number) => String(Number(v.toFixed(2)))
 
@@ -51,12 +61,6 @@ export function ReflectionsView() {
   const goalId = Number.isFinite(goalParam) && goalParam > 0 ? goalParam : undefined
 
   const goals = useGoalCategories()
-  const feed = useReflectionFeed(goalId)
-  const entries = feed.data?.pages.flatMap((p) => p.entries) ?? []
-  const groups = byDate(entries)
-  const today = todayKst()
-  const oldest = feed.data?.pages[feed.data.pages.length - 1]?.from
-
   const options = (goals.data ?? []).filter(filterable)
   const select = (id?: number) => {
     const q = new URLSearchParams(params)
@@ -64,10 +68,6 @@ export function ReflectionsView() {
     else q.delete('goal')
     router.replace(`${pathname}${q.size ? `?${q}` : ''}`, { scroll: false })
   }
-
-  const checkIns = entries.filter((e) => e.kind === 'CHECK_IN')
-  const moodCounts = MOODS.map((m) => ({ ...m, count: checkIns.filter((e) => e.mood === m.value).length }))
-  const days = groups.length
 
   return (
     <div className="mx-auto flex max-w-[860px] flex-col gap-5">
@@ -100,8 +100,136 @@ export function ReflectionsView() {
         ))}
       </div>
 
+      <ReflectionTimeline goalId={goalId} showGoal={!goalId} />
+    </div>
+  )
+}
+
+const PERIODS: { value: ReflectionPeriod; label: string }[] = [
+  { value: 'DAY', label: '일간' },
+  { value: 'WEEK', label: '주간' },
+  { value: 'MONTH', label: '월간' },
+]
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** 기준 날짜가 든 기간 [from, to] */
+export function periodRange(period: ReflectionPeriod, anchor: string) {
+  if (period === 'DAY') return { from: anchor, to: anchor }
+  if (period === 'WEEK') {
+    const from = startOfWeek(anchor)
+    return { from, to: addDays(from, 6) }
+  }
+  const y = yearOf(anchor)
+  const m = monthOf(anchor)
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  return { from: `${y}-${pad2(m)}-01`, to: `${y}-${pad2(m)}-${pad2(last)}` }
+}
+
+/** 기간 이동 (‹ ›) */
+const shift = (period: ReflectionPeriod, anchor: string, n: number) =>
+  period === 'DAY' ? addDays(anchor, n) : period === 'WEEK' ? addDays(anchor, n * 7) : addMonths(anchor, n)
+
+function periodTitle(period: ReflectionPeriod, from: string, to: string, today: string) {
+  if (period === 'DAY') return from === today ? `오늘 · ${formatMonthDay(from)}` : formatMonthDay(from)
+  if (period === 'MONTH') return `${yearOf(from)}년 ${monthOf(from)}월`
+  const thisWeek = startOfWeek(today) === from
+  return `${thisWeek ? '이번 주 · ' : ''}${monthOf(from)}월 ${dayOfMonth(from)}일 – ${
+    monthOf(to) !== monthOf(from) ? `${monthOf(to)}월 ` : ''
+  }${dayOfMonth(to)}일`
+}
+
+/**
+ * 기간별 회고 목록 — 일간 · 주간 · 월간 탭 + ‹ › 로 기간 이동. 회고 모아보기와 목표 상세 "회고" 탭이 같이 써요.
+ *  - 일간: 그날 남긴 기록 · 회고
+ *  - 주간(기본): 월~일, 날짜별로 묶어서 + 기분 요약
+ *  - 월간: 그 달 전체, 날짜별로 묶어서 + 기분 요약 · 가장 많이 기록한 목표
+ * @param goalId    한 목표만 (없으면 전체)
+ * @param showGoal  줄마다 목표 이름을 보일지 (한 목표만 볼 땐 끄기)
+ * @param emptyHint 비었을 때 안내 문구
+ */
+export function ReflectionTimeline({
+  goalId,
+  showGoal = true,
+  emptyHint,
+}: {
+  goalId?: number
+  showGoal?: boolean
+  emptyHint?: string
+}) {
+  const today = todayKst()
+  const [period, setPeriod] = useState<ReflectionPeriod>('WEEK')
+  const [anchor, setAnchor] = useState(today)
+  const { from, to } = periodRange(period, anchor)
+  const feed = useReflectionRange(from, to, goalId)
+  const entries = feed.data?.entries ?? []
+  const groups = byDate(entries)
+  const atLatest = to >= today
+
+  const checkIns = entries.filter((e) => e.kind === 'CHECK_IN')
+  const moodCounts = MOODS.map((m) => ({ ...m, count: checkIns.filter((e) => e.mood === m.value).length }))
+  const days = groups.length
+  const totalDays = Math.min(
+    Math.round((Date.parse(atLatest ? today : to) - Date.parse(from)) / 86_400_000) + 1,
+    Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1
+  )
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* 기간 고르기 + 이동 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="bg-surface border-line inline-flex rounded-xl border p-1" role="tablist" aria-label="기간">
+          {PERIODS.map((p) => (
+            <button
+              key={p.value}
+              type="button"
+              role="tab"
+              aria-selected={period === p.value}
+              onClick={() => setPeriod(p.value)}
+              className={cn(
+                'h-8 rounded-lg px-3.5 text-[13px] font-semibold transition-colors',
+                period === p.value ? 'bg-ink text-on-ink' : 'text-ink-2 hover:text-ink'
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setAnchor(shift(period, anchor, -1))}
+            aria-label="이전 기간"
+            className="text-ink-2 hover:bg-subtle grid size-8 place-items-center rounded-lg"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <p className="min-w-[140px] text-center text-[14px] font-bold tabular-nums">
+            {periodTitle(period, from, to, today)}
+          </p>
+          <button
+            type="button"
+            onClick={() => setAnchor(shift(period, anchor, 1))}
+            disabled={atLatest}
+            aria-label="다음 기간"
+            className="text-ink-2 hover:bg-subtle grid size-8 place-items-center rounded-lg disabled:opacity-30"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+          {!atLatest && (
+            <button
+              type="button"
+              onClick={() => setAnchor(today)}
+              className="text-brand hover:bg-brand-soft h-8 rounded-lg px-2 text-[12px] font-semibold"
+            >
+              {period === 'DAY' ? '오늘' : period === 'WEEK' ? '이번 주' : '이번 달'}
+            </button>
+          )}
+        </div>
+      </div>
+
       {feed.isPending ? (
-        <div className="grid min-h-[300px] place-items-center">
+        <div className="grid min-h-[240px] place-items-center">
           <Spinner className="text-ink-3 size-6" />
         </div>
       ) : feed.isError ? (
@@ -112,14 +240,13 @@ export function ReflectionsView() {
           </Button>
         </Card>
       ) : (
-        <>
-          {/* 이 기간 요약 */}
-          {entries.length > 0 && (
+        <div className={cn('flex flex-col gap-4 transition-opacity', feed.isPlaceholderData && 'opacity-60')}>
+          {/* 이 기간 요약 (주간 · 월간) */}
+          {period !== 'DAY' && entries.length > 0 && (
             <Card className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3">
               <p className="text-[13px]">
-                <span className="text-ink-3">{oldest ? `${formatMonthDay(oldest)}부터 ` : ''}</span>
                 <b className="tabular-nums">{days}일</b>
-                <span className="text-ink-3"> 기록</span>
+                <span className="text-ink-3"> 기록 / {totalDays}일</span>
               </p>
               {checkIns.some((e) => e.mood) && (
                 <ul className="flex items-center gap-3 text-[13px]" aria-label="기분별 날 수">
@@ -132,6 +259,7 @@ export function ReflectionsView() {
                   ))}
                 </ul>
               )}
+              {showGoal && <TopGoal entries={entries} />}
             </Card>
           )}
 
@@ -140,28 +268,30 @@ export function ReflectionsView() {
               <span className="bg-subtle text-ink-3 grid size-11 place-items-center rounded-full">
                 <Library className="size-5" />
               </span>
-              <p className="text-[15px] font-bold">아직 남긴 회고가 없어요</p>
-              <p className="text-ink-3 text-[13px]">
-                홈의 &lsquo;오늘 회고&rsquo;나 목표 상세의 &lsquo;오늘 기록&rsquo;에서 하루를 돌아보면 여기 모여요.
+              <p className="text-[15px] font-bold">
+                {period === 'DAY' ? '이날' : period === 'WEEK' ? '이번 주' : '이 달'}에 남긴 회고가 없어요
               </p>
-              <Link href="/" className="text-brand mt-1 text-[13px] font-semibold hover:underline">
-                홈으로 가기
-              </Link>
+              <p className="text-ink-3 text-[13px]">
+                {emptyHint ??
+                  '홈의 \u2018오늘 회고\u2019나 목표 상세의 \u2018오늘 기록\u2019에서 하루를 돌아보면 여기 모여요.'}
+              </p>
             </Card>
           ) : (
             <ol className="flex flex-col gap-4">
               {groups.map((g) => (
                 <li key={g.date}>
-                  <h2 className="mb-2 flex items-baseline gap-2 px-1">
-                    <span className="text-[15px] font-bold">{formatMonthDay(g.date)}</span>
-                    <span className="text-ink-3 text-[12px]">{relLabel(g.date, today)}</span>
-                  </h2>
+                  {period !== 'DAY' && (
+                    <h3 className="mb-2 flex items-baseline gap-2 px-1">
+                      <span className="text-[15px] font-bold">{formatMonthDay(g.date)}</span>
+                      <span className="text-ink-3 text-[12px]">{relLabel(g.date, today)}</span>
+                    </h3>
+                  )}
                   <Card className="divide-line divide-y">
                     {g.items.map((e) => (
                       <EntryRow
                         key={`${e.kind}-${e.goalCategoryId}-${e.retrospectiveId ?? e.date}`}
                         entry={e}
-                        showGoal={!goalId}
+                        showGoal={showGoal}
                       />
                     ))}
                   </Card>
@@ -169,20 +299,31 @@ export function ReflectionsView() {
               ))}
             </ol>
           )}
-
-          {feed.hasNextPage && (
-            <Button
-              variant="secondary"
-              className="self-center"
-              loading={feed.isFetchingNextPage}
-              onClick={() => feed.fetchNextPage()}
-            >
-              이전 30일 더 보기
-            </Button>
-          )}
-        </>
+        </div>
       )}
     </div>
+  )
+}
+
+/** 이 기간에 기록을 가장 많이 남긴 목표 (전체 보기에서만) */
+function TopGoal({ entries }: { entries: ReflectionEntry[] }) {
+  const byGoal = new Map<number, { name: string; emoji: string | null; days: Set<string> }>()
+  for (const e of entries) {
+    const g = byGoal.get(e.goalCategoryId) ?? { name: e.goalName, emoji: e.goalEmoji, days: new Set<string>() }
+    g.days.add(e.date)
+    byGoal.set(e.goalCategoryId, g)
+  }
+  const top = [...byGoal.values()].sort((a, b) => b.days.size - a.days.size)[0]
+  if (!top || byGoal.size < 2) return null
+  return (
+    <p className="text-[13px]">
+      <span className="text-ink-3">가장 많이 돌아본 목표 </span>
+      <b>
+        {top.emoji ? `${top.emoji} ` : ''}
+        {top.name}
+      </b>
+      <span className="text-ink-3"> · {top.days.size}일</span>
+    </p>
   )
 }
 

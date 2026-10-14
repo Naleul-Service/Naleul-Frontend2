@@ -20,7 +20,7 @@ import type { BillingStatus, WebPlan } from '../types'
 const BENEFITS = [
   'AI 목표 만들기 하루 10개 (Free: 하루 1개 · 주 3개)',
   'AI 계획 초안 하루 20번 (Free: 하루 5번)',
-  'AI로 목표 고치기 · 브레인 덤프 AI 정리 하루 30번 (Free: 각 3번)',
+  'AI로 목표 고치기 · AI로 일정 조정 · 브레인 덤프 AI 정리 하루 30번 (Free: 각 3번)',
   '광고 없이',
   '웹과 iOS 앱 어디서든 같은 Pro',
 ]

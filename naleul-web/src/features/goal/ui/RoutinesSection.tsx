@@ -1,7 +1,8 @@
 'use client'
 
-import { isValidRoutineRange } from '@/features/timetable/time'
+import { isValidRoutineRange, minutesToTime, timeToMinutes } from '@/features/timetable/time'
 import { useState } from 'react'
+import { RoutineWeekMap } from './RoutineWeekMap'
 import { Bell, BellOff } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { todayKst } from '@/features/timetable/time'
@@ -247,6 +248,24 @@ function RoutineForm({
           </>
         )}
       </div>
+      {/* 다른 루틴과 겹치는지 · 내 루틴 주간표 (캘린더에 다녀오지 않아도 돼요) */}
+      <RoutineWeekMap
+        draft={{ routineId: routine?.routineId, name: name.trim(), days, timeOf }}
+        onPick={(d, m) => {
+          // 지금 길이(없으면 1시간)를 그대로 두고 시작 시각만 옮겨요
+          const len =
+            startTime && endTime ? (timeToMinutes(endTime) - timeToMinutes(startTime) + 1440) % 1440 || 60 : 60
+          if (!days.includes(d)) setDays((v) => JAVA_DAYS.filter((x) => x === d || v.includes(x)))
+          const st = minutesToTime(m)
+          const et = minutesToTime((m + len) % 1440)
+          if (perDay && days.length > 1) {
+            setDayTimes((map) => ({ ...map, [d]: { start: st, end: et } }))
+          } else {
+            setStartTime(st)
+            setEndTime(et)
+          }
+        }}
+      />
       {/* 요일별 시간 — 기본은 같은 시간, 필요할 때만 펼쳐요 */}
       {days.length > 1 &&
         (perDay ? (

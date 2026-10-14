@@ -290,7 +290,7 @@ function RecentReflections({
       <div className="mb-1.5 flex items-center">
         <p className="text-ink-3 text-[12px] font-semibold">최근 기록</p>
         <Link
-          href={`/reflections?goal=${goalId}`}
+          href={`/goal/${goalId}?tab=reflections`}
           className="text-brand ml-auto text-[12px] font-semibold hover:underline"
         >
           모두 보기

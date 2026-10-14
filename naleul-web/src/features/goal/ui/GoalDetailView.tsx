@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { BarChart3, KanbanSquare } from 'lucide-react'
+import { BarChart3, KanbanSquare, LayoutDashboard, Library, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -11,6 +11,7 @@ import { isApiError } from '@/lib/client/api'
 import { cn } from '@/lib/cn'
 import { RecordPatternSection } from '@/features/record/ui/pattern/RecordPatternSection'
 import { HabitView } from '@/features/habit/ui/HabitView'
+import { ReflectionTimeline } from '@/features/reflection/ui/ReflectionsView'
 import { WorkBoardView } from '@/features/work/ui/WorkBoardView'
 import { isHabitGoal, isRecordGoal, useGoalCategory, type GoalCategory } from '../api'
 import { EditingContext } from '../edit/inline'
@@ -105,71 +106,124 @@ function Hero({ goal }: { goal: GoalCategory }) {
   )
 }
 
-// ─── 기록형 목표 ───────────────────────────────────────────────
+// ─── 탭 ────────────────────────────────────────────────────────
 
-type RecordTab = 'board' | 'stats'
-
-const RECORD_TABS: { value: RecordTab; label: string; icon: typeof KanbanSquare }[] = [
-  { value: 'board', label: '보드', icon: KanbanSquare },
-  { value: 'stats', label: '통계', icon: BarChart3 },
-]
+interface TabDef<T extends string> {
+  value: T
+  label: string
+  icon: LucideIcon
+}
 
 /**
- * 업무형 목표 — 탭 두 개.
- *  - 보드(기본): 다음 마감 · 로드맵(주제별 남은 할 일) · Task 보드 · 업무 일지 · 루틴 · 메모 + 오른쪽 "적기" 패널
- *  - 통계: 이 목표에 대한 나의 패턴 + 루틴 실천
- * 고른 탭은 주소(?tab=stats)에 남겨서 새로고침·공유해도 그대로예요. (예전 ?tab=journal 은 보드로)
+ * 고른 탭은 주소(?tab=)에 남겨서 새로고침·공유해도 그대로예요. 첫 탭(기본)은 주소에서 빼요.
+ * 모르는 값(예전 ?tab=journal 등)은 첫 탭으로.
  */
-function RecordGoalBody({ goal }: { goal: GoalCategory }) {
+function useGoalTab<T extends string>(tabs: TabDef<T>[]) {
   const params = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
   const raw = params.get('tab')
-  const tab: RecordTab = raw === 'stats' ? 'stats' : 'board'
-
-  const setTab = (t: RecordTab) => {
+  const tab = tabs.find((t) => t.value === raw)?.value ?? tabs[0].value
+  const setTab = (t: T) => {
     const next = new URLSearchParams(params)
-    if (t === 'board') next.delete('tab')
+    if (t === tabs[0].value) next.delete('tab')
     else next.set('tab', t)
     const qs = next.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }
+  return [tab, setTab] as const
+}
+
+function GoalTabBar<T extends string>({
+  tabs,
+  tab,
+  onChange,
+}: {
+  tabs: TabDef<T>[]
+  tab: T
+  onChange: (t: T) => void
+}) {
+  return (
+    <div className="bg-surface border-line mt-6 inline-flex rounded-xl border p-1" role="tablist" aria-label="보기">
+      {tabs.map(({ value, label, icon: Icon }) => (
+        <button
+          key={value}
+          type="button"
+          role="tab"
+          id={`goal-tab-${value}`}
+          aria-selected={tab === value}
+          aria-controls={`goal-panel-${value}`}
+          onClick={() => onChange(value)}
+          className={cn(
+            'flex h-9 items-center gap-1.5 rounded-lg px-4 text-[14px] font-semibold transition-colors',
+            tab === value ? 'bg-ink text-on-ink' : 'text-ink-2 hover:text-ink'
+          )}
+        >
+          <Icon className="size-4" />
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** "회고" 탭 — 이 목표에서 남긴 기록 · 회고를 날짜별로 (회고 모아보기와 같은 목록) */
+function ReflectionsPanel({ goal, hint }: { goal: GoalCategory; hint: string }) {
+  return (
+    <section id="goal-panel-reflections" role="tabpanel" aria-labelledby="goal-tab-reflections" className="mt-5">
+      <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <h2 className="text-[17px] font-bold">이 목표의 회고</h2>
+        <p className="text-ink-3 text-[13px]">{hint}</p>
+        <Link
+          href={`/reflections`}
+          className="text-brand ml-auto text-[12px] font-semibold hover:underline"
+          title="모든 목표의 회고를 한 번에"
+        >
+          모든 목표 회고 보기
+        </Link>
+      </div>
+      <ReflectionTimeline goalId={goal.goalCategoryId} showGoal={false} emptyHint={hint} />
+    </section>
+  )
+}
+
+// ─── 기록형 목표 ───────────────────────────────────────────────
+
+type RecordTab = 'board' | 'stats' | 'reflections'
+
+const RECORD_TABS: TabDef<RecordTab>[] = [
+  { value: 'board', label: '보드', icon: KanbanSquare },
+  { value: 'stats', label: '통계', icon: BarChart3 },
+  { value: 'reflections', label: '회고', icon: Library },
+]
+
+/**
+ * 업무형 목표 — 탭 세 개.
+ *  - 보드(기본): 다음 마감 · 로드맵(주제별 남은 할 일) · Task 보드 · 업무 일지 · 루틴 · 메모 + 오른쪽 "적기" 패널
+ *  - 통계: 이 목표에 대한 나의 패턴 + 루틴 실천
+ *  - 회고: 이 목표에 남긴 회고를 날짜별로
+ */
+function RecordGoalBody({ goal }: { goal: GoalCategory }) {
+  const [tab, setTab] = useGoalTab(RECORD_TABS)
 
   return (
     <>
-      <div className="bg-surface border-line mt-6 inline-flex rounded-xl border p-1" role="tablist" aria-label="보기">
-        {RECORD_TABS.map(({ value, label, icon: Icon }) => (
-          <button
-            key={value}
-            type="button"
-            role="tab"
-            id={`record-tab-${value}`}
-            aria-selected={tab === value}
-            aria-controls={`record-panel-${value}`}
-            onClick={() => setTab(value)}
-            className={cn(
-              'flex h-9 items-center gap-1.5 rounded-lg px-4 text-[14px] font-semibold transition-colors',
-              tab === value ? 'bg-ink text-on-ink' : 'text-ink-2 hover:text-ink'
-            )}
-          >
-            <Icon className="size-4" />
-            {label}
-          </button>
-        ))}
-      </div>
+      <GoalTabBar tabs={RECORD_TABS} tab={tab} onChange={setTab} />
 
       {tab === 'board' ? (
-        <div id="record-panel-board" role="tabpanel" aria-labelledby="record-tab-board" className="mt-5">
+        <div id="goal-panel-board" role="tabpanel" aria-labelledby="goal-tab-board" className="mt-5">
           <WorkBoardView goal={goal} />
         </div>
-      ) : (
-        <section id="record-panel-stats" role="tabpanel" aria-labelledby="record-tab-stats" className="mt-5">
+      ) : tab === 'stats' ? (
+        <section id="goal-panel-stats" role="tabpanel" aria-labelledby="goal-tab-stats" className="mt-5">
           <h2 className="sr-only">이 목표에 대한 나의 패턴</h2>
           <div className="space-y-5">
             <RecordPatternSection goalId={goal.goalCategoryId} />
             <RoutineHeatmapSection goal={goal} />
           </div>
         </section>
+      ) : (
+        <ReflectionsPanel goal={goal} hint="보드의 '적기 → 회고'나 홈의 '오늘 회고'에서 남기면 여기 모여요." />
       )}
     </>
   )
@@ -234,19 +288,48 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
 }
 
 /**
- * 달성형 목표.
- *  - 위: 진행 요약 → 오늘 기록(수치 + 회고) → "말로 고치기" → 이 목표를 시작한 이유
- *  - 왼쪽: 매일 보는 "할 것" — 루틴 · 루틴 실천 히트맵 · Task (세부 목표는 각 줄의 라벨)
- *  - 오른쪽: 수치 그래프(여러 개) · Task 실천률
+ * 달성형 목표 — 탭 두 개 (?tab=reflections).
+ *  - 개요(기본)
+ *    · 위: 진행 요약 → 오늘 기록(수치 + 회고) → "말로 고치기" → 이 목표를 시작한 이유
+ *    · 왼쪽: 매일 보는 "할 것" — 루틴 · 루틴 실천 히트맵 · Task (세부 목표는 각 줄의 라벨)
+ *    · 오른쪽: 수치 그래프(여러 개) · Task 실천률
+ *  - 회고: 이 목표에 남긴 기록 · 회고를 날짜별로
  */
+type AchievementTab = 'overview' | 'reflections'
+
+const ACHIEVEMENT_TABS: TabDef<AchievementTab>[] = [
+  { value: 'overview', label: '개요', icon: LayoutDashboard },
+  { value: 'reflections', label: '회고', icon: Library },
+]
+
 function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
+  const [tab, setTab] = useGoalTab(ACHIEVEMENT_TABS)
+  return (
+    <>
+      <GoalTabBar tabs={ACHIEVEMENT_TABS} tab={tab} onChange={setTab} />
+      {tab === 'overview' ? (
+        <div id="goal-panel-overview" role="tabpanel" aria-labelledby="goal-tab-overview">
+          <AchievementOverview goal={goal} />
+        </div>
+      ) : (
+        <ReflectionsPanel
+          goal={goal}
+          hint="개요 탭의 '오늘 기록'이나 홈의 '오늘 회고'에서 수치 · 기분 · 한 줄 회고를 남기면 여기 모여요."
+        />
+      )}
+    </>
+  )
+}
+
+/** 달성형 "개요" 탭 — 예전 목표 상세 화면 그대로 */
+function AchievementOverview({ goal }: { goal: GoalCategory }) {
   const completed = goal.goalCategoryStatus === 'COMPLETED'
   const ongoing = !goal.temporary && goal.goalCategoryStatus === 'IN_PROGRESS'
   return (
     <>
       {/* 임시 목표는 기간·수치가 없어 진행률이 의미 없어요 → 구체화 카드만 보여줘요 */}
       {!goal.temporary && (
-        <div className="mt-6">
+        <div className="mt-5">
           <Hero goal={goal} />
         </div>
       )}
