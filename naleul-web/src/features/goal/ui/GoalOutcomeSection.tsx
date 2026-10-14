@@ -120,7 +120,7 @@ export function GoalWrapUpSection({ goal }: { goal: GoalCategory }) {
         open={open}
         onClose={() => !complete.isPending && setOpen(false)}
         title="이 목표, 어땠나요?"
-        description="오늘 날짜로 마무리하고, 앞으로 예정된 할 일은 정리돼요."
+        description="오늘 날짜로 마무리해요. 남은 기간의 루틴과 예정된 할 일은 캘린더에서 빠지고, 지난 기록과 완료한 일은 그대로 남아요."
         dismissible={!complete.isPending}
         footer={
           <>

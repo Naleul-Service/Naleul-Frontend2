@@ -3,11 +3,11 @@
 import { isValidRoutineRange, minutesToTime, timeToMinutes } from '@/features/timetable/time'
 import { useState } from 'react'
 import { RoutineWeekMap } from './RoutineWeekMap'
-import { Bell, BellOff } from 'lucide-react'
+import { Bell, BellOff, CalendarPlus } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { todayKst } from '@/features/timetable/time'
+import { addDays, todayKst, weekdayIndex } from '@/features/timetable/time'
 import type { GoalCategory, JavaDayOfWeek, RoutineSummary } from '../api'
-import { useCreateRoutine, useDeleteRoutine, useUpdateRoutine } from '../edit/mutations'
+import { useAddRoutineExtraDay, useCreateRoutine, useDeleteRoutine, useUpdateRoutine } from '../edit/mutations'
 import {
   AddButton,
   DaysPicker,
@@ -366,6 +366,111 @@ function RoutineForm({
   )
 }
 
+/** 그 날의 루틴 시간 — 요일별 시간이 있으면 그 시간, 없으면 기본 시간 */
+function routineTimeOn(routine: RoutineSummary, ymd: string) {
+  const day = JAVA_DAYS[weekdayIndex(ymd)]
+  const own = routine.dayTimes?.find((t) => t.dayOfWeek === day)
+  return {
+    start: hhmm(own?.startTime ?? routine.repeatStartTime) ?? '',
+    end: hhmm(own?.endTime ?? routine.repeatEndTime) ?? '',
+  }
+}
+
+/**
+ * 다른 날 추가 — 평일 루틴을 주말에도 했을 때처럼, 반복 요일이 아닌 날에 그날 하루만 루틴 블록을 만들어요.
+ * "이미 했어요"면 그 시간을 실제로 한 시간으로 바로 남겨요 (앞날은 예정으로만).
+ */
+function ExtraDayForm({ routine, onDone }: { routine: RoutineSummary; onDone: () => void }) {
+  const today = todayKst()
+  const add = useAddRoutineExtraDay()
+  const [date, setDate] = useState(today)
+  const [startTime, setStartTime] = useState(() => routineTimeOn(routine, today).start)
+  const [endTime, setEndTime] = useState(() => routineTimeOn(routine, today).end)
+  const [done, setDone] = useState(true)
+  const future = date > today
+  const day = date ? JAVA_DAYS[weekdayIndex(date)] : null
+  const repeatDay = !!day && routine.repeatDays.includes(day)
+
+  const changeDate = (v: string) => {
+    setDate(v)
+    if (!v) return
+    const t = routineTimeOn(routine, v)
+    setStartTime(t.start)
+    setEndTime(t.end)
+  }
+
+  const error = !date
+    ? '날짜를 골라 주세요.'
+    : date > addDays(today, 60)
+      ? '60일 뒤까지만 추가할 수 있어요.'
+      : !!startTime !== !!endTime
+        ? '시작·종료 시간을 함께 입력하거나 둘 다 비워 주세요.'
+        : startTime && endTime && !isValidRoutineRange(startTime, endTime)
+          ? '시작과 종료 시간을 확인해 주세요.'
+          : null
+
+  const submit = () =>
+    add.mutate(
+      {
+        routineId: routine.routineId,
+        date,
+        startTime: startTime || null,
+        endTime: endTime || null,
+        done: done && !future,
+      },
+      { onSuccess: onDone }
+    )
+
+  return (
+    <InlineForm
+      onSubmit={submit}
+      onCancel={onDone}
+      saving={add.isPending}
+      valid={!error}
+      error={date ? error : null}
+      submitLabel={done && !future ? '한 걸로 남기기' : '그날 추가'}
+    >
+      <p className="text-[14px] font-semibold">&lsquo;{routine.routineName}&rsquo;를 다른 날에도 했어요</p>
+      <p className="text-ink-3 -mt-1 text-xs">
+        반복 요일은 그대로 두고, 고른 날 하루만 루틴 블록이 생겨요. 실천 기록에도 함께 들어가요.
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="날짜" className="col-span-2">
+          <input
+            type="date"
+            value={date}
+            max={addDays(today, 60)}
+            onChange={(e) => changeDate(e.target.value)}
+            className={inlineInput}
+            data-autofocus
+          />
+        </Field>
+        <Field label="시작">
+          <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={inlineInput} />
+        </Field>
+        <Field label="종료">
+          <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={inlineInput} />
+        </Field>
+      </div>
+      {repeatDay && (
+        <p className="text-warning text-xs">
+          {JAVA_DAY_LABEL[day!]}요일은 원래 하는 날이에요. 이미 블록이 있으면 캘린더에서 그 블록을 완료해 주세요.
+        </p>
+      )}
+      <label className={cn('flex items-center gap-2 text-[14px]', future && 'opacity-50')}>
+        <input
+          type="checkbox"
+          checked={done && !future}
+          disabled={future}
+          onChange={(e) => setDone(e.target.checked)}
+          className="size-4"
+        />
+        이미 했어요 {future ? '(앞날은 예정으로만 넣어요)' : startTime ? `— ${startTime}~${endTime} 에 한 걸로` : ''}
+      </label>
+    </InlineForm>
+  )
+}
+
 function RoutineRow({
   goal,
   routine,
@@ -380,8 +485,18 @@ function RoutineRow({
   const key = `routine:${routine.routineId}`
   const edit = useEditing(key)
   const del = useEditing(`del:${key}`)
+  const extra = useEditing(`extra:${key}`)
   const remove = useDeleteRoutine()
   const start = hhmm(routine.repeatStartTime)
+  const active = routine.routineStatus !== 'STOPPED' && routine.routineStatus !== 'DELETED'
+
+  if (extra.isOpen) {
+    return (
+      <li className="py-2">
+        <ExtraDayForm routine={routine} onDone={extra.close} />
+      </li>
+    )
+  }
 
   if (edit.isOpen) {
     return (
@@ -430,6 +545,17 @@ function RoutineRow({
       <div className="order-3 w-full sm:order-none sm:w-auto">
         <DayChips days={routine.repeatDays} />
       </div>
+      {active && (
+        <button
+          type="button"
+          onClick={extra.open}
+          title="반복 요일이 아닌 날에도 했다면 그날을 추가해요"
+          className="text-ink-3 hover:text-ink border-line hover:border-line-strong order-4 flex h-7 items-center gap-1 rounded-full border px-2.5 text-[12px] font-medium sm:order-none"
+        >
+          <CalendarPlus className="size-3.5" />
+          다른 날 추가
+        </button>
+      )}
       <RowActions label={routine.routineName} onEdit={edit.open} onDelete={del.open} />
     </li>
   )

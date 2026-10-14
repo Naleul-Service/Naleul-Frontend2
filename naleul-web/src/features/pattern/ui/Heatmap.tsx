@@ -2,13 +2,17 @@ import type { PatternHeatmap } from '../types'
 import { DAY_SHORT, HATCH, HEAT_BG, heatText, windowLabel } from '../format'
 import { NotEnough, Section } from './Section'
 
-/** 언제 가장 잘 실행하나요? — 요일 × 시간 실행률 */
+/**
+ * 언제 가장 잘 실행하나요? — 요일 × 시간에 실제로 한 횟수
+ * 계획한 시간과 상관없이, 그 시간대에 Task · 루틴을 했으면 +1 이에요.
+ * 가장 많이 한 칸이 가장 진하고, 한 번도 안 한 칸은 색이 없어요.
+ */
 export function Heatmap({ heatmap }: { heatmap?: PatternHeatmap | null }) {
   const hasValue = heatmap?.rows.some((r) => r.cells.some((c) => c.state === 'VALUE'))
   return (
-    <Section title="언제 가장 잘 실행하나요?" aside="요일 × 시간 · 실행률 %">
+    <Section title="언제 가장 잘 실행하나요?" aside="요일 × 시간 · 한 횟수">
       {!heatmap || !hasValue ? (
-        <NotEnough>시간을 정한 블록을 실행하면 시간대별 실행률이 보여요</NotEnough>
+        <NotEnough>Task나 루틴을 완료하면 언제 많이 했는지 보여요</NotEnough>
       ) : (
         <>
           {/* 좁은 화면에서는 카드 안에서만 가로 스크롤 */}
@@ -36,11 +40,11 @@ export function Heatmap({ heatmap }: { heatmap?: PatternHeatmap | null }) {
                         return (
                           <td
                             key={c.hour}
-                            title={`${label} · 실행률 ${c.rate}% (${c.samples}개)`}
+                            title={`${label} · ${c.count ?? 0}번 했어요${c.rate != null ? ` · 계획 대비 ${c.rate}%` : ''}`}
                             className={`h-9 rounded-md text-[11px] font-semibold ${heatText(c.level)}`}
                             style={{ background: HEAT_BG[c.level] }}
                           >
-                            {c.rate}
+                            {c.count ?? ''}
                           </td>
                         )
                       }
@@ -54,7 +58,13 @@ export function Heatmap({ heatmap }: { heatmap?: PatternHeatmap | null }) {
                           />
                         )
                       }
-                      return <td key={c.hour} title={`${label} · 블록 없음`} className="bg-subtle h-9 rounded-md" />
+                      return (
+                        <td
+                          key={c.hour}
+                          title={`${label} · 한 게 없어요`}
+                          className="border-line h-9 rounded-md border border-dashed"
+                        />
+                      )
                     })}
                   </tr>
                 ))}
@@ -64,19 +74,18 @@ export function Heatmap({ heatmap }: { heatmap?: PatternHeatmap | null }) {
 
           <div className="text-ink-3 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px]">
             <span className="flex items-center gap-1.5">
-              낮음
+              적게
               {[1, 2, 3, 4, 5].map((l) => (
                 <span key={l} className="h-3 w-4 rounded-[3px]" style={{ background: HEAT_BG[l] }} />
               ))}
-              높음
+              많이{heatmap.maxCount ? ` (최대 ${heatmap.maxCount}번)` : ''}
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-3 w-4 rounded-[3px]" style={{ background: HATCH }} />
               {heatmap.fixedLabel ?? '고정 시간'}
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="bg-subtle border-line h-3 w-4 rounded-[3px] border" />
-              블록 없음
+              <span className="border-line h-3 w-4 rounded-[3px] border border-dashed" />한 게 없음
             </span>
           </div>
 

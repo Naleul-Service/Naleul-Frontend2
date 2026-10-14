@@ -167,6 +167,34 @@ export const useUpdateRoutine = () =>
     '루틴을 수정했어요.'
   )
 
+export interface RoutineExtraDayInput {
+  routineId: number
+  /** yyyy-MM-dd — 반복 요일이 아닌 날도 돼요 (예: 평일 루틴을 토요일에도) */
+  date: string
+  /** "HH:mm" — 비우면 루틴 시간 */
+  startTime: string | null
+  endTime: string | null
+  /** true 면 "이미 했어요" — 그 시간을 실제로 한 시간으로 남겨요 */
+  done: boolean
+}
+
+/** 루틴을 다른 날에도 했을 때 — 그날 하루만 루틴 블록을 하나 더 만들어요 */
+export function useAddRoutineExtraDay() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ routineId, ...body }: RoutineExtraDayInput) =>
+      api.post<{ taskId: number }>(`/v1/routines/${routineId}/extra-days`, body),
+    onSuccess: (_, v) => toast.success(v.done ? '그날 한 걸로 남겼어요.' : '그날 캘린더에 넣었어요.'),
+    onError: (e) => toast.error(errorMessage(e)),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: goalKeys.all })
+      qc.invalidateQueries({ queryKey: timetableKeys.all })
+      qc.invalidateQueries({ queryKey: ['home'] })
+      qc.invalidateQueries({ queryKey: ['pattern'] })
+    },
+  })
+}
+
 export const useDeleteRoutine = () =>
   useGoalMutation((id: number) => api.delete(`/v1/routines/${id}`), '루틴을 삭제했어요.')
 

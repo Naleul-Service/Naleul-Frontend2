@@ -78,8 +78,10 @@ export interface HeatCell {
   state: HeatCellState
   rate?: number | null
   samples?: number | null
-  /** 1~5 (≤60 / ≤70 / ≤80 / ≤90 / >90) */
+  /** 1~5 — 그 칸에서 한 횟수를 가장 많이 한 칸(maxCount)에 견준 진하기 */
   level?: number | null
+  /** 그 요일 · 시간에 실제로 한 Task · 루틴 수 (계획한 시간과 상관없이) */
+  count?: number | null
 }
 
 export interface TimeWindow {
@@ -94,6 +96,8 @@ export interface TimeWindow {
 export interface PatternHeatmap {
   hours: number[]
   rows: { dayOfWeek: JavaDayOfWeek; cells: HeatCell[] }[]
+  /** 가장 많이 한 칸의 횟수 */
+  maxCount?: number | null
   fixedLabel?: string | null
   goldenTime?: TimeWindow | null
   weakTime?: TimeWindow | null
@@ -146,6 +150,20 @@ export interface PatternBlockKeeping {
   late?: number | null
   missed?: number | null
   frequentMoves: FrequentMove[]
+  /** 블록(루틴 · Task)별 제시간 / 늦게 / 놓침 횟수 — 많은 순 */
+  items?: BlockKeepItem[] | null
+}
+
+export interface BlockKeepItem {
+  key: string
+  title: string
+  emoji?: string | null
+  goalName?: string | null
+  goalColorCode?: string | null
+  routine: boolean
+  onTime: number
+  late: number
+  missed: number
 }
 
 export interface PatternRoutines {

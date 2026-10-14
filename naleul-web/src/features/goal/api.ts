@@ -436,7 +436,7 @@ export function useUpdateOutcome(goalId: number) {
   })
 }
 
-/** 목표 마무리 — 결과 · 소감과 함께 끝내요. 이후 예정된 Task 는 서버가 정리해요 */
+/** 목표 마무리 — 결과 · 소감과 함께 끝내요. 남은 루틴은 끝내고 앞으로 예정된 Task 는 서버가 지워요 */
 export function useCompleteGoal(goalId: number) {
   const qc = useQueryClient()
   return useMutation({
@@ -447,6 +447,8 @@ export function useCompleteGoal(goalId: number) {
       qc.invalidateQueries({ queryKey: goalKeys.progress(goalId) })
       qc.invalidateQueries({ queryKey: goalKeys.list() })
       invalidateGoalPlan(qc, goalId)
+      // 캘린더(invalidateGoalPlan) · 홈에 남아 있던 앞날의 루틴 블록이 빠져요
+      qc.invalidateQueries({ queryKey: ['home'] })
     },
     onError: (e) => toast.error(isApiError(e) ? e.message : '마무리하지 못했어요. 다시 시도해 주세요.'),
   })

@@ -21,7 +21,7 @@ export function RoutineLists({ routines }: { routines?: PatternRoutines | null }
           ))}
         </ul>
       ) : (
-        <p className="text-ink-3 mt-3 text-[13px]">8번 이상 한 루틴 중 80% 넘게 지킨 루틴이 여기에 보여요</p>
+        <p className="text-ink-3 mt-3 text-[13px]">4번 이상 한 루틴 중 75% 넘게 지킨 루틴이 여기에 보여요</p>
       )}
 
       <div className="border-line my-5 border-t" />
@@ -43,7 +43,7 @@ export function RoutineLists({ routines }: { routines?: PatternRoutines | null }
           ))}
         </ul>
       ) : (
-        <p className="text-ink-3 mt-3 text-[13px]">자주 놓치는 블록이 없어요 👏</p>
+        <p className="text-ink-3 mt-3 text-[13px]">3번 이상 한 루틴 중 자주 놓친 게 없어요 👏</p>
       )}
     </Card>
   )

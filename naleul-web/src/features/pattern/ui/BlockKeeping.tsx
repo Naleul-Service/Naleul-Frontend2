@@ -1,5 +1,19 @@
-import type { PatternBlockKeeping } from '../types'
+'use client'
+
+import { useState } from 'react'
+import { Repeat } from 'lucide-react'
+import { cn } from '@/lib/cn'
+import { hexOf } from '@/features/timetable/layout'
+import type { BlockKeepItem, PatternBlockKeeping } from '../types'
 import { NotEnough, Section } from './Section'
+
+type KeepKind = 'onTime' | 'late' | 'missed'
+
+const KINDS: { kind: KeepKind; label: string; color: string; text: string }[] = [
+  { kind: 'onTime', label: '제시간 시작', color: 'bg-success', text: 'text-success' },
+  { kind: 'late', label: '늦게 시작', color: 'bg-warning', text: 'text-warning' },
+  { kind: 'missed', label: '놓침', color: 'bg-danger', text: 'text-danger' },
+]
 
 /** 블록을 어떻게 지키나요? — 제시간 / 늦게 / 놓침 + 자주 옮기는 블록 */
 export function BlockKeeping({ block }: { block?: PatternBlockKeeping | null }) {
@@ -18,11 +32,7 @@ export function BlockKeeping({ block }: { block?: PatternBlockKeeping | null }) 
             <span className="bg-warning" style={{ width: `${block!.late}%` }} />
             <span className="bg-danger" style={{ width: `${block!.missed}%` }} />
           </div>
-          <div className="text-ink-2 mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
-            <Legend color="bg-success" label="제시간 시작" value={block!.onTime} />
-            <Legend color="bg-warning" label="늦게 시작" value={block!.late} />
-            <Legend color="bg-danger" label="놓침" value={block!.missed} />
-          </div>
+          <KeepFilter block={block!} />
         </>
       )}
 
@@ -59,11 +69,81 @@ export function BlockKeeping({ block }: { block?: PatternBlockKeeping | null }) 
   )
 }
 
-function Legend({ color, label, value }: { color: string; label: string; value?: number | null }) {
+/**
+ * 제시간 / 늦게 / 놓침 칩 — 누르면 그렇게 된 루틴 · Task 를 많은 순으로 보여줘요.
+ * 다시 누르면 접혀요.
+ */
+function KeepFilter({ block }: { block: PatternBlockKeeping }) {
+  const [kind, setKind] = useState<KeepKind | null>(null)
+  const items = block.items ?? []
+  const picked = kind ? KINDS.find((k) => k.kind === kind)! : null
+  const list: BlockKeepItem[] = kind
+    ? items
+        .filter((i) => i[kind] > 0)
+        .sort((a, b) => b[kind] - a[kind] || b.onTime + b.late + b.missed - (a.onTime + a.late + a.missed))
+    : []
   return (
-    <span className="flex items-center gap-1.5">
-      <span className={`size-2.5 rounded-sm ${color}`} />
-      {label} <b className="text-ink">{value ?? 0}%</b>
-    </span>
+    <>
+      <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="블록 지킴 필터">
+        {KINDS.map((k) => {
+          const on = kind === k.kind
+          return (
+            <button
+              key={k.kind}
+              type="button"
+              aria-pressed={on}
+              onClick={() => setKind(on ? null : k.kind)}
+              className={cn(
+                'flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors',
+                on ? 'border-ink bg-ink text-surface' : 'border-line text-ink-2 hover:border-line-strong'
+              )}
+            >
+              <span className={`size-2.5 rounded-sm ${k.color}`} />
+              {k.label} <b className={on ? '' : 'text-ink'}>{block[k.kind] ?? 0}%</b>
+            </button>
+          )
+        })}
+      </div>
+      {!kind && items.length > 0 && (
+        <p className="text-ink-4 mt-2 text-[12px]">칩을 누르면 어떤 루틴 · Task였는지 볼 수 있어요</p>
+      )}
+      {picked &&
+        (list.length ? (
+          <ul className="divide-line border-line mt-3 divide-y rounded-2xl border">
+            {list.map((i) => {
+              const total = i.onTime + i.late + i.missed
+              return (
+                <li key={i.key} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 truncate text-[14px] font-semibold">
+                      {i.routine && <Repeat className="text-brand size-3.5 shrink-0" aria-label="루틴" />}
+                      {i.emoji && <span>{i.emoji}</span>}
+                      <span className="truncate">{i.title}</span>
+                    </p>
+                    {i.goalName && (
+                      <p className="text-ink-3 mt-0.5 flex items-center gap-1 text-[12px]">
+                        <span
+                          className="size-2 rounded-full"
+                          style={{ backgroundColor: hexOf(i.goalColorCode) }}
+                          aria-hidden
+                        />
+                        {i.goalName}
+                      </p>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-[13px]">
+                    <b className={picked.text}>{i[picked.kind]}번</b>
+                    <span className="text-ink-4"> / {total}번</span>
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <p className="text-ink-3 mt-3 text-[13px]">
+            {picked.kind === 'missed' ? '놓친 블록이 없어요 👏' : `${picked.label}한 블록이 없어요`}
+          </p>
+        ))}
+    </>
   )
 }
