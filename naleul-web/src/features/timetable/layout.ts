@@ -113,10 +113,12 @@ function clip(start: number, end: number, from: number, to: number) {
 
 export function placeFixed(day: TimetableDay, from: number, to: number): Placed<FixedBlock>[] {
   const out: Placed<FixedBlock>[] = []
-  // 수면은 placeSleep 이 자르지 않은 원본으로 따로 그려요 (기상·취침 가장자리를 끌 수 있게)
-  const sleepSeparately = !!day.sleep
+  // 기상 · 취침 수면은 placeSleep 이 자르지 않은 원본으로 따로 그려요 (기상·취침 가장자리를 끌 수 있게).
+  // 그 둘이 아닌 수면(예전 서버가 늦잠 기상을 못 알아본 경우 등)은 여기서 그대로 그려서 사라지지 않게 해요
+  const sameSleep = (a: FixedBlock, b: FixedBlock | null | undefined) =>
+    !!b && a.lifePatternId === b.lifePatternId && a.targetDate === b.targetDate
   for (const b of day.fixedBlocks) {
-    if (sleepSeparately && b.patternType === 'SLEEP') continue
+    if (b.patternType === 'SLEEP' && (sameSleep(b, day.sleep?.wake) || sameSleep(b, day.sleep?.bed))) continue
     const c = clip(minutesFrom(day.date, b.start), minutesFrom(day.date, b.end), from, to)
     if (c) out.push({ item: b, ...c, col: 0, cols: 1 })
   }
