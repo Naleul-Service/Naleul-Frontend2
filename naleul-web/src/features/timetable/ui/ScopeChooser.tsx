@@ -19,14 +19,13 @@ export interface ScopeOption {
  * 고를 수 있는 범위.
  * @param kind      루틴 / 고정 시간
  * @param sameDay   원래 날짜 그대로인지 (루틴을 다른 날로 옮기면 이날만)
- * @param crossesMidnight 새 시간이 자정을 넘기는지 (루틴 기본값은 자정을 넘길 수 없어요)
+ * @param crossesMidnight 새 시간이 자정을 넘기는지 (루틴은 자정을 넘겨도 "앞으로"가 돼요 — 12시간까지)
  * @param weekdayLabel 고정 시간: "앞으로 ○마다"에 넣을 요일 이름 (예: "수요일", "토요일 아침"). 있으면 요일별 옵션이 생겨요
  */
 export function scopeOptions({
   kind,
   isToday,
   sameDay = true,
-  crossesMidnight = false,
   weekdayLabel,
 }: {
   kind: 'routine' | 'fixed'
@@ -64,9 +63,7 @@ export function scopeOptions({
       scope: 'FOLLOWING',
       label: '앞으로 계속',
       hint: kind === 'routine' ? '남은 루틴 전부 + 루틴 기본 시간' : '기본 시간이 바뀌어요 (지난 기록은 그대로)',
-      disabledReason:
-        otherDay ??
-        (kind === 'routine' && crossesMidnight ? '자정을 넘기는 시간은 루틴 기본값으로 정할 수 없어요' : undefined),
+      disabledReason: otherDay,
     },
   ]
 }

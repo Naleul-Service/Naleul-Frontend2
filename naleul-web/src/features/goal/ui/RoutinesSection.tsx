@@ -1,5 +1,6 @@
 'use client'
 
+import { isValidRoutineRange } from '@/features/timetable/time'
 import { useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
 import { cn } from '@/lib/cn'
@@ -120,7 +121,7 @@ function RoutineForm({
   const badDay = perDay
     ? shownDays.find((d) => {
         const t = timeOf(d)
-        return !!t.start !== !!t.end || (t.start && t.end && t.start >= t.end)
+        return !!t.start !== !!t.end || (t.start && t.end && !isValidRoutineRange(t.start, t.end))
       })
     : undefined
 
@@ -132,14 +133,14 @@ function RoutineForm({
       ? '요일을 하나 이상 골라 주세요.'
       : oneTimeOnly
         ? '시작·종료 시간을 함께 입력하거나 둘 다 비워 주세요.'
-        : startTime && endTime && startTime >= endTime
-          ? '종료 시간이 시작 시간보다 늦어야 해요. (자정을 넘기는 루틴은 아직 안 돼요)'
+        : startTime && endTime && !isValidRoutineRange(startTime, endTime)
+          ? '시작과 종료 시간을 확인해 주세요. 자정을 넘기는 루틴(예: 23:00 ~ 00:00)은 12시간까지 돼요.'
           : hadTime && !startTime
             ? '이미 정한 시간은 비울 수 없어요. 시간 없이 하려면 루틴을 다시 만들어 주세요.'
             : !start || !end || start > end
               ? '반복 기간을 확인해 주세요.'
               : badDay
-                ? `${JAVA_DAY_LABEL[badDay]}요일 시간을 확인해 주세요. (시작·종료를 함께, 종료가 더 늦게)`
+                ? `${JAVA_DAY_LABEL[badDay]}요일 시간을 확인해 주세요. (시작·종료를 함께, 자정을 넘기면 12시간까지)`
                 : null
   const valid = !!name.trim() && !error
 

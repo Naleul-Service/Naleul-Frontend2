@@ -40,6 +40,8 @@ export type DragSource =
       group?: GroupMember[]
     }
   | { kind: 'fixed'; block: FixedBlock; date: string; start: number; end: number }
+  /** 완료한 Task 의 "실제로 한 시간" 블록 — 끌어서 옮기거나 위·아래 끝을 늘이고 줄여요 (part = 나눠서 한 구간 번호) */
+  | { kind: 'actual'; task: TimeBlockTask; date: string; start: number; end: number; part: number }
 
 /** resize = 아래 끝(끝 시각) 조절, resize-top = 위 끝(시작 시각) 조절 */
 export type DragMode = 'move' | 'resize' | 'resize-top'
@@ -157,7 +159,8 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
       // ② 날짜 칸 (고정 시간·크기 조절은 원래 날짜에서만)
       const cols = [...root.querySelectorAll<HTMLElement>('[data-date]')]
       if (!cols.length) return null
-      const sameDay = s.source.kind === 'fixed' || isResize(s.mode)
+      // 고정 시간 · 실제로 한 시간 · 크기 조절은 원래 날짜 칸에서만
+      const sameDay = s.source.kind === 'fixed' || s.source.kind === 'actual' || isResize(s.mode)
       let col = sameDay ? cols.find((c) => c.dataset.date === s.source.date) : undefined
       if (!col) {
         // 칸 밖이면 가장 가까운 칸

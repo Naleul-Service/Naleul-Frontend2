@@ -19,10 +19,28 @@ const inputClass =
 
 const MAX_SEGMENTS = 10
 
+/** 입력 행 → 분 범위. 끝 ≤ 시작이면 끝은 다음 날, 앞 구간보다 이르게 시작하면 그 구간부터 다음 날 */
+function parseRows(rows: { start: string; end: string }[]) {
+  const out: { start: number; end: number }[] = []
+  let offset = 0
+  let prevStart = -Infinity
+  for (const r of rows) {
+    let s = r.start ? timeToMinutes(r.start) : NaN
+    let e = r.end ? timeToMinutes(r.end) : NaN
+    if (!Number.isNaN(s) && s + offset < prevStart) offset += 1440
+    s += offset
+    e += offset
+    if (e <= s) e += 1440
+    prevStart = s
+    out.push({ start: s, end: e })
+  }
+  return out
+}
+
 /**
  * "실제로 한 시간" 기록 — 한 번에 했으면 한 줄, 중간에 쉬었다가 이어서 했으면 "나눠서 했어요"로 여러 줄.
  * 예) 계획 13:00~18:00 → 실제 13:00~15:00, 16:00~18:00
- * 한 줄일 때만 자정을 넘길 수 있어요 (23:00~01:00). 여러 줄이면 같은 날 안에서, 서로 겹치지 않게.
+ * 자정을 넘겨도 돼요 (21:30~22:00, 23:00~00:00 / 23:30~00:30). 구간끼리는 겹치지 않게.
  */
 export function ActualTimeModal({
   task,
@@ -47,13 +65,9 @@ export function ActualTimeModal({
     saved.length > 1 ? saved : [{ start: minutesToTime(initial.start), end: minutesToTime(initial.end) }]
   )
 
-  const parsed = rows.map((r) => {
-    const s = r.start ? timeToMinutes(r.start) : NaN
-    let e = r.end ? timeToMinutes(r.end) : NaN
-    // 한 줄일 때만 "종료가 더 이르면 다음 날"로 봐요
-    if (rows.length === 1 && e <= s) e += 1440
-    return { start: s, end: e }
-  })
+  // 자정을 넘기는 구간도 돼요: 끝이 시작보다 이르거나 같으면(23:00 ~ 00:00) 끝은 다음 날,
+  // 앞 구간보다 이른 시각에 시작하면(23:00 ~ 23:30 다음 00:30 ~ 01:00) 그 구간은 통째로 다음 날로 봐요
+  const parsed = parseRows(rows)
   const error = (() => {
     if (parsed.some((p) => Number.isNaN(p.start) || Number.isNaN(p.end)))
       return '시작과 종료 시각을 모두 입력해 주세요.'

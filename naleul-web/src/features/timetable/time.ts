@@ -159,3 +159,15 @@ export function dDay(ymd: string, today: string) {
   if (diff < 0) return `${-diff}일 지남`
   return `D-${diff}`
 }
+
+/**
+ * 루틴 시간 범위가 괜찮은지 ("HH:mm"). 끝이 시작보다 이르면 자정을 넘기는 루틴이에요 (23:00 ~ 00:00 = 오후 11시 ~ 오전 12시).
+ * 자정을 넘기면 12시간까지 (백엔드 RoutineValidator 와 같은 규칙). 같은 시각은 안 돼요.
+ */
+export function isValidRoutineRange(start: string, end: string) {
+  const s = timeToMinutes(start)
+  const e = timeToMinutes(end)
+  if (s === e) return false
+  if (e > s) return true
+  return 1440 - (s - e) <= 12 * 60
+}

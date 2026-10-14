@@ -556,6 +556,28 @@ export function useTimetableInteractions(
     // 범위를 고르지 않고 다음 드래그를 하면 앞의 변경은 "이날만"으로 저장해요
     if (ask) chooseScope('DAY')
 
+    // 실제로 한 시간 블록: 끌어 놓은 자리로 실제 시간을 바로 고쳐요 (나눠서 했으면 그 구간만)
+    if (source.kind === 'actual') {
+      if (target.type !== 'grid') return
+      const segs = source.task.actualSegments ?? []
+      const ranges =
+        segs.length > 1
+          ? segs.map((g, i) =>
+              i === source.part
+                ? { start: toDateTime(target.date, target.start), end: toDateTime(target.date, target.end) }
+                : g
+            )
+          : [{ start: toDateTime(target.date, target.start), end: toDateTime(target.date, target.end) }]
+      ranges.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0))
+      completeWithActual.mutate({
+        taskId: source.task.taskId,
+        actualStartAt: ranges[0].start,
+        actualEndAt: ranges[ranges.length - 1].end,
+        segments: ranges.length > 1 ? ranges : undefined,
+      })
+      return
+    }
+
     // 묶음 드래그: 끈 만큼 묶음 전체를 같이 옮기고 한 번에 저장 (루틴도 이날만 바뀌어요)
     if (source.kind === 'task' && source.group?.length && target.type === 'grid') {
       const moves = groupMoves(source, target)

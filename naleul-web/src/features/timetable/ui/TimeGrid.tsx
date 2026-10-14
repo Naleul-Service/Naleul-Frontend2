@@ -39,6 +39,10 @@ export const fixedKey = (b: FixedBlock) => `${b.lifePatternId}-${b.targetDate}-$
 /** 드래그로 옮길 수 있는 Task (완료·미션은 백엔드에서 409) */
 export const canDragTask = (t: TimeBlockTask) => t.taskStatus !== 'COMPLETED' && t.sourceType !== 'MISSION'
 
+/** 실제로 한 시간을 끌어서 고칠 수 있는 완료 Task (미션은 실제 시간을 따로 저장해서 제외) */
+export const canDragActual = (t: TimeBlockTask) =>
+  t.taskStatus === 'COMPLETED' && t.sourceType !== 'MISSION' && !!t.plannedStartAt
+
 /**
  * 드래그로 옮길 수 있는 고정 블록: 그날 안에서 시작하고 끝나는 것만.
  * 자정을 넘기는 수면은 화면에 날짜별 조각만 보여서 끌어도 실제 길이를 알 수 없어요 → 상세의 "이날만 시간 변경"으로.
@@ -100,6 +104,24 @@ function validateSleep(days: TimetableDay[], block: FixedBlock, target: Extract<
   }
   if (s.bed && fixedKey(s.bed) === key && s.wake) {
     if (target.start < minutesFrom(day.date, s.wake.end) + MIN_AWAKE_MINUTES) return '기상 시간보다 일찍 잘 수 없어요'
+  }
+  return null
+}
+
+/**
+ * 실제로 한 시간: 나눠서 한 다른 구간과 겹치면 안 돼요 (백엔드 TASK_ACTUAL_INVALID_SEGMENT 와 같은 규칙)
+ */
+function validateActual(
+  source: Extract<DragSource, { kind: 'actual' }>,
+  target: Extract<DropTarget, { type: 'grid' }>
+) {
+  const segs = source.task.actualSegments ?? []
+  if (segs.length < 2) return null
+  for (let i = 0; i < segs.length; i++) {
+    if (i === source.part) continue
+    const s = minutesFrom(target.date, segs[i].start)
+    const e = minutesFrom(target.date, segs[i].end)
+    if (target.start < e && s < target.end) return '나눠서 한 다른 구간과 겹쳐요'
   }
   return null
 }
@@ -195,6 +217,7 @@ export function TimeGrid({
   const validate = useCallback(
     (source: DragSource, target: DropTarget) => {
       if (source.kind === 'fixed' && target.type === 'grid') return validateSleep(days, source.block, target)
+      if (source.kind === 'actual' && target.type === 'grid') return validateActual(source, target)
       if (source.kind !== 'task' || target.type !== 'grid') return null
       const moves = groupMoves(source, target)
       const moving = new Set(moves.map((m) => m.task.taskId))
@@ -229,8 +252,9 @@ export function TimeGrid({
   const isDragging = (kind: 'task' | 'fixed', id: string | number) =>
     !!drag &&
     (kind === 'task'
-      ? drag.source.kind === 'task' &&
-        (drag.source.task.taskId === id || !!drag.source.group?.some((m) => m.task.taskId === id))
+      ? (drag.source.kind === 'task' &&
+          (drag.source.task.taskId === id || !!drag.source.group?.some((m) => m.task.taskId === id))) ||
+        (drag.source.kind === 'actual' && drag.source.task.taskId === id)
       : drag.source.kind === 'fixed' && fixedKey(drag.source.block) === id)
   // 묶음 드래그 중 같이 움직이는 나머지 Task 들의 새 자리
   const groupGhosts =
@@ -492,7 +516,22 @@ export function TimeGrid({
                                 },
                                 mode
                               )
-                          : undefined
+                          : // 완료한 Task 가 실제 시각에 그려져 있으면(계획 | 실제 비교가 아닐 때) 끌어서 실제 시간을 고쳐요
+                            enabled && !compare && canDragActual(p.item)
+                            ? (e, mode) =>
+                                startDrag(
+                                  e,
+                                  {
+                                    kind: 'actual',
+                                    task: p.item,
+                                    date: d.date,
+                                    start: p.start,
+                                    end: p.end,
+                                    part: p.part ?? 0,
+                                  },
+                                  mode
+                                )
+                            : undefined
                       }
                     />
                   )
@@ -530,6 +569,29 @@ export function TimeGrid({
                       geometry={geometry}
                       selected={selection?.kind === 'task' && selection.id === p.item.taskId}
                       onSelect={selectTask}
+                      dimmed={
+                        drag?.source.kind === 'actual' &&
+                        drag.source.task.taskId === p.item.taskId &&
+                        drag.source.part === (p.part ?? 0)
+                      }
+                      // 실제 칸의 완료 Task: 끌어서 옮기고 위·아래 끝으로 늘이고 줄여서 실제 시간을 고쳐요
+                      drag={
+                        enabled && canDragActual(p.item)
+                          ? (e, mode) =>
+                              startDrag(
+                                e,
+                                {
+                                  kind: 'actual',
+                                  task: p.item,
+                                  date: d.date,
+                                  start: p.start,
+                                  end: p.end,
+                                  part: p.part ?? 0,
+                                },
+                                mode
+                              )
+                          : undefined
+                      }
                     />
                   ))}
                   {acts.map((p) => (
@@ -672,11 +734,11 @@ function DragGhost({
 }) {
   const { source, invalid } = drag
   const title =
-    source.kind === 'task'
-      ? `${source.task.emoji ? `${source.task.emoji} ` : ''}${source.task.taskName}`
+    source.kind === 'task' || source.kind === 'actual'
+      ? `${source.task.emoji ? `${source.task.emoji} ` : ''}${source.task.taskName}${source.kind === 'actual' ? ' · 실제' : ''}`
       : source.block.title
   const style =
-    source.kind === 'task'
+    source.kind === 'task' || source.kind === 'actual'
       ? taskColors(source.task)
       : { ...HATCH, color: 'var(--color-ink-2)', borderColor: 'var(--color-ink-4)' }
   return (
