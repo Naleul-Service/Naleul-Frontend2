@@ -151,6 +151,8 @@ function useWorkMutation<V, R>(
       qc.invalidateQueries({ queryKey: goalKeys.tasks(goalId) })
       qc.invalidateQueries({ queryKey: timetableKeys.all })
       qc.invalidateQueries({ queryKey: ['record'] })
+      // 홈 회고 · 회고 모아보기
+      qc.invalidateQueries({ queryKey: ['home'] })
     },
   })
 }

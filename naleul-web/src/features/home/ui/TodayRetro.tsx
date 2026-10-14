@@ -2,13 +2,25 @@
 
 import { useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Check, Pencil, PencilLine, Trash2 } from 'lucide-react'
+import { ArrowRight, Check, Library, Pencil, PencilLine, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { inlineInput } from '@/features/goal/edit/inline'
 import { hexOf } from '@/features/timetable/layout'
-import { useCreateTodayRetro, useDeleteRetro, useUpdateRetro, type HomeGoalToday, type HomeRetro } from '../api'
+import { todayKst } from '@/features/timetable/time'
+import {
+  checkInWritten,
+  useCreateTodayRetro,
+  useDeleteRetro,
+  useUpdateRetro,
+  type HomeGoalToday,
+  type HomeRetro,
+} from '../api'
+import { HomeCheckInForm } from './HomeCheckInForm'
+
+/** 그날 남긴 게 있는지 — 목표형은 "오늘 기록"(수치 · 기분 · 회고), 업무형은 회고 글 */
+export const hasRecord = (g: HomeGoalToday) => g.retros.length > 0 || checkInWritten(g.checkIn)
 
 /** 목표 형태별 회고 질문 — 빈 칸 앞에서 막막하지 않게 */
 function promptOf(g: HomeGoalToday) {
@@ -22,11 +34,13 @@ function nextGoal(goals: HomeGoalToday[], after: number | null, written: Set<num
   const order = goals.filter((g) => g.activeToday)
   const start = after === null ? -1 : order.findIndex((g) => g.goalCategoryId === after)
   const rest = [...order.slice(start + 1), ...order.slice(0, Math.max(start, 0))]
-  return rest.find((g) => g.retros.length === 0 && !written.has(g.goalCategoryId) && g.goalCategoryId !== after) ?? null
+  return rest.find((g) => !hasRecord(g) && !written.has(g.goalCategoryId) && g.goalCategoryId !== after) ?? null
 }
 
 /**
  * 오늘 회고 (홈 오른쪽 패널) — 목표를 하나씩 고를 필요 없이 입력창 하나로 써요.
+ *  - 목표형: 목표 상세 "오늘 기록"과 같은 칸 (수치 + 오늘 어땠는지 + 한 줄 회고) — 어디서 쓰든 같은 기록이에요
+ *  - 업무형: 지금처럼 회고 글
  *  - 오늘 할 일이 있던 목표 중 아직 회고가 없는 것부터 자동으로 골라 둬요
  *  - Enter 로 저장하면 다음 목표로 넘어가요 (건너뛰기도 가능) · Shift+Enter 줄바꿈
  *  - 위의 목표 칩을 눌러 직접 고를 수도 있어요 (✓ = 오늘 회고 있음)
@@ -56,7 +70,9 @@ export function RetroPanel({
   if (!goals) return <div className="bg-subtle h-60 animate-pulse rounded-[20px]" />
   if (goals.length === 0) return <p className="text-ink-3 text-sm">진행 중인 목표가 없어요.</p>
 
-  const hasRetro = (g: HomeGoalToday) => g.retros.length > 0 || written.has(g.goalCategoryId)
+  const hasRetro = (g: HomeGoalToday) => hasRecord(g) || written.has(g.goalCategoryId)
+  // 앞날은 아직 기록할 수 없어요 (목표형 기록은 서버도 미래 날짜를 막아요)
+  const future = today > todayKst()
   const auto = nextGoal(goals, null, written) ?? goals.find((g) => g.activeToday) ?? goals[0]
   const current = finished ? null : (goals.find((g) => g.goalCategoryId === picked) ?? auto)
   const active = goals.filter((g) => g.activeToday)
@@ -138,6 +154,13 @@ export function RetroPanel({
           </span>
         )}
       </div>
+      <Link
+        href="/reflections"
+        className="text-brand hover:bg-brand-soft mt-1 -ml-1 inline-flex items-center gap-1 rounded-lg px-1 py-0.5 text-[12px] font-semibold"
+      >
+        <Library className="size-3.5" />
+        지난 회고 모아보기
+      </Link>
 
       {/* 목표 고르기 — 자동으로 골라 두지만 눌러서 바꿀 수 있어요 */}
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -200,35 +223,63 @@ export function RetroPanel({
             </ul>
           )}
 
-          <textarea
-            ref={inputRef}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault()
-                submit()
-              }
-            }}
-            rows={4}
-            aria-label={`${current.goalName} 오늘 회고`}
-            placeholder={promptOf(current)}
-            className={`${inlineInput} mt-3 h-auto resize-none py-2.5 text-[14px] leading-relaxed`}
-          />
-          <div className="mt-2 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => goNext(current.goalCategoryId, false)}
-              className="text-ink-3 hover:text-ink text-[13px] font-semibold"
-            >
-              건너뛰기
-            </button>
-            <Button size="sm" className="ml-auto" loading={create.isPending} disabled={!text.trim()} onClick={submit}>
-              저장하고 다음
-              <ArrowRight className="size-3.5" />
-            </Button>
-          </div>
-          <p className="text-ink-4 mt-1.5 text-[11px]">Enter 저장 후 다음 목표로 · Shift+Enter 줄바꿈</p>
+          {future ? (
+            <p className="text-ink-3 bg-subtle mt-3 rounded-xl px-3 py-3 text-[13px]">
+              앞날은 아직 기록할 수 없어요. 그날이 되면 남겨 주세요.
+            </p>
+          ) : current.checkIn ? (
+            <HomeCheckInForm
+              key={current.goalCategoryId}
+              goalCategoryId={current.goalCategoryId}
+              goalName={current.goalName}
+              date={today}
+              checkIn={current.checkIn}
+              prompt={promptOf(current)}
+              onSaved={() => {
+                setWritten((s) => new Set([...s, current.goalCategoryId]))
+                goNext(current.goalCategoryId, true)
+              }}
+              onSkip={() => goNext(current.goalCategoryId, false)}
+            />
+          ) : (
+            <>
+              <textarea
+                ref={inputRef}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                    e.preventDefault()
+                    submit()
+                  }
+                }}
+                rows={4}
+                aria-label={`${current.goalName} 오늘 회고`}
+                placeholder={promptOf(current)}
+                className={`${inlineInput} mt-3 h-auto resize-none py-2.5 text-[14px] leading-relaxed`}
+              />
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => goNext(current.goalCategoryId, false)}
+                  className="text-ink-3 hover:text-ink text-[13px] font-semibold"
+                >
+                  건너뛰기
+                </button>
+                <Button
+                  size="sm"
+                  className="ml-auto"
+                  loading={create.isPending}
+                  disabled={!text.trim()}
+                  onClick={submit}
+                >
+                  저장하고 다음
+                  <ArrowRight className="size-3.5" />
+                </Button>
+              </div>
+              <p className="text-ink-4 mt-1.5 text-[11px]">Enter 저장 후 다음 목표로 · Shift+Enter 줄바꿈</p>
+            </>
+          )}
         </div>
       ) : (
         <div className="mt-5 py-4 text-center">

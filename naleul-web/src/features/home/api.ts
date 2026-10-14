@@ -1,7 +1,7 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
-import type { GoalMode } from '@/features/goal/api'
+import { goalKeys, type GoalMode, type ReflectionMood } from '@/features/goal/api'
 import { workKeys } from '@/features/work/api'
 
 /**
@@ -38,6 +38,24 @@ export interface HomeRetro {
   content: string
 }
 
+/**
+ * 목표형(ACHIEVEMENT) 그날 기록 — 목표 상세 "오늘 기록"과 같은 데이터 (PUT /goal-categories/{id}/check-in)
+ *  - hasMetric: 수치 목표인지 (아니면 기분 · 한 줄 회고만)
+ *  - value: 그날 기록한 수치
+ */
+export interface HomeCheckIn {
+  hasMetric: boolean
+  metricName: string | null
+  unit: string | null
+  currentValue: number | null
+  value: number | null
+  mood: ReflectionMood | null
+  note: string | null
+}
+
+export const checkInWritten = (c: HomeCheckIn | null | undefined) =>
+  !!c && (c.value != null || c.mood != null || !!c.note)
+
 export interface HomeGoalToday {
   goalCategoryId: number
   goalName: string
@@ -51,6 +69,8 @@ export interface HomeGoalToday {
   doneTasks: string[]
   openTasks: string[]
   retros: HomeRetro[]
+  /** 목표형만 (업무형은 null — 회고 글로 남겨요). 아직 배포 전 서버면 없을 수 있어요 */
+  checkIn?: HomeCheckIn | null
 }
 
 export interface HomeToday {
@@ -62,6 +82,7 @@ export interface HomeToday {
 export const homeKeys = {
   all: ['home'] as const,
   today: (date?: string) => [...homeKeys.all, 'today', date ?? 'today'] as const,
+  reflections: (goalCategoryId?: number) => [...homeKeys.all, 'reflections', goalCategoryId ?? 'all'] as const,
 }
 
 /** date 를 주면 그날 (홈에서 날짜 ‹ › 로 지난날 · 앞날 보기). 안 주면 오늘 */
@@ -112,3 +133,78 @@ export const useUpdateRetro = () =>
 
 export const useDeleteRetro = () =>
   useRetroMutation((retrospectiveId: number) => api.delete(`/v1/retrospectives/${retrospectiveId}`), '회고를 지웠어요.')
+
+/** 홈에서 목표형 "오늘 기록" 남기기 — 목표 상세의 오늘 기록과 같은 API (수치 + 기분 + 한 줄 회고) */
+export function useHomeCheckIn() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (v: {
+      goalCategoryId: number
+      date: string
+      value: number | null
+      mood: ReflectionMood | null
+      note: string | null
+    }) =>
+      api.put(`/v1/goal-categories/${v.goalCategoryId}/check-in`, {
+        date: v.date,
+        value: v.value,
+        mood: v.mood,
+        note: v.note,
+      }),
+    onSuccess: () => toast.success('오늘 기록을 남겼어요.'),
+    onError: (e) => toast.error(errorMessage(e)),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: homeKeys.all })
+      // 목표 상세 그래프 · 오늘 기록 · 목록의 현재 값도 같이 바뀌어요
+      qc.invalidateQueries({ queryKey: goalKeys.progress(v.goalCategoryId) })
+      qc.invalidateQueries({ queryKey: goalKeys.detail(v.goalCategoryId) })
+      qc.invalidateQueries({ queryKey: goalKeys.list() })
+    },
+  })
+}
+
+// ── 회고 모아보기 (GET /home/reflections) ──────────────────────────
+
+export type ReflectionKind = 'CHECK_IN' | 'RETRO'
+
+export interface ReflectionEntry {
+  kind: ReflectionKind
+  date: string
+  goalCategoryId: number
+  goalName: string
+  goalEmoji: string | null
+  colorCode: string | null
+  goalMode: GoalMode | null
+  /** RETRO 만 */
+  retrospectiveId: number | null
+  reviewType: 'DAILY' | 'WEEKLY' | 'MONTHLY' | null
+  /** CHECK_IN 만 */
+  mood: ReflectionMood | null
+  /** CHECK_IN: 한 줄 회고 · RETRO: 회고 내용 */
+  note: string | null
+  value: number | null
+  metricName: string | null
+  unit: string | null
+}
+
+export interface ReflectionFeedPage {
+  from: string
+  to: string
+  entries: ReflectionEntry[]
+  hasMore: boolean
+}
+
+/** 30일씩, "더 보기"로 그 전 30일 */
+export function useReflectionFeed(goalCategoryId?: number) {
+  return useInfiniteQuery({
+    queryKey: homeKeys.reflections(goalCategoryId),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => {
+      const q = new URLSearchParams({ days: '30' })
+      if (pageParam) q.set('before', pageParam)
+      if (goalCategoryId) q.set('goalCategoryId', String(goalCategoryId))
+      return api.get<ReflectionFeedPage>(`/v1/home/reflections?${q}`)
+    },
+    getNextPageParam: (last) => (last.hasMore ? last.from : null),
+  })
+}

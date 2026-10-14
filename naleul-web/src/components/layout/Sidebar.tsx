@@ -2,7 +2,18 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { BarChart3, CalendarDays, Home, LogIn, LogOut, Plus, Settings, Target, type LucideIcon } from 'lucide-react'
+import {
+  BarChart3,
+  CalendarDays,
+  Home,
+  Library,
+  LogIn,
+  LogOut,
+  Plus,
+  Settings,
+  Target,
+  type LucideIcon,
+} from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { logout } from '@/lib/client/api'
 import { Logo } from '@/components/brand/Logo'
@@ -21,6 +32,7 @@ const NAV: NavItem[] = [
   { href: '/', label: '홈', icon: Home },
   { href: '/goal', label: '목표', icon: Target },
   { href: '/calendar', label: '캘린더', icon: CalendarDays },
+  { href: '/reflections', label: '회고 모아보기', icon: Library },
   { href: '/patterns', label: '나의 패턴', icon: BarChart3 },
 ]
 

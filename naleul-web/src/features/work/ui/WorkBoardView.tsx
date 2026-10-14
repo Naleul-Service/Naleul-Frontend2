@@ -18,6 +18,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -906,7 +907,15 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
       </Button>
       {board.retrospectives.length > 0 && (
         <>
-          <p className="text-ink-3 mt-4 mb-1 text-[12px] font-semibold">최근 회고</p>
+          <div className="mt-4 mb-1 flex items-center">
+            <p className="text-ink-3 text-[12px] font-semibold">최근 회고</p>
+            <Link
+              href={`/reflections?goal=${goalId}`}
+              className="text-brand ml-auto text-[12px] font-semibold hover:underline"
+            >
+              모두 보기
+            </Link>
+          </div>
           <ul className="divide-line divide-y">
             {board.retrospectives.map((r) => (
               <li key={r.retrospectiveId} className="group flex gap-2 py-2">

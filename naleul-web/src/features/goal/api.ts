@@ -365,6 +365,8 @@ export function useCheckIn(goalId: number) {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: goalKeys.detail(goalId) })
       qc.invalidateQueries({ queryKey: goalKeys.list() })
+      // 홈 "오늘 기록" · 회고 모아보기에도 같은 기록이 보여요
+      qc.invalidateQueries({ queryKey: ['home'] })
     },
   })
 }

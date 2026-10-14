@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import Link from 'next/link'
 import { NotebookPen, PencilLine, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
@@ -214,7 +215,9 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
         </form>
       )}
 
-      {recent.length > 0 && <RecentReflections list={recent} logs={m?.logs ?? []} unit={m?.unit ?? null} />}
+      {recent.length > 0 && (
+        <RecentReflections goalId={goal.goalCategoryId} list={recent} logs={m?.logs ?? []} unit={m?.unit ?? null} />
+      )}
     </section>
   )
 }
@@ -272,17 +275,27 @@ function AdjustHint() {
 }
 
 function RecentReflections({
+  goalId,
   list,
   logs,
   unit,
 }: {
+  goalId: number
   list: GoalReflection[]
   logs: { date: string; value: number }[]
   unit: string | null
 }) {
   return (
     <div className="border-line mt-4 border-t pt-3">
-      <p className="text-ink-3 mb-1.5 text-[12px] font-semibold">최근 기록</p>
+      <div className="mb-1.5 flex items-center">
+        <p className="text-ink-3 text-[12px] font-semibold">최근 기록</p>
+        <Link
+          href={`/reflections?goal=${goalId}`}
+          className="text-brand ml-auto text-[12px] font-semibold hover:underline"
+        >
+          모두 보기
+        </Link>
+      </div>
       <ul className="space-y-1">
         {list.map((r) => {
           const v = logs.find((l) => l.date === r.date)?.value

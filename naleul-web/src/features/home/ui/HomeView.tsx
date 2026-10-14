@@ -14,7 +14,7 @@ import { useHomeToday } from '../api'
 import { agendaOf, inLabel, isDone, isRoutineTask, startMinutes, tasksOfDay } from '../today'
 import { HomeDayCalendar } from './HomeDayCalendar'
 import { TodayRoutines, TodayTasks } from './TodayChecklist'
-import { RetroPanel } from './TodayRetro'
+import { RetroPanel, hasRecord } from './TodayRetro'
 import { DeadlineRoadmap, UpcomingSchedule } from './Upcoming'
 
 const WEEKDAY_FULL = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']
@@ -96,7 +96,7 @@ export function HomeView({ userName }: { userName: string }) {
   const onToggle = (t: TimeBlockTask) => toggle.mutate(t)
   const onToggleHabit = (h: Habit) => toggleHabit.mutate({ habit: h, day: today })
 
-  const retroLeft = (home.data?.goals ?? []).filter((g) => g.activeToday && g.retros.length === 0).length
+  const retroLeft = (home.data?.goals ?? []).filter((g) => g.activeToday && !hasRecord(g)).length
   // 앞날은 습관을 체크할 수 없어서 빼요 (루틴 Task 는 보여요)
   const habitsShown = isFuture ? undefined : habits.data
 
