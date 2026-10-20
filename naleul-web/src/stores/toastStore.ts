@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { COMMON_EVENTS as CE, track } from '@/lib/client/analytics'
+import { currentPath } from '@/lib/client/commonEvents'
 
 export type ToastTone = 'default' | 'success' | 'error'
 
@@ -6,6 +8,8 @@ interface ToastItem {
   id: number
   message: string
   tone: ToastTone
+  /** 뜬 시각 (toast.dismiss_click 의 seconds_shown) */
+  at: number
 }
 
 interface ToastState {
@@ -20,7 +24,9 @@ export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
   show: (message, tone = 'default') => {
     const id = ++seq
-    set({ toasts: [...get().toasts.slice(-2), { id, message, tone }] }) // 최대 3개
+    set({ toasts: [...get().toasts.slice(-2), { id, message, tone, at: Date.now() }] }) // 최대 3개
+    // 문구는 앱이 정한 것만 들어와요 (서버 에러 메시지도 앱 문구, 사용자 입력은 안 들어감 — 노션 toast_message)
+    track(CE.toastView, { toast_tone: tone, toast_message: message, current_path: currentPath() })
     setTimeout(() => get().dismiss(id), 2800)
   },
   dismiss: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),

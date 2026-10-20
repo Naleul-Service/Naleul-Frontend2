@@ -3,6 +3,7 @@
 import { CheckCircle2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useToastStore } from '@/stores/toastStore'
+import { COMMON_EVENTS as CE, track } from '@/lib/client/analytics'
 
 export function Toaster() {
   const toasts = useToastStore((s) => s.toasts)
@@ -17,7 +18,10 @@ export function Toaster() {
         <button
           key={t.id}
           type="button"
-          onClick={() => dismiss(t.id)}
+          onClick={() => {
+            track(CE.toastDismissClick, { toast_tone: t.tone, seconds_shown: Math.round((Date.now() - t.at) / 1000) })
+            dismiss(t.id)
+          }}
           className={cn(
             'pointer-events-auto flex max-w-md items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium text-white',
             'shadow-pop animate-[toast-in_180ms_ease-out]',

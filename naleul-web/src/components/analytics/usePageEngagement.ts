@@ -1,7 +1,13 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { onInteraction, track, trackBeforeLeave, type AnalyticsEventName, type EventProps } from '@/lib/client/analytics'
+import {
+  onInteraction,
+  track,
+  trackBeforeLeave,
+  type AnalyticsEventName,
+  type EventProps,
+} from '@/lib/client/analytics'
 
 /**
  * 화면 첫 동작 · 머문 시간 — 노션 규칙 "화면마다 같은 방식으로 (공통 훅 하나로)".

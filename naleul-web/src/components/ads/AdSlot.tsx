@@ -1,8 +1,14 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import Script from 'next/script'
 import { cn } from '@/lib/cn'
+import { COMMON_EVENTS as CE, track, trackBeforeLeave } from '@/lib/client/analytics'
+import { currentPath } from '@/lib/client/commonEvents'
+
+/** 광고를 요청한 뒤 결과(채워짐/빈 광고)를 확인하기까지 기다리는 시간 */
+const AD_RESULT_WAIT_MS = 3000
 
 /**
  * 배너 광고 자리 (Google AdSense) — Free · 둘러보기 사용자에게만 보여요. Pro 는 광고 없음.
@@ -37,6 +43,12 @@ export function AdSlot({
   const slot = SLOTS[placement]
   const pushed = useRef(false)
   const show = role !== 'PRO' && role !== 'ADMIN'
+  const configured = !!CLIENT && !!slot
+  const boxRef = useRef<HTMLDivElement>(null)
+  const insRef = useRef<HTMLModElement>(null)
+  // push 가 실패했는지 (광고 차단기 등) — 화면엔 안 쓰고 분석에만 써서 state 가 아니라 ref
+  const blocked = useRef(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     if (!show || !CLIENT || !slot || pushed.current) return
@@ -45,8 +57,32 @@ export function AdSlot({
       ;(window.adsbygoogle = window.adsbygoogle || []).push({})
     } catch {
       /* 광고 차단기 등 — 조용히 무시 */
+      blocked.current = true
     }
   }, [show, slot])
+
+  // ad.view — 광고 자리가 그려질 때 경로마다 1회 (좁은 화면에서 숨겨진 고정 사이드바 쪽은 빼요)
+  // ad_state: rendered 광고 요청함 / not_configured 환경변수 없음(개발 점선 자리) / blocked 광고 차단·스크립트 실패 / unfilled 빈 광고
+  useEffect(() => {
+    if (!show || (!configured && process.env.NODE_ENV === 'production')) return
+    const t = window.setTimeout(
+      () => {
+        if (!boxRef.current || boxRef.current.offsetParent === null) return
+        const status = insRef.current?.getAttribute('data-ad-status')
+        const scriptLoaded = !!(window.adsbygoogle as { loaded?: boolean } | undefined)?.loaded
+        const state = !configured
+          ? 'not_configured'
+          : blocked.current || !scriptLoaded
+            ? 'blocked'
+            : status === 'unfilled'
+              ? 'unfilled'
+              : 'rendered'
+        track(CE.adView, { ad_placement: placement, ad_state: state, current_path: currentPath() })
+      },
+      configured ? AD_RESULT_WAIT_MS : 0
+    )
+    return () => window.clearTimeout(t)
+  }, [show, configured, placement, pathname])
 
   if (!show) return null
 
@@ -54,6 +90,7 @@ export function AdSlot({
     if (process.env.NODE_ENV === 'production') return null
     return (
       <div
+        ref={boxRef}
         className={cn(
           'border-line-strong text-ink-4 grid h-[90px] place-items-center rounded-xl border border-dashed text-[12px]',
           className
@@ -65,7 +102,7 @@ export function AdSlot({
   }
 
   return (
-    <div className={cn('overflow-hidden rounded-xl', className)} aria-label="광고">
+    <div ref={boxRef} className={cn('overflow-hidden rounded-xl', className)} aria-label="광고">
       <Script
         id="adsbygoogle-js"
         async
@@ -74,6 +111,7 @@ export function AdSlot({
         src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${CLIENT}`}
       />
       <ins
+        ref={insRef}
         className="adsbygoogle block"
         style={{ display: 'block', width: '100%', height: 90 }}
         data-ad-client={CLIENT}
@@ -83,8 +121,14 @@ export function AdSlot({
         {...(TEST ? { 'data-adtest': 'on' } : {})}
       />
       <p className="text-ink-4 mt-1 text-right text-[10px]">
-        광고 ·{' '}
-        <a href="/settings/membership" className="hover:underline">
+        광고 · {/* Link 가 아니라 a 태그라 앱 전체를 새로 불러와요 → beacon 으로 보내요 */}
+        <a
+          href="/settings/membership"
+          onClick={() =>
+            void trackBeforeLeave(CE.adUpgradeClick, { ad_placement: placement, current_path: currentPath() })
+          }
+          className="hover:underline"
+        >
           Pro는 광고 없이
         </a>
       </p>
