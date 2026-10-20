@@ -18,7 +18,7 @@ export function ProfileSummaryCard({ user }: { user: SessionUserView }) {
 
   return (
     <Card className="flex items-center gap-4 p-5">
-      <span className="grid size-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#8EA2FF] to-[#B49CFF] text-lg font-bold text-white">
+      <span className="grid size-12 shrink-0 place-items-center rounded-full from-ai-gradient-start to-ai-gradient-end text-h3 bg-linear-to-br text-white">
         {user.name.slice(0, 1)}
       </span>
       <div className="flex min-w-0 flex-1 items-center gap-2">

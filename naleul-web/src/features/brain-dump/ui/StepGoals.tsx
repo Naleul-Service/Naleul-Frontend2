@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import { errorStatusOf } from '@/features/home/analytics'
 import type { GoalCategory } from '@/features/goal/api'
-import { hexOf } from '@/features/timetable/layout'
+import { goalAccent } from '@/lib/goalTone'
 import { formatDuration, formatMonthDay } from '@/features/timetable/time'
 import type { ConfirmItem, ConfirmResponse, TempGoalInput } from '../types'
 import type { TaskAddSurface } from '../analytics'
@@ -117,7 +117,7 @@ export function StepGoals({
   const byKey = new Map<string, Group>()
   for (const it of items) {
     let key = 'none'
-    let g: Omit<Group, 'items'> = { key, title: '목표를 골라 주세요', color: '#B8BCC4', temp: false }
+    let g: Omit<Group, 'items'> = { key, title: '목표를 골라 주세요', color: goalAccent(null), temp: false }
     if (it.goalCategoryId) {
       const goal = goals.find((x) => x.goalCategoryId === it.goalCategoryId)
       key = `g${it.goalCategoryId}`
@@ -125,13 +125,13 @@ export function StepGoals({
         key,
         title: goal?.goalCategoryName ?? '목표',
         emoji: goal?.emoji,
-        color: hexOf(goal?.colorCode),
+        color: goalAccent(goal?.colorCode),
         temp: false,
       }
     } else if (it.tempGoalKey) {
       const t = tempGoals.find((x) => x.tempKey === it.tempGoalKey)
       key = `t:${it.tempGoalKey}`
-      g = { key, title: t?.name ?? '임시 목표', emoji: t?.emoji, color: '#F59E0B', temp: true }
+      g = { key, title: t?.name ?? '임시 목표', emoji: t?.emoji, color: 'var(--color-warning)', temp: true }
     }
     if (!byKey.has(key)) {
       const group = { ...g, items: [] }
@@ -260,7 +260,7 @@ export function StepGoals({
                     }}
                     aria-label="임시 목표 이름"
                     size={Math.max(g.title.length * 2, 6)}
-                    className="focus:border-brand min-w-0 border-b border-transparent bg-transparent text-[15px] font-bold outline-none"
+                    className="focus:border-border-focus min-w-0 border-b border-transparent bg-transparent text-[15px] font-bold outline-none"
                   />
                   <Pencil className="text-ink-4 size-3.5 shrink-0" aria-hidden />
                   <Badge tone="warning">임시 목표</Badge>
@@ -371,7 +371,7 @@ function ItemRow({
           </p>
           {it.reason && !conflict && (
             <p className="text-ink-3 mt-1.5 flex items-start gap-1 text-xs">
-              <Sparkles className="text-brand mt-0.5 size-3 shrink-0" />
+              <Sparkles className="text-text-brand mt-0.5 size-3 shrink-0" />
               {it.reason}
             </p>
           )}

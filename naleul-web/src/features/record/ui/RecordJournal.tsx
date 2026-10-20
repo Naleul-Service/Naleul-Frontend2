@@ -142,7 +142,7 @@ export function RecordJournal({ goalId, goalName }: { goalId: number; goalName: 
       </div>
       <p className="text-ink-3 mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
         <span className="flex items-center gap-1">
-          <CheckCircle2 className="text-brand size-3.5" /> 완료한 Task
+          <CheckCircle2 className="text-text-brand size-3.5" /> 완료한 Task
         </span>
         <span className="flex items-center gap-1">
           <PenLine className="size-3.5" /> 직접 남긴 기록
@@ -262,7 +262,7 @@ function JournalDaySection({
               {i.startAt && i.endAt ? `${i.startAt.slice(11, 16)}–${i.endAt.slice(11, 16)}` : '시간 미정'}
             </span>
             {i.type === 'TASK' ? (
-              <CheckCircle2 className="text-brand mt-0.5 size-4 shrink-0" aria-label="완료한 Task" />
+              <CheckCircle2 className="text-text-brand mt-0.5 size-4 shrink-0" aria-label="완료한 Task" />
             ) : (
               <PenLine className="text-ink-3 mt-0.5 size-4 shrink-0" aria-label="직접 남긴 기록" />
             )}
@@ -273,7 +273,7 @@ function JournalDaySection({
                   {i.title}
                 </span>
                 {i.routine && (
-                  <span className="bg-brand-soft text-brand inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[10px] font-bold">
+                  <span className="bg-brand-soft text-text-brand inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-px text-[10px] font-bold">
                     <Repeat className="size-2.5" />
                     루틴
                   </span>

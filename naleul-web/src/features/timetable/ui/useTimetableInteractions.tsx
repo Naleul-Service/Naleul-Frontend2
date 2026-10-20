@@ -982,7 +982,7 @@ export function useTimetableInteractions(
         <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
           <div
             role="status"
-            className="bg-inverse pointer-events-auto flex max-w-[560px] items-center gap-2 rounded-full py-2 pr-2 pl-4 text-[13px] text-white shadow-[0_8px_24px_rgb(17_17_17/0.25)]"
+            className="bg-inverse pointer-events-auto flex max-w-[560px] items-center gap-2 rounded-full py-2 pr-2 pl-4 text-[13px] text-on-ink shadow-pop"
           >
             <Link2 className="size-4 shrink-0" />
             <span className="min-w-0">
@@ -999,7 +999,7 @@ export function useTimetableInteractions(
             <button
               type="button"
               onClick={clearGroup}
-              className="flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold hover:bg-white/15"
+              className="flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold hover:bg-on-ink/15"
             >
               <X className="size-3.5" />
               묶음 풀기

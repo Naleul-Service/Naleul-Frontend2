@@ -51,9 +51,10 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, placeholder,
         if (canSend) onSubmit('button')
       }}
       className={cn(
-        'border-line-strong bg-surface flex items-end gap-2 rounded-[20px] border p-2 pl-4 transition-colors',
-        'focus-within:border-ink-3',
-        disabled && 'bg-subtle'
+        // 디자인 시스템 ChatComposer — 최소 높이 52 · 모서리 26 · 6/6/6/18
+        'border-border-subtle bg-bg-surface rounded-composer flex min-h-[52px] items-end gap-2 border p-1.5 pl-[18px] transition-colors',
+        'focus-within:border-border-focus',
+        disabled && 'bg-disabled-bg'
       )}
     >
       <textarea
@@ -67,7 +68,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, placeholder,
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
         aria-label="답변 입력"
-        className="placeholder:text-ink-4 max-h-40 min-h-10 flex-1 resize-none bg-transparent py-2 text-[15px] leading-6 outline-none disabled:cursor-not-allowed"
+        className="placeholder:text-text-placeholder max-h-40 min-h-10 flex-1 resize-none bg-transparent text-body-lg py-2 outline-none disabled:cursor-not-allowed"
       />
       {nearLimit && (
         <span className="text-ink-3 self-center text-xs tabular-nums">
@@ -78,9 +79,9 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, placeholder,
         type="submit"
         disabled={!canSend}
         aria-label="보내기"
-        className="bg-ink grid size-10 shrink-0 place-items-center rounded-full text-on-ink transition-opacity disabled:opacity-25"
+        className="bg-action-primary-bg text-action-primary-fg hover:bg-action-primary-bg-hover disabled:bg-border-subtle disabled:text-text-tertiary grid size-10 shrink-0 place-items-center rounded-full transition-colors"
       >
-        <ArrowUp className="size-5" strokeWidth={2.4} />
+        <ArrowUp className="size-5" strokeWidth={2} />
       </button>
     </form>
   )

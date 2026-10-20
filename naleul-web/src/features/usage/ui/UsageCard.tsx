@@ -65,7 +65,7 @@ export function UsageCard() {
                   </p>
                 </div>
                 {i.limit != null && (
-                  <div className="bg-subtle mt-1.5 h-1.5 overflow-hidden rounded-full">
+                  <div className="bg-progress-track mt-1.5 h-1.5 overflow-hidden rounded-full">
                     <div
                       className={cn(
                         'h-full rounded-full',

@@ -125,9 +125,9 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
   }
 
   return (
-    <section className="border-line bg-surface rounded-[20px] border px-4 py-3 sm:px-5">
+    <section className="border-line bg-surface rounded-card border px-4 py-3 sm:px-5">
       <div className="flex items-center gap-2">
-        <MessageSquareText className="text-brand size-5 shrink-0" />
+        <MessageSquareText className="text-text-brand size-5 shrink-0" />
         <input
           ref={inputRef}
           value={text}
@@ -141,7 +141,7 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
           disabled={ask.isPending}
           placeholder="바꾸고 싶은 걸 말로 적어 보세요. 예) 운동은 주 2회로 줄여줘"
           aria-label="말로 고치기"
-          className="placeholder:text-ink-4 h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+          className="placeholder:text-text-placeholder h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
         />
         <Button
           size="sm"

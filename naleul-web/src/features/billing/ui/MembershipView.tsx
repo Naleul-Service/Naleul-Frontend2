@@ -56,7 +56,7 @@ export function MembershipView() {
   }, [isError, error, errorUpdatedAt])
 
   if (isPending)
-    return <div className="bg-surface border-line mt-6 h-64 max-w-3xl animate-pulse rounded-[20px] border" />
+    return <div className="bg-surface border-line mt-6 h-64 max-w-3xl animate-pulse rounded-card border" />
   if (isError) {
     return (
       <Card className="mt-6 max-w-3xl p-8 text-center">
@@ -89,7 +89,7 @@ export function MembershipView() {
         <SubscriptionCard data={data} />
       ) : data.otherPremium ? (
         <Card className="flex items-start gap-4 p-5 sm:p-6">
-          <span className="bg-brand-soft text-brand grid size-10 shrink-0 place-items-center rounded-xl">
+          <span className="bg-brand-soft text-text-brand grid size-10 shrink-0 place-items-center rounded-xl">
             <Smartphone className="size-5" />
           </span>
           <div>
@@ -158,7 +158,7 @@ function PlanPicker({ data, state }: { data: BillingStatus; state: MembershipSta
       <ul className="mt-3 grid gap-2 sm:grid-cols-2">
         {BENEFITS.map((b) => (
           <li key={b} className="text-ink-2 flex items-center gap-2 text-[14px]">
-            <Check className="text-brand size-4 shrink-0" />
+            <Check className="text-text-brand size-4 shrink-0" />
             {b}
           </li>
         ))}

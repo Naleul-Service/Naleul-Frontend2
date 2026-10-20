@@ -29,7 +29,7 @@ function TempGoalCard({ goal, position }: { goal: GoalCategory; position: number
   return (
     <div
       onClick={onCardClick}
-      className="border-warning/40 bg-warning-soft/40 flex flex-col rounded-[20px] border border-dashed p-5"
+      className="border-warning/40 bg-warning-soft/40 flex flex-col rounded-card border border-dashed p-5"
     >
       <div className="flex items-center gap-2">
         <span className="size-2.5 rounded-full" style={{ backgroundColor: goalColor(goal.colorCode) }} />
@@ -84,7 +84,7 @@ function metricProgress(goal: GoalCategory) {
 
 function ProgressBar({ ratio, color }: { ratio: number; color: string }) {
   return (
-    <div className="bg-subtle h-1.5 rounded-full">
+    <div className="bg-progress-track h-1.5 rounded-full">
       <div className="h-full rounded-full" style={{ width: `${ratio * 100}%`, backgroundColor: color }} />
     </div>
   )
@@ -200,7 +200,7 @@ function GoalCard({
     <Link
       href={`/goal/${goal.goalCategoryId}`}
       onClick={onClick}
-      className="border-line bg-surface hover:border-line-strong group flex flex-col rounded-[20px] border p-5 transition-colors"
+      className="border-line bg-surface hover:border-line-strong group flex flex-col rounded-card border p-5 transition-colors"
     >
       <div className="flex items-center gap-2">
         <span className="size-2.5 rounded-full" style={{ backgroundColor: color }} />
@@ -328,7 +328,7 @@ export function GoalListView() {
       {isPending && (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-surface border-line h-48 animate-pulse rounded-[20px] border" />
+            <div key={i} className="bg-surface border-line h-48 animate-pulse rounded-card border" />
           ))}
         </div>
       )}

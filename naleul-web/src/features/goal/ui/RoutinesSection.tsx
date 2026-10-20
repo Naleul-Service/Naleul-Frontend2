@@ -265,7 +265,7 @@ function RoutineForm({
           aria-pressed={notify}
           className={cn(
             'flex items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold',
-            notify ? 'text-brand hover:bg-brand-soft' : 'text-ink-3 hover:bg-subtle'
+            notify ? 'text-text-brand hover:bg-brand-soft' : 'text-ink-3 hover:bg-subtle'
           )}
         >
           {notify ? <Bell className="size-3.5" /> : <BellOff className="size-3.5" />}
@@ -440,7 +440,7 @@ function RoutineForm({
               })
               setPerDay(true)
             }}
-            className="text-brand self-start text-[13px] font-semibold"
+            className="text-text-brand self-start text-[13px] font-semibold"
           >
             + 요일마다 시간을 다르게 하기
           </button>

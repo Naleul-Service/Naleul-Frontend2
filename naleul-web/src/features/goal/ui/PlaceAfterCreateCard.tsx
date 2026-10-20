@@ -65,7 +65,7 @@ export function PlaceAfterCreateCard({ goal, className }: { goal: GoalCategory; 
   return (
     <section
       className={cn(
-        'border-success/25 bg-success-soft/50 flex flex-col gap-4 rounded-[20px] border p-5 sm:flex-row sm:items-center sm:p-6',
+        'border-success/25 bg-success-soft/50 flex flex-col gap-4 rounded-card border p-5 sm:flex-row sm:items-center sm:p-6',
         className
       )}
     >

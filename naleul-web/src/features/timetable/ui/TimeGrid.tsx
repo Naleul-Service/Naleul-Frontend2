@@ -342,13 +342,19 @@ export function TimeGrid({
               <span
                 className={cn(
                   'grid size-8 shrink-0 place-items-center rounded-full text-[15px] font-bold',
-                  isToday ? 'bg-brand text-white' : wd === 6 ? 'text-danger' : wd === 5 ? 'text-brand' : 'text-ink'
+                  isToday
+                    ? 'bg-calendar-today-bg text-calendar-today-fg'
+                    : wd === 6
+                      ? 'text-calendar-holiday'
+                      : wd === 5
+                        ? 'text-calendar-saturday'
+                        : 'text-ink'
                 )}
               >
                 {dayOfMonth(d.date)}
               </span>
               <span className="min-w-0">
-                <span className={cn('block text-xs font-semibold', isToday ? 'text-brand' : 'text-ink-3')}>
+                <span className={cn('block text-xs font-semibold', isToday ? 'text-text-brand' : 'text-ink-3')}>
                   {WEEKDAY_LABEL[wd]}요일
                 </span>
                 <span
@@ -446,7 +452,7 @@ export function TimeGrid({
               onClick={(e) => clickEmpty(d.date, e)}
               className={cn(
                 'border-line relative border-l',
-                isToday && 'bg-brand-soft/30',
+                isToday && 'bg-ai-tint-soft/40',
                 canClickEmpty && 'cursor-cell'
               )}
               style={{ height: (to - from) * PPM }}
@@ -633,11 +639,11 @@ export function TimeGrid({
                   .map((m) => <GroupGhost key={m.task.taskId} member={m} from={from} invalid={!!drag.invalid} />)}
               {nowLine(d.date) !== null && (
                 <div
-                  className="pointer-events-none absolute inset-x-0 z-20 h-0 border-t-2 border-red-500"
+                  className="pointer-events-none absolute inset-x-0 z-20 h-0 border-t-2 border-action-danger-bg"
                   style={{ top: (nowLine(d.date)! - from) * PPM }}
                   aria-hidden
                 >
-                  <span className="absolute -top-[5px] -left-[5px] size-2 rounded-full bg-red-500" />
+                  <span className="absolute -top-[5px] -left-[5px] size-2 rounded-full bg-action-danger-bg" />
                 </div>
               )}
             </div>
@@ -677,7 +683,7 @@ function UnscheduledCell({
         isTarget && 'bg-brand-soft outline-brand outline-2 -outline-offset-2 outline-dashed'
       )}
     >
-      {isTarget && <p className="text-brand px-1 text-[11px] font-semibold">여기에 놓으면 시간 미정</p>}
+      {isTarget && <p className="text-text-brand px-1 text-[11px] font-semibold">여기에 놓으면 시간 미정</p>}
       {shown.map((t) => {
         const draggable = !!onDragDown && canDragTask(t)
         return (
@@ -689,7 +695,7 @@ function UnscheduledCell({
             onPointerDown={draggable ? (e) => onDragDown(e, t) : undefined}
             style={{ ...taskColors(t), WebkitTouchCallout: 'none', userSelect: 'none' }}
             className={cn(
-              'shrink-0 truncate rounded-md px-2 py-1 text-left text-[11px] font-semibold',
+              'rounded-event text-label-sm shrink-0 truncate py-1 pr-2 pl-3 text-left',
               draggable && 'cursor-grab',
               t.taskStatus === 'COMPLETED' && 'line-through opacity-55',
               drag?.source.kind === 'task' && drag.source.task.taskId === t.taskId && 'opacity-30',
@@ -724,8 +730,8 @@ function GroupGhost({ member, from, invalid }: { member: GroupMember; from: numb
     <div
       aria-hidden
       className={cn(
-        'pointer-events-none absolute inset-x-0.5 z-30 flex flex-col overflow-hidden rounded-lg border px-2 py-1 text-xs leading-tight opacity-90 shadow-[0_8px_24px_rgb(17_17_17/0.18)]',
-        invalid ? 'border-danger ring-danger ring-2' : 'border-white/60'
+        'rounded-event text-label-sm shadow-pop pointer-events-none absolute inset-x-0.5 z-30 flex flex-col overflow-hidden border py-1 pr-2 pl-3 opacity-90',
+        invalid ? 'border-danger ring-danger ring-2' : 'border-(--goal-accent)'
       )}
       style={{
         ...taskColors(t),
@@ -764,14 +770,14 @@ function DragGhost({
   const style =
     source.kind === 'task' || source.kind === 'actual'
       ? taskColors(source.task)
-      : { ...HATCH, color: 'var(--color-ink-2)', borderColor: 'var(--color-ink-4)' }
+      : { ...HATCH, color: 'var(--color-text-secondary)' }
   return (
     <div
       data-drag-ghost
       aria-live="polite"
       className={cn(
-        'pointer-events-none absolute inset-x-0.5 z-30 flex flex-col overflow-hidden rounded-lg border px-2 py-1 text-xs leading-tight shadow-[0_8px_24px_rgb(17_17_17/0.22)]',
-        invalid ? 'border-danger ring-danger ring-2' : 'border-white/60'
+        'rounded-event text-label-sm shadow-pop pointer-events-none absolute inset-x-0.5 z-30 flex flex-col overflow-hidden border py-1 pr-2 pl-3',
+        invalid ? 'border-danger ring-danger ring-2' : 'border-[var(--goal-accent,var(--color-border-subtle))]'
       )}
       style={{
         ...style,
@@ -834,7 +840,7 @@ function HabitBlocks({
               'absolute left-0.5 z-[1] flex items-start gap-1 overflow-hidden rounded-md border border-dashed px-1.5 py-0.5 text-left text-[11px] font-semibold',
               h.checked
                 ? 'border-success/50 bg-success-soft text-success'
-                : 'border-[#16a34a]/40 bg-[#16a34a]/5 text-[#15803d] hover:bg-[#16a34a]/10'
+                : 'border-success/40 bg-success-soft/40 text-success hover:bg-success-soft'
             )}
             style={{ top: (s - from) * PPM, height: Math.max(height, 16), right: `calc(${right} + 2px)` }}
           >

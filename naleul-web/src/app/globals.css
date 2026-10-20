@@ -3,63 +3,291 @@
 /*
  * 디자인 토큰 — Tailwind 클래스로 바로 쓸 수 있어요.
  * 예) bg-brand, text-ink-3, border-line, rounded-card, shadow-card
+ * 새 시맨틱: bg-bg-surface, text-text-secondary, border-border-subtle, bg-action-primary-bg, text-h3, text-label-md …
+ * 기존 이름(ink · surface · brand …)은 새 값으로 다시 연결돼 있어요 (iOS · Android 와 같은 매핑표).
  */
 @theme static {
   --font-sans:
     'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Noto Sans KR',
     'Malgun Gothic', sans-serif;
 
-  /* 글자 */
-  --color-ink: #111111;
-  --color-ink-2: #4b5059;
-  --color-ink-3: #8b9099;
-  --color-ink-4: #b8bcc4;
-
-  /* 면 / 선 */
-  --color-canvas: #f5f6f8;
+  /* ── 기존 토큰 (이름 유지 · 새 값으로 다시 연결 — web/iOS/Android 공통 매핑표) ── */
+  --color-ink: #121820;
+  --color-ink-2: #566273;
+  --color-ink-3: #7d8898;
+  --color-ink-4: #a3aebd;
+  --color-canvas: #f8fafc;
   --color-surface: #ffffff;
-  --color-subtle: #f3f4f6;
-  --color-line: #eceef1;
-  --color-line-strong: #dcdfe4;
-
-  /* 포인트 */
-  --color-brand: #3d5afe;
-  --color-brand-strong: #2c47e8;
-  --color-brand-soft: #eef1ff;
-
-  /* 상태 */
-  --color-success: #12b76a;
-  --color-success-soft: #e8f8f0;
-  --color-warning: #f59e0b;
-  --color-warning-soft: #fff6e5;
-  --color-danger: #ef4444;
-  --color-danger-soft: #fdecec;
-
-  /* bg-ink 위 글자 (라이트: 흰색 · 다크: ink 가 밝아지니 검정) */
+  --color-subtle: #e8edf3;
+  --color-line: #d8dfe8;
+  --color-line-strong: #a3aebd;
+  --color-brand: #0f7a9c;
+  --color-brand-strong: #0d6b89;
+  --color-brand-soft: #e8f4f5;
+  --color-success: #246b42;
+  --color-success-soft: #edf7f0;
+  --color-warning: #f5b63a;
+  --color-warning-soft: #fff6df;
+  --color-danger: #bc3942;
+  --color-danger-soft: #fbf0f0;
   --color-on-ink: #ffffff;
-  /* 늘 어두운 면 (실행 스타일 카드 · 하단 확정 바 · 토스트) — 다크 모드에서도 어둡게 남아요 */
-  --color-inverse: #111111;
-  /* 연한 노랑 바탕 위 경고 글자 */
-  --color-warning-ink: #b45309;
-  --color-warning-ink-strong: #92400e;
+  --color-inverse: #121820;
+  /* inverse 면 위 강조 글자 (라이트: 민트 · 다크: inverse 가 밝아지니 진한 청록) */
+  --color-on-inverse-accent: #00cba8;
+  --color-warning-ink: #805a12;
+  --color-warning-ink-strong: #6b4a0e;
+  --color-hatch: #f2f5f9;
+  --color-hatch-line: #e1e7ee;
+  --color-sleep: #efeafd;
+  --color-sleep-line: #ded5fa;
+  --color-sleep-ink: #5c49a8;
+  --color-heat-1: #dcebee;
+  --color-heat-2: #a9d1dc;
+  --color-heat-3: #5fb0c6;
+  --color-heat-4: #1f8fae;
+  --color-heat-5: #0b5d77;
 
-  /* 타임테이블 빗금 (고정 시간 · 수면) */
-  --color-hatch: #f6f7f9;
-  --color-hatch-line: #e6e8ec;
-  --color-sleep: #eef1fb;
-  --color-sleep-line: #dfe4f6;
-  --color-sleep-ink: #4b5bb8;
+  /* ── 새 시맨틱 토큰 (Figma Component_ver.2 · Semantic Color) ── */
+  --color-bg-canvas: #f8fafc;
+  --color-bg-surface: #ffffff;
+  --color-bg-elevated: #ffffff;
+  --color-bg-subtle: #e8edf3;
+  --color-bg-sunken: #f2f5f9;
+  --color-bg-inverse: #121820;
+  --color-bg-overlay: #00000066;
+  --color-text-primary: #121820;
+  --color-text-secondary: #566273;
+  --color-text-tertiary: #7d8898;
+  --color-text-placeholder: #667184;
+  --color-text-brand: #0d6b89;
+  --color-text-inverse: #ffffff;
+  --color-border-subtle: #d8dfe8;
+  --color-border-soft: #e1e7eeb2;
+  --color-border-control: #566273;
+  --color-border-focus: #0f7a9c;
+  --color-action-primary-bg: #0f7a9c;
+  --color-action-primary-bg-hover: #0d6b89;
+  --color-action-primary-bg-pressed: #0b5d77;
+  --color-action-primary-fg: #ffffff;
+  --color-action-secondary-bg: #e8f4f5;
+  --color-action-secondary-bg-hover: #dcebee;
+  --color-action-secondary-bg-pressed: #cce1e5;
+  --color-action-secondary-fg: #0d6b89;
+  --color-action-secondary-border: #d3e6ea;
+  --color-action-outline-border: #0f7a9c;
+  --color-action-ghost-hover: #e8f4f5;
+  --color-action-ghost-pressed: #dcebee;
+  --color-action-danger-bg: #d13f49;
+  --color-action-danger-bg-hover: #b83740;
+  --color-action-danger-bg-pressed: #9f3037;
+  --color-action-danger-fg: #ffffff;
+  --color-disabled-bg: #e8edf3;
+  --color-disabled-fg: #7d8898;
+  --color-selection-bg: #e8edf3;
+  --color-selection-fg: #121820;
+  --color-status-success-bg: #edf7f0;
+  --color-status-success-fg: #246b42;
+  --color-status-warning-bg: #fff6df;
+  --color-status-warning-fg: #805a12;
+  --color-status-error-bg: #fbf0f0;
+  --color-status-error-fg: #bc3942;
+  --color-status-info-bg: #e8edf3;
+  --color-status-info-fg: #3f4a5a;
+  --color-accent-mint: #00cba8;
+  --color-accent-on-mint: #121820;
+  --color-progress-track: #d8dfe8;
+  --color-progress-fill: #00cba8;
+  --color-calendar-today-bg: #00cba8;
+  --color-calendar-today-fg: #121820;
+  --color-calendar-holiday: #bc3942;
+  --color-calendar-saturday: #3c5ea8;
+  --color-ai-tint: #d9f7f2;
+  --color-ai-tint-soft: #d9f7f299;
+  --color-ai-accent-start: #00cba8;
+  --color-ai-accent-end: #2aa7df;
+  --color-ai-accent-violet: #a18bfa;
+  --color-ai-gradient-start: #1488ab;
+  --color-ai-gradient-mid: #3487c3;
+  --color-ai-gradient-end: #6f86f0;
+  --color-ai-gradient-hover-start: #127896;
+  --color-ai-gradient-hover-mid: #2e77ab;
+  --color-ai-gradient-hover-end: #6276d3;
+  --color-ai-gradient-pressed-start: #0f6782;
+  --color-ai-gradient-pressed-mid: #276794;
+  --color-ai-gradient-pressed-end: #5466b6;
+  --color-mood-mint: #ddf7f1;
+  --color-mood-sky: #e2f0fc;
+  --color-mood-lavender: #efeafd;
+  --color-glass-bg: #ffffffe0;
+  --color-glass-border: #1218200d;
+  --color-glass-shadow: #1218201f;
+  --color-glass-shadow-soft: #1218200f;
+  --color-brand-logo: #0b4f65;
+  --color-brand-logo-accent: #4a90e2;
+  --color-neutral-400: #a3aebd;
 
-  /* 히트맵 단계 (1 연함 ~ 5 진함) */
-  --color-heat-1: #e3e7fe;
-  --color-heat-2: #c3cbfb;
-  --color-heat-3: #8e9cf6;
-  --color-heat-4: #5a6ff0;
-  --color-heat-5: #3346d8;
+  /* ── 목표 색 21종 (bg 연한 바탕 · fg 글자 · accent 선/점) — 서버 hex 는 lib/goalTone.ts 가 가장 가까운 색으로 맞춰요 ── */
+  --color-goal-coral-bg: #fdecec;
+  --color-goal-coral-fg: #9d4b4b;
+  --color-goal-coral-accent: #f27474;
+  --color-goal-orange-bg: #fef0e7;
+  --color-goal-orange-fg: #935730;
+  --color-goal-orange-accent: #f59150;
+  --color-goal-amber-bg: #fef5e3;
+  --color-goal-amber-fg: #876420;
+  --color-goal-amber-accent: #f5b63a;
+  --color-goal-yellow-bg: #fefae8;
+  --color-goal-yellow-fg: #7b6e2f;
+  --color-goal-yellow-accent: #f5dc5e;
+  --color-goal-lime-bg: #f2fae8;
+  --color-goal-lime-fg: #526d2f;
+  --color-goal-lime-accent: #a3d95e;
+  --color-goal-green-bg: #e6f7ed;
+  --color-goal-green-fg: #2d764a;
+  --color-goal-green-accent: #4bc47c;
+  --color-goal-mint-bg: #e0f7f3;
+  --color-goal-mint-fg: #137664;
+  --color-goal-mint-accent: #1fc4a6;
+  --color-goal-sky-bg: #e4f6fc;
+  --color-goal-sky-fg: #25738a;
+  --color-goal-sky-accent: #3dbfe6;
+  --color-goal-blue-bg: #e7eefd;
+  --color-goal-blue-fg: #3c5ea8;
+  --color-goal-blue-accent: #5586f0;
+  --color-goal-purple-bg: #eeeafd;
+  --color-goal-purple-fg: #5c49a8;
+  --color-goal-purple-accent: #8468f0;
+  --color-goal-violet-bg: #f5ebfc;
+  --color-goal-violet-fg: #7f51a2;
+  --color-goal-violet-accent: #b573e8;
+  --color-goal-pink-bg: #fdeffa;
+  --color-goal-pink-fg: #915383;
+  --color-goal-pink-accent: #f28bdb;
+  --color-goal-rose-bg: #fdebf1;
+  --color-goal-rose-fg: #9c4967;
+  --color-goal-rose-accent: #f0709e;
+  --color-goal-teal-bg: #e2f5f7;
+  --color-goal-teal-fg: #1b7078;
+  --color-goal-teal-accent: #2dbbc8;
+  --color-goal-slate-bg: #eaeef1;
+  --color-goal-slate-fg: #4a5c6b;
+  --color-goal-slate-accent: #6a8499;
+  --color-goal-brown-bg: #f4efea;
+  --color-goal-brown-fg: #7b6147;
+  --color-goal-brown-accent: #b08a66;
+  --color-goal-sand-bg: #f8f5ef;
+  --color-goal-sand-fg: #71654c;
+  --color-goal-sand-accent: #cdb88b;
+  --color-goal-sage-bg: #eff4f0;
+  --color-goal-sage-fg: #56685a;
+  --color-goal-sage-accent: #8fae96;
+  --color-goal-navy-bg: #e6e9f3;
+  --color-goal-navy-fg: #374576;
+  --color-goal-navy-accent: #4f63a8;
+  --color-goal-plum-bg: #f2eaf1;
+  --color-goal-plum-fg: #744c6d;
+  --color-goal-plum-accent: #a56c9c;
+  --color-goal-neutral-bg: var(--color-bg-subtle);
+  --color-goal-neutral-fg: var(--color-text-secondary);
+  --color-goal-neutral-accent: var(--color-text-tertiary);
 
-  --radius-card: 18px;
-  --shadow-card: 0 1px 2px rgb(17 17 17 / 0.04);
-  --shadow-pop: 0 12px 40px rgb(17 17 17 / 0.14);
+  /* ── 모서리 ── */
+  --radius-card: 16px;
+  --radius-dialog: 16px;
+  --radius-btn: 12px;
+  --radius-btn-sm: 10px;
+  --radius-input: 10px;
+  --radius-chip: 8px;
+  --radius-chip-sm: 6px;
+  --radius-event: 8px;
+  --radius-event-fixed: 10px;
+  --radius-nav: 8px;
+  --radius-icon-btn: 6px;
+  --radius-toast: 12px;
+  --radius-seg: 12px;
+  --radius-seg-item: 9px;
+  --radius-checkbox: 6px;
+  --radius-quick-reply: 20px;
+  --radius-composer: 26px;
+  --radius-sheet: 24px;
+
+  /* ── 그림자 ── */
+  --shadow-card: 0 4px 16px rgb(18 24 32 / 0.06);
+  --shadow-pop: 0 12px 40px rgb(18 24 32 / 0.12);
+  --shadow-primary: 0 4px 12px rgb(8 127 142 / 0.25);
+  --shadow-danger: 0 4px 12px rgb(209 63 73 / 0.22);
+  --shadow-seg: 0 1px 3px rgb(0 0 0 / 0.08);
+  --shadow-glass: 0 4px 16px rgb(18 24 32 / 0.05);
+
+  /* ── 글자 스타일 (Pretendard · 자간 -2%) — text-display-xl · text-h1 · text-body-md · text-label-sm … ── */
+  --text-display-xl: 32px;
+  --text-display-xl--line-height: 1.3;
+  --text-display-xl--font-weight: 700;
+  --text-display-xl--letter-spacing: -0.02em;
+  --text-display-lg: 28px;
+  --text-display-lg--line-height: 1.3;
+  --text-display-lg--font-weight: 700;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-h1: 24px;
+  --text-h1--line-height: 1.4;
+  --text-h1--font-weight: 600;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h2: 20px;
+  --text-h2--line-height: 1.4;
+  --text-h2--font-weight: 600;
+  --text-h2--letter-spacing: -0.02em;
+  --text-h3: 18px;
+  --text-h3--line-height: 1.4;
+  --text-h3--font-weight: 600;
+  --text-h3--letter-spacing: -0.02em;
+  --text-h4: 16px;
+  --text-h4--line-height: 1.5;
+  --text-h4--font-weight: 600;
+  --text-h4--letter-spacing: -0.02em;
+  --text-body-lg: 16px;
+  --text-body-lg--line-height: 1.5;
+  --text-body-lg--font-weight: 400;
+  --text-body-lg--letter-spacing: -0.02em;
+  --text-body-md: 14px;
+  --text-body-md--line-height: 1.32;
+  --text-body-md--font-weight: 400;
+  --text-body-md--letter-spacing: -0.02em;
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 1.32;
+  --text-body-sm--font-weight: 400;
+  --text-body-sm--letter-spacing: -0.02em;
+  --text-label-lg: 14px;
+  --text-label-lg--line-height: 1.4;
+  --text-label-lg--font-weight: 600;
+  --text-label-lg--letter-spacing: -0.02em;
+  --text-label-md: 13px;
+  --text-label-md--line-height: 1.4;
+  --text-label-md--font-weight: 600;
+  --text-label-md--letter-spacing: -0.02em;
+  --text-label-sm: 12px;
+  --text-label-sm--line-height: 1.3;
+  --text-label-sm--font-weight: 600;
+  --text-label-sm--letter-spacing: -0.02em;
+  --text-label-xs: 11px;
+  --text-label-xs--line-height: 1.3;
+  --text-label-xs--font-weight: 500;
+  --text-label-xs--letter-spacing: -0.02em;
+  --text-label-2xs: 9px;
+  --text-label-2xs--line-height: 1.0;
+  --text-label-2xs--font-weight: 500;
+  --text-label-2xs--letter-spacing: -0.02em;
+  --text-caption-md: 12px;
+  --text-caption-md--line-height: 1.32;
+  --text-caption-md--font-weight: 400;
+  --text-caption-md--letter-spacing: -0.02em;
+  --text-caption-sm: 11px;
+  --text-caption-sm--line-height: 1.32;
+  --text-caption-sm--font-weight: 400;
+  --text-caption-sm--letter-spacing: -0.02em;
+  --text-input: 14px;
+  --text-input--line-height: 1.32;
+  --text-input--font-weight: 500;
+  --text-input--letter-spacing: -0.02em;
 }
 
 /*
@@ -69,51 +297,215 @@
  */
 :root {
   color-scheme: light;
+  /* 서버 hex 가 팔레트와 멀 때 만드는 색 (lib/goalTone.ts) — 바탕 섞는 비율 · 글자 어둡게 */
+  --goal-tint: 12%;
+  --goal-fg-keep: 55%;
+  --goal-fg-base: #000000;
 }
 :root[data-theme='dark'] {
   color-scheme: dark; /* 날짜 선택기 · 스크롤바 같은 기본 UI 도 어둡게 */
 
-  --color-ink: #f2f3f5;
-  --color-ink-2: #c5c9d0;
-  --color-ink-3: #8d929b;
-  --color-ink-4: #5d626c;
+  /* ── 기존 토큰 (이름 유지 · 새 값으로 다시 연결 — web/iOS/Android 공통 매핑표) ── */
+  --color-ink: #f2f5f9;
+  --color-ink-2: #a3aebd;
+  --color-ink-3: #7d8898;
+  --color-ink-4: #566273;
+  --color-canvas: #121820;
+  --color-surface: #1c232c;
+  --color-subtle: #252d38;
+  --color-line: #2f3845;
+  --color-line-strong: #3f4a5a;
+  --color-brand: #167a9c;
+  --color-brand-strong: #126b88;
+  --color-brand-soft: #2b3646;
+  --color-success: #8ed6aa;
+  --color-success-soft: #334745;
+  --color-warning: #f6c158;
+  --color-warning-soft: #45443b;
+  --color-danger: #e2888e;
+  --color-danger-soft: #443740;
+  --color-on-ink: #121820;
+  --color-inverse: #f2f5f9;
+  --color-on-inverse-accent: #0f7a9c;
+  --color-warning-ink: #e8c878;
+  --color-warning-ink-strong: #f0d89a;
+  --color-hatch: #1a2129;
+  --color-hatch-line: #2a323d;
+  --color-sleep: #25213d;
+  --color-sleep-line: #352f55;
+  --color-sleep-ink: #d0c5f9;
+  --color-heat-1: #1a3540;
+  --color-heat-2: #1f4f60;
+  --color-heat-3: #22708a;
+  --color-heat-4: #2a93b5;
+  --color-heat-5: #6fb1cf;
 
-  --color-canvas: #0e0f11;
-  --color-surface: #18191c;
-  --color-subtle: #222429;
-  --color-line: #2a2d32;
-  --color-line-strong: #3a3d44;
+  /* ── 새 시맨틱 토큰 (Figma Component_ver.2 · Semantic Color) ── */
+  --color-bg-canvas: #121820;
+  --color-bg-surface: #1c232c;
+  --color-bg-elevated: #252d38;
+  --color-bg-subtle: #252d38;
+  --color-bg-sunken: #121820;
+  --color-bg-inverse: #f2f5f9;
+  --color-bg-overlay: #00000099;
+  --color-text-primary: #f2f5f9;
+  --color-text-secondary: #a3aebd;
+  --color-text-tertiary: #7d8898;
+  --color-text-placeholder: #7d8898;
+  --color-text-brand: #a3d2e8;
+  --color-text-inverse: #121820;
+  --color-border-subtle: #2f3845;
+  --color-border-soft: #2f3845b2;
+  --color-border-control: #7d8898;
+  --color-border-focus: #6fb1cf;
+  --color-action-primary-bg: #167a9c;
+  --color-action-primary-bg-hover: #126b88;
+  --color-action-primary-bg-pressed: #0e5b75;
+  --color-action-primary-fg: #ffffff;
+  --color-action-secondary-bg: #2b3646;
+  --color-action-secondary-bg-hover: #354258;
+  --color-action-secondary-bg-pressed: #3f4d63;
+  --color-action-secondary-fg: #f2f5f9;
+  --color-action-secondary-border: #3f4a5a;
+  --color-action-outline-border: #6fb1cf;
+  --color-action-ghost-hover: #252d38;
+  --color-action-ghost-pressed: #2f3845;
+  --color-action-danger-bg: #a33139;
+  --color-action-danger-bg-hover: #ac464d;
+  --color-action-danger-bg-pressed: #8b2a30;
+  --color-action-danger-fg: #ffffff;
+  --color-disabled-bg: #252d38;
+  --color-disabled-fg: #566273;
+  --color-selection-bg: #2f3845;
+  --color-selection-fg: #f2f5f9;
+  --color-status-success-bg: #334745;
+  --color-status-success-fg: #8ed6aa;
+  --color-status-warning-bg: #45443b;
+  --color-status-warning-fg: #e8c878;
+  --color-status-error-bg: #443740;
+  --color-status-error-fg: #e2888e;
+  --color-status-info-bg: #252d38;
+  --color-status-info-fg: #a3aebd;
+  --color-accent-mint: #00cba8;
+  --color-accent-on-mint: #121820;
+  --color-progress-track: #2f3845;
+  --color-progress-fill: #00cba8;
+  --color-calendar-today-bg: #00cba8;
+  --color-calendar-today-fg: #121820;
+  --color-calendar-holiday: #e2888e;
+  --color-calendar-saturday: #6f98f2;
+  --color-ai-tint: #1c2b3d;
+  --color-ai-tint-soft: #1c2b3d99;
+  --color-ai-accent-start: #00cba8;
+  --color-ai-accent-end: #2aa7df;
+  --color-ai-accent-violet: #a18bfa;
+  --color-ai-gradient-start: #2aa0c6;
+  --color-ai-gradient-mid: #4d92dc;
+  --color-ai-gradient-end: #8ea3ff;
+  --color-ai-gradient-hover-start: #3bb0d4;
+  --color-ai-gradient-hover-mid: #62a2e6;
+  --color-ai-gradient-hover-end: #a2b4ff;
+  --color-ai-gradient-pressed-start: #1f86aa;
+  --color-ai-gradient-pressed-mid: #3d7fc4;
+  --color-ai-gradient-pressed-end: #7a8fe8;
+  --color-mood-mint: #16302d;
+  --color-mood-sky: #172a3b;
+  --color-mood-lavender: #25213d;
+  --color-glass-bg: #141d29e5;
+  --color-glass-border: #ffffff24;
+  --color-glass-shadow: #00000080;
+  --color-glass-shadow-soft: #0000004d;
+  --color-brand-logo: #7fcbe6;
+  --color-brand-logo-accent: #5f9cf5;
+  --color-neutral-400: #566273;
 
-  --color-brand: #6b82ff;
-  --color-brand-strong: #8597ff;
-  --color-brand-soft: #1d2340;
+  /* 목표 색 21종 */
+  --color-goal-coral-bg: #47373f;
+  --color-goal-coral-fg: #facaca;
+  --color-goal-coral-accent: #f48989;
+  --color-goal-orange-bg: #483c38;
+  --color-goal-orange-fg: #fbd5bc;
+  --color-goal-orange-accent: #f6a16a;
+  --color-goal-amber-bg: #484335;
+  --color-goal-amber-fg: #fbe3b4;
+  --color-goal-amber-accent: #f6c158;
+  --color-goal-yellow-bg: #48493b;
+  --color-goal-yellow-fg: #fbf2c1;
+  --color-goal-yellow-accent: #f6e176;
+  --color-goal-lime-bg: #3a493b;
+  --color-goal-lime-fg: #dcf0c1;
+  --color-goal-lime-accent: #b1df76;
+  --color-goal-green-bg: #2b4540;
+  --color-goal-green-fg: #bae8cd;
+  --color-goal-green-accent: #66cd90;
+  --color-goal-mint-bg: #234547;
+  --color-goal-mint-fg: #a9e8dd;
+  --color-goal-mint-accent: #41cdb3;
+  --color-goal-sky-bg: #284452;
+  --color-goal-sky-fg: #b5e7f5;
+  --color-goal-sky-accent: #5ac9ea;
+  --color-goal-blue-bg: #2d3a54;
+  --color-goal-blue-fg: #bed1f9;
+  --color-goal-blue-accent: #6f98f2;
+  --color-goal-purple-bg: #343554;
+  --color-goal-purple-fg: #d0c5f9;
+  --color-goal-purple-accent: #967ff2;
+  --color-goal-violet-bg: #3d3752;
+  --color-goal-violet-fg: #e3c9f6;
+  --color-goal-violet-accent: #c088eb;
+  --color-goal-pink-bg: #473b50;
+  --color-goal-pink-fg: #fad3f1;
+  --color-goal-pink-accent: #f49ce0;
+  --color-goal-rose-bg: #473746;
+  --color-goal-rose-fg: #f9c8da;
+  --color-goal-rose-accent: #f285ad;
+  --color-goal-teal-bg: #26434d;
+  --color-goal-teal-fg: #afe5ea;
+  --color-goal-teal-accent: #4dc5d0;
+  --color-goal-slate-bg: #303a45;
+  --color-goal-slate-fg: #c6d0d8;
+  --color-goal-slate-accent: #8096a8;
+  --color-goal-brown-bg: #3c3b3c;
+  --color-goal-brown-fg: #e1d2c4;
+  --color-goal-brown-accent: #bc9c7d;
+  --color-goal-sand-bg: #414342;
+  --color-goal-sand-fg: #ece4d3;
+  --color-goal-sand-accent: #d4c39c;
+  --color-goal-sage-bg: #364144;
+  --color-goal-sage-fg: #d4e0d7;
+  --color-goal-sage-accent: #a0baa6;
+  --color-goal-navy-bg: #2b3447;
+  --color-goal-navy-fg: #bcc3de;
+  --color-goal-navy-accent: #697ab5;
+  --color-goal-plum-bg: #3a3645;
+  --color-goal-plum-fg: #ddc7d9;
+  --color-goal-plum-accent: #b282ab;
 
-  --color-success: #34d399;
-  --color-success-soft: #0f2a1f;
-  --color-warning: #fbbf24;
-  --color-warning-soft: #2d2410;
-  --color-danger: #f87171;
-  --color-danger-soft: #331b1b;
+  --shadow-card: 0 4px 16px rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.5);
+  --shadow-primary: 0 4px 12px rgb(0 0 0 / 0.35);
+  --shadow-danger: 0 4px 12px rgb(0 0 0 / 0.35);
+  --shadow-seg: 0 1px 3px rgb(0 0 0 / 0.3);
+  --shadow-glass: 0 4px 16px rgb(0 0 0 / 0.3);
 
-  --color-on-ink: #111111;
-  --color-inverse: #26282e;
-  --color-warning-ink: #fbbf24;
-  --color-warning-ink-strong: #fcd34d;
+  /* 서버 hex 가 팔레트와 멀 때 만드는 색 (lib/goalTone.ts) */
+  --goal-tint: 22%;
+  --goal-fg-keep: 40%;
+  --goal-fg-base: #ffffff;
+}
 
-  --color-hatch: #1b1c20;
-  --color-hatch-line: #26282d;
-  --color-sleep: #191d30;
-  --color-sleep-line: #232945;
-  --color-sleep-ink: #a9b5fa;
-
-  --color-heat-1: #1f2547;
-  --color-heat-2: #2c3880;
-  --color-heat-3: #3f52c2;
-  --color-heat-4: #5a6ff0;
-  --color-heat-5: #8b9cff;
-
-  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-pop: 0 12px 40px rgb(0 0 0 / 0.55);
+/*
+ * 그림자 유틸리티(shadow-card 등)는 Tailwind 가 값을 클래스 안에 바로 넣어서 위 변수 덮어쓰기가 안 먹어요
+ * → 다크 모드에서는 그림자 색만 바꿔 줘요 (hover:shadow-pop 같은 변형 포함)
+ */
+:root[data-theme='dark'] :is([class*='shadow-card'], [class*='shadow-glass'], [class*='shadow-seg']) {
+  --tw-shadow-color: rgb(0 0 0 / 0.3);
+}
+:root[data-theme='dark'] [class*='shadow-pop'] {
+  --tw-shadow-color: rgb(0 0 0 / 0.5);
+}
+:root[data-theme='dark'] :is([class*='shadow-primary'], [class*='shadow-danger']) {
+  --tw-shadow-color: rgb(0 0 0 / 0.35);
 }
 
 /* Tailwind dark: 변형 (dark:bg-…) 도 같은 기준으로 */
@@ -125,12 +517,12 @@
   }
   body {
     @apply bg-canvas text-ink font-sans antialiased;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
     word-break: keep-all; /* 한글이 단어 중간에서 줄바꿈되지 않게 */
     overflow-wrap: anywhere; /* 아주 긴 영문/URL 은 넘치지 않게 */
   }
   :focus-visible {
-    @apply outline-brand outline-2 outline-offset-2;
+    @apply outline-border-focus outline-2 outline-offset-2;
   }
 }
 

@@ -52,7 +52,7 @@ export function DailyCheckInCard({ goal }: { goal: GoalCategory }) {
   const { data: p, isPending } = useGoalProgress(goal.goalCategoryId)
   if (isPending) {
     return (
-      <section className="border-brand/30 bg-surface grid h-32 place-items-center rounded-[20px] border-2">
+      <section className="border-brand/30 bg-surface grid h-32 place-items-center rounded-card border-2">
         <Spinner className="text-ink-3 size-5" />
       </section>
     )
@@ -136,7 +136,7 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
     <section
       aria-labelledby="checkin-title"
       className={cn(
-        'rounded-[20px] border-2 px-4 py-4 sm:px-5',
+        'rounded-card border-2 px-4 py-4 sm:px-5',
         editing ? 'border-brand bg-brand-soft/40' : 'border-line bg-surface'
       )}
     >
@@ -343,7 +343,7 @@ function AdjustHint({ goal }: { goal: GoalCategory }) {
         })
         prefillAiEdit('최근 기록과 회고를 보고 계획을 조정해줘')
       }}
-      className="text-brand hover:bg-brand-soft flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold"
+      className="text-text-brand hover:bg-brand-soft flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold"
     >
       <Sparkles className="size-3.5" />
       최근 기록 보고 계획 조정받기
@@ -369,7 +369,7 @@ function RecentReflections({
         <Link
           href={`/goal/${goalId}?tab=reflections`}
           onClick={() => track('goal_detail.recent_records_all_click', { goal_category_id: goalId })}
-          className="text-brand ml-auto text-[12px] font-semibold hover:underline"
+          className="text-text-brand ml-auto text-[12px] font-semibold hover:underline"
         >
           모두 보기
         </Link>

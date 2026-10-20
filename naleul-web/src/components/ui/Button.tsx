@@ -1,22 +1,35 @@
-import type { ButtonHTMLAttributes, Ref } from 'react'
+import type { ButtonHTMLAttributes, ReactNode, Ref } from 'react'
 import { cn } from '@/lib/cn'
 import { Spinner } from './Spinner'
 
-export type ButtonVariant = 'primary' | 'brand' | 'secondary' | 'ghost' | 'danger'
+/**
+ * 디자인 시스템 Button — "Style A Soft Flat"
+ *  primary · secondary · outline · ghost · danger · ai(그라데이션)
+ *  brand 는 예전 이름이에요 (= primary)
+ */
+export type ButtonVariant = 'primary' | 'brand' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'ai'
 export type ButtonSize = 'sm' | 'md' | 'lg'
 
 const VARIANT: Record<ButtonVariant, string> = {
-  primary: 'bg-ink text-on-ink hover:bg-ink/85',
-  brand: 'bg-brand text-white hover:bg-brand-strong',
-  secondary: 'bg-surface text-ink border border-line-strong hover:bg-subtle',
-  ghost: 'bg-transparent text-ink-2 hover:bg-subtle',
-  danger: 'bg-danger text-white hover:bg-danger/90',
+  primary:
+    'bg-action-primary-bg text-action-primary-fg shadow-primary hover:bg-action-primary-bg-hover active:bg-action-primary-bg-pressed',
+  brand:
+    'bg-action-primary-bg text-action-primary-fg shadow-primary hover:bg-action-primary-bg-hover active:bg-action-primary-bg-pressed',
+  secondary:
+    'bg-action-secondary-bg text-action-secondary-fg border border-action-secondary-border hover:bg-action-secondary-bg-hover active:bg-action-secondary-bg-pressed',
+  outline:
+    'bg-bg-surface text-text-brand border border-action-outline-border hover:bg-action-ghost-hover active:bg-action-ghost-pressed',
+  ghost: 'bg-transparent text-text-brand hover:bg-action-ghost-hover active:bg-action-ghost-pressed',
+  danger:
+    'bg-action-danger-bg text-action-danger-fg hover:bg-action-danger-bg-hover active:bg-action-danger-bg-pressed',
+  ai: 'text-white bg-linear-to-r from-ai-gradient-start via-ai-gradient-mid to-ai-gradient-end hover:from-ai-gradient-hover-start hover:via-ai-gradient-hover-mid hover:to-ai-gradient-hover-end active:from-ai-gradient-pressed-start active:via-ai-gradient-pressed-mid active:to-ai-gradient-pressed-end',
 }
 
+// LG h48 px20 · MD h40 px16 · SM h32 px12 (아이콘 쪽은 4px 줄여요)
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-[13px] rounded-lg gap-1.5',
-  md: 'h-10 px-4 text-sm rounded-xl gap-2',
-  lg: 'h-12 px-5 text-[15px] rounded-2xl gap-2',
+  lg: 'h-12 px-5 text-body-md font-medium rounded-btn gap-1.5 has-[>svg:first-child]:pl-4 has-[>svg:last-child]:pr-4',
+  md: 'h-10 px-4 text-body-sm font-medium rounded-btn gap-1.5 has-[>svg:first-child]:pl-3 has-[>svg:last-child]:pr-3',
+  sm: 'h-8 px-3 text-body-sm font-medium rounded-btn-sm gap-1 has-[>svg:first-child]:pl-2.5 has-[>svg:last-child]:pr-2.5',
 }
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -24,14 +37,20 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize
   loading?: boolean
   fullWidth?: boolean
+  /** 글자 왼쪽 / 오른쪽 아이콘 (lucide 아이콘 — 크기는 버튼이 맞춰요) */
+  leftIcon?: ReactNode
+  rightIcon?: ReactNode
   ref?: Ref<HTMLButtonElement>
 }
 
 /** 클래스만 필요할 때 (예: <Link className={buttonClass('primary')}>) */
 export function buttonClass(variant: ButtonVariant = 'primary', size: ButtonSize = 'md', fullWidth = false) {
   return cn(
-    'inline-flex shrink-0 items-center justify-center font-semibold whitespace-nowrap transition-colors',
-    'disabled:pointer-events-none disabled:opacity-40',
+    'inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-colors',
+    '[&_svg]:shrink-0',
+    'focus-visible:outline-border-focus focus-visible:outline-2 focus-visible:outline-offset-2',
+    // 비활성: 모든 종류 같은 회색 (테두리 · 그림자 없음)
+    'disabled:pointer-events-none disabled:border-transparent disabled:bg-disabled-bg disabled:bg-none disabled:text-disabled-fg disabled:shadow-none',
     VARIANT[variant],
     SIZE[size],
     fullWidth && 'w-full'
@@ -43,6 +62,8 @@ export function Button({
   size = 'md',
   loading = false,
   fullWidth = false,
+  leftIcon,
+  rightIcon,
   disabled,
   className,
   children,
@@ -57,8 +78,9 @@ export function Button({
       className={cn(buttonClass(variant, size, fullWidth), className)}
       {...rest}
     >
-      {loading && <Spinner className="size-4" />}
+      {loading ? <Spinner className="size-4" /> : leftIcon}
       {children}
+      {rightIcon}
     </button>
   )
 }

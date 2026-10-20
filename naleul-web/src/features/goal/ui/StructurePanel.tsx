@@ -33,12 +33,12 @@ export function StructurePanel({ goal }: { goal: GoalCategory }) {
   const dLeft = next ? Math.max(Math.round((Date.parse(next.dueDate) - Date.parse(today)) / 86_400_000), 0) : 0
 
   return (
-    <section className="border-line bg-surface overflow-hidden rounded-[20px] border">
+    <section className="border-line bg-surface overflow-hidden rounded-card border">
       {/* 다음 마일스톤 — 접혀 있어도 한눈에 보이게 크게 */}
       {next && (
         <div className="bg-brand-soft px-5 pt-5 pb-4 sm:px-6">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-brand text-[13px] font-semibold">다음 마일스톤</span>
+            <span className="text-text-brand text-[13px] font-semibold">다음 마일스톤</span>
             <span className="bg-brand rounded-full px-2.5 py-0.5 text-[13px] font-bold text-white tabular-nums">
               {dLeft === 0 ? 'D-DAY' : `D-${dLeft}`}
             </span>
@@ -49,7 +49,7 @@ export function StructurePanel({ goal }: { goal: GoalCategory }) {
               {Number(next.dueDate.slice(5, 7))}월 {Number(next.dueDate.slice(8, 10))}일까지
             </span>
             {next.targetValue != null && (
-              <span className="text-brand font-bold">
+              <span className="text-text-brand font-bold">
                 목표 {next.targetValue}
                 {unit}
               </span>

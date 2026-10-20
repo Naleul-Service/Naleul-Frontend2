@@ -130,7 +130,7 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
             <button
               type="button"
               onClick={() => changeMonth(thisMonth, 'today')}
-              className="text-brand ml-1 text-[13px] font-semibold"
+              className="text-text-brand ml-1 text-[13px] font-semibold"
             >
               이번 달
             </button>
@@ -202,7 +202,7 @@ function HabitMonth({
           {Number(h.startDate.slice(5, 7))}월 {Number(h.startDate.slice(8, 10))}일부터
         </p>
         {h.streak > 1 && (
-          <p className="mt-0.5 inline-flex items-center gap-0.5 text-[12px] font-semibold text-[#ea580c]">
+          <p className="mt-0.5 inline-flex items-center gap-0.5 text-[12px] font-semibold text-goal-orange-fg">
             <Flame className="size-3.5" />
             {h.streak}일 연속
           </p>

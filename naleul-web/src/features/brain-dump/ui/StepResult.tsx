@@ -428,7 +428,7 @@ function ReasonRow({
   return (
     <li className="flex items-start gap-3">
       {dashed ? (
-        <span className="border-brand text-brand mt-1 shrink-0 rounded border border-dashed px-1 text-[9px] leading-[12px] font-bold">
+        <span className="border-brand text-text-brand mt-1 shrink-0 rounded border border-dashed px-1 text-[9px] leading-[12px] font-bold">
           제안
         </span>
       ) : (

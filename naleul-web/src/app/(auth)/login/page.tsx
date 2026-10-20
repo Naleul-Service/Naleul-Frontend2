@@ -35,7 +35,7 @@ export default async function LoginPage({
         <h1 className="mt-10 text-[32px] leading-[1.25] font-bold tracking-tight">
           목표를 세우고,
           <br />
-          <span className="text-brand">나를</span> 알아가요
+          <span className="text-text-brand">나를</span> 알아가요
         </h1>
         <p className="text-ink-3 mt-3 text-[15px] leading-relaxed">
           AI와 대화하며 목표를 설계하고

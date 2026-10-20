@@ -13,7 +13,7 @@ import { cn } from '@/lib/cn'
 import { toast } from '@/stores/toastStore'
 import { goalKeys } from '@/features/goal/api'
 import { timetableKeys } from '../api'
-import { hexOf } from '../layout'
+import { goalAccent } from '@/lib/goalTone'
 
 // ── API (POST /timetable/ai-edit/preview · /apply) ─────────────────────
 
@@ -184,9 +184,9 @@ export function ScheduleAiBar({
   }
 
   return (
-    <section className="border-line bg-surface mb-3 rounded-[20px] border px-4 py-2.5 sm:px-5">
+    <section className="border-line bg-surface mb-3 rounded-card border px-4 py-2.5 sm:px-5">
       <div className="flex items-center gap-2">
-        <Sparkles className="text-brand size-5 shrink-0" />
+        <Sparkles className="text-text-brand size-5 shrink-0" />
         <input
           ref={inputRef}
           value={text}
@@ -200,7 +200,7 @@ export function ScheduleAiBar({
           disabled={ask.isPending}
           placeholder="AI로 일정 조정 — 예) 겹치는 루틴 정리해줘 · 운동 루틴은 전부 저녁 8시로"
           aria-label="AI로 일정 조정"
-          className="placeholder:text-ink-4 h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+          className="placeholder:text-text-placeholder h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
         />
         <Button
           size="sm"
@@ -283,13 +283,13 @@ export function ScheduleAiBar({
                         />
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-1.5">
-                            {c.kind === 'ROUTINE' && <Repeat className="text-brand size-3.5" aria-label="루틴" />}
+                            {c.kind === 'ROUTINE' && <Repeat className="text-text-brand size-3.5" aria-label="루틴" />}
                             <span className="text-[14px] font-semibold">{c.target}</span>
                             {c.goal && (
                               <span className="text-ink-3 flex items-center gap-1 text-[12px]">
                                 <span
                                   className="size-2 rounded-full"
-                                  style={{ backgroundColor: hexOf(c.colorCode) }}
+                                  style={{ backgroundColor: goalAccent(c.colorCode) }}
                                   aria-hidden
                                 />
                                 {c.goal}
@@ -326,7 +326,7 @@ export function ScheduleAiBar({
                       setPreview(null)
                       send('겹치는 루틴 정리해줘')
                     }}
-                    className="text-brand mt-1.5 pl-6 text-[12px] font-semibold hover:underline"
+                    className="text-text-brand mt-1.5 pl-6 text-[12px] font-semibold hover:underline"
                   >
                     겹치는 루틴 정리해 달라고 하기
                   </button>

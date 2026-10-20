@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Repeat } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { hexOf } from '@/features/timetable/layout'
+import { goalAccent } from '@/lib/goalTone'
 import type { BlockKeepItem, PatternBlockKeeping } from '../types'
 import { track } from '@/lib/client/analytics'
 import { useDeadClick, usePatternAnalytics } from '../analytics'
@@ -116,7 +116,7 @@ function KeepFilter({ block }: { block: PatternBlockKeeping }) {
               onClick={() => toggle(k.kind)}
               className={cn(
                 'flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors',
-                on ? 'border-ink bg-ink text-surface' : 'border-line text-ink-2 hover:border-line-strong'
+                on ? 'border-text-brand bg-ai-tint-soft text-text-brand' : 'border-line text-ink-2 hover:border-line-strong'
               )}
             >
               <span className={`size-2.5 rounded-sm ${k.color}`} />
@@ -137,7 +137,7 @@ function KeepFilter({ block }: { block: PatternBlockKeeping }) {
                 <li key={i.key} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
                   <div className="min-w-0">
                     <p className="flex items-center gap-1.5 truncate text-[14px] font-semibold">
-                      {i.routine && <Repeat className="text-brand size-3.5 shrink-0" aria-label="루틴" />}
+                      {i.routine && <Repeat className="text-text-brand size-3.5 shrink-0" aria-label="루틴" />}
                       {i.emoji && <span>{i.emoji}</span>}
                       <span className="truncate">{i.title}</span>
                     </p>
@@ -145,7 +145,7 @@ function KeepFilter({ block }: { block: PatternBlockKeeping }) {
                       <p className="text-ink-3 mt-0.5 flex items-center gap-1 text-[12px]">
                         <span
                           className="size-2 rounded-full"
-                          style={{ backgroundColor: hexOf(i.goalColorCode) }}
+                          style={{ backgroundColor: goalAccent(i.goalColorCode) }}
                           aria-hidden
                         />
                         {i.goalName}

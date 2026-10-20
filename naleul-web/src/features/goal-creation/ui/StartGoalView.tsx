@@ -194,7 +194,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
 
         <section className="mt-8">
           <p className="mb-3 text-[14px] font-semibold">
-            <span className="text-brand mr-1.5">1</span>카테고리
+            <span className="text-text-brand mr-1.5">1</span>카테고리
           </p>
           <GoalKindPicker
             value={kind}
@@ -207,7 +207,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
 
         <section className={kindReady ? 'mt-8' : 'pointer-events-none mt-8 opacity-40'}>
           <p className="mb-3 text-[14px] font-semibold">
-            <span className="text-brand mr-1.5">2</span>이루고 싶은 목표를 작성해 주세요
+            <span className="text-text-brand mr-1.5">2</span>이루고 싶은 목표를 작성해 주세요
           </p>
           {/* Enter 는 바로 시작하지 않고 다음 질문(꼭 해야 할 일)으로 넘어가요 */}
           <input
@@ -223,7 +223,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             disabled={busy || !kindReady}
             placeholder={placeholder}
             aria-label="이루고 싶은 목표"
-            className="border-line-strong bg-surface placeholder:text-ink-4 focus:border-ink-3 disabled:bg-subtle h-12 w-full rounded-2xl border px-4 text-[15px] outline-none"
+            className="border-line-strong bg-surface placeholder:text-text-placeholder focus:border-border-focus disabled:bg-subtle h-12 w-full rounded-2xl border px-4 text-[15px] outline-none"
           />
           <div className="mt-3 flex flex-wrap gap-2">
             {examples.map((goal, i) => (
@@ -244,10 +244,10 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
 
         <section className={kindReady ? 'mt-8' : 'pointer-events-none mt-8 opacity-40'}>
           <p className="text-[14px] font-semibold">
-            <span className="text-brand mr-1.5">3</span>
+            <span className="text-text-brand mr-1.5">3</span>
             {goalText ? (
               <>
-                <span className="text-brand">
+                <span className="text-text-brand">
                   &ldquo;{goalText.length > 24 ? `${goalText.slice(0, 24)}…` : goalText}&rdquo;
                 </span>{' '}
                 목표를 이루기 위해 꼭 해야 할 일들이 있나요?
@@ -301,7 +301,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             <Link
               href="/settings/membership"
               onClick={() => track('goal_new.membership_click', { quota_state: quotaState })}
-              className="text-brand underline"
+              className="text-text-brand underline"
             >
               Pro로 더 많이
             </Link>

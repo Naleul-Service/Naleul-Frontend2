@@ -37,7 +37,7 @@ interface Props {
 }
 
 const inputClass =
-  'border-line-strong focus:border-brand h-11 w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
+  'border-line-strong focus:border-border-focus h-11 w-full rounded-input border bg-surface px-3 text-[15px] outline-none'
 
 /**
  * 시간 직접 입력 (드래그 대신 쓰는 방법).

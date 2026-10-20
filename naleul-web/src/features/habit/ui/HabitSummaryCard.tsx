@@ -5,6 +5,7 @@ import { ArrowRight, Check } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import { useHabitHome } from '../api'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 
 /**
  * 목표 목록 맨 위 — 기본 생활 습관 요약 (오늘 몇 개 챙겼는지 + 습관 칩).
@@ -13,7 +14,7 @@ import { useHabitHome } from '../api'
 export function HabitSummaryCard({ className }: { className?: string }) {
   const { data, isPending } = useHabitHome()
   if (isPending)
-    return <div className={cn('bg-surface border-line h-[120px] animate-pulse rounded-[20px] border', className)} />
+    return <div className={cn('bg-surface border-line h-[120px] animate-pulse rounded-card border', className)} />
   if (!data) return null
 
   const due = data.habits.filter((h) => h.status === 'ACTIVE' && h.scheduled)
@@ -31,7 +32,7 @@ export function HabitSummaryCard({ className }: { className?: string }) {
         })
       }
       className={cn(
-        'border-line bg-surface hover:border-line-strong group block rounded-[20px] border p-5 transition-colors',
+        'border-line bg-surface hover:border-line-strong group block rounded-card border p-5 transition-colors',
         className
       )}
     >
@@ -61,9 +62,7 @@ export function HabitSummaryCard({ className }: { className?: string }) {
       </div>
       {due.length > 0 && (
         <>
-          <div className="bg-subtle mt-3 h-1.5 overflow-hidden rounded-full" aria-hidden>
-            <div className="bg-success h-full rounded-full transition-all" style={{ width: `${ratio * 100}%` }} />
-          </div>
+          <ProgressBar value={ratio} className="mt-3" />
           <div className="mt-3 flex flex-wrap gap-1.5">
             {due.slice(0, 8).map((h) => (
               <span

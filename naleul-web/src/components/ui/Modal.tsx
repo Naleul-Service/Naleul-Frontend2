@@ -22,7 +22,7 @@ interface ModalProps {
   dismissible?: boolean
 }
 
-const WIDTH = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-xl' }
+const WIDTH = { sm: 'sm:max-w-[340px]', md: 'sm:max-w-md', lg: 'sm:max-w-xl' }
 
 export function Modal({
   open,
@@ -63,7 +63,7 @@ export function Modal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
-        className="absolute inset-0 animate-[fade-in_150ms_ease-out] bg-black/40"
+        className="bg-bg-overlay absolute inset-0 animate-[fade-in_150ms_ease-out]"
         onClick={dismissible ? () => onClose('backdrop') : undefined}
         aria-hidden
       />
@@ -74,35 +74,39 @@ export function Modal({
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
         className={cn(
-          'bg-surface shadow-pop relative flex max-h-[90dvh] w-full flex-col rounded-t-3xl outline-none sm:rounded-3xl',
+          // 디자인 시스템 Dialog — glass (반투명 바탕 + blur 16 + 1px glass 테두리) · 모서리 16 · 여백 20 · 간격 16
+          'bg-glass-bg border-glass-border shadow-pop relative flex max-h-[90dvh] w-full flex-col border outline-none backdrop-blur-[16px]',
+          'rounded-t-sheet sm:rounded-dialog',
           'animate-[modal-in_180ms_ease-out]',
           WIDTH[size]
         )}
       >
         {(title || dismissible) && (
-          <div className="flex items-start justify-between gap-4 px-6 pt-6">
+          <div className="flex items-start justify-between gap-4 px-5 pt-5">
             <div className="min-w-0">
               {title && (
-                <h2 id={titleId} className="text-lg font-bold">
+                <h2 id={titleId} className="text-h3 text-text-primary">
                   {title}
                 </h2>
               )}
-              {description && <p className="text-ink-3 mt-1 text-sm leading-relaxed">{description}</p>}
+              {description && <p className="text-body-md text-text-secondary mt-1.5">{description}</p>}
             </div>
             {dismissible && (
               <button
                 type="button"
                 onClick={() => onClose('x_button')}
                 aria-label="닫기"
-                className="text-ink-3 hover:bg-subtle hover:text-ink -mt-1 -mr-2 rounded-lg p-1.5"
+                className="rounded-icon-btn text-text-secondary hover:bg-bg-subtle hover:text-text-primary -mt-1 -mr-1.5 grid size-8 shrink-0 place-items-center"
               >
-                <X className="size-5" />
+                <X className="size-[18px]" strokeWidth={1.5} />
               </button>
             )}
           </div>
         )}
-        {children && <div className="overflow-y-auto px-6 pt-4 pb-2">{children}</div>}
-        {footer && <div className="flex justify-end gap-2 px-6 pt-3 pb-6">{footer}</div>}
+        {children && <div className="overflow-y-auto px-5 pt-4 pb-1">{children}</div>}
+        {footer && (
+          <div className="flex justify-end gap-2 px-5 pt-4 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-5">{footer}</div>
+        )}
         {!footer && <div className="pb-4" />}
       </div>
     </div>,

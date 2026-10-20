@@ -19,7 +19,7 @@ export function GoalHero({ goals }: { goals: Goals }) {
   return (
     <Card className="grid gap-6 p-5 sm:p-6 lg:grid-cols-2">
       <div>
-        <p className="text-brand text-[13px] font-bold">핵심 지표 · 목표 달성률</p>
+        <p className="text-text-brand text-[13px] font-bold">핵심 지표 · 목표 달성률</p>
         <div className="mt-2 flex items-end gap-3">
           <p className="text-[52px] leading-none font-extrabold tracking-tight tabular-nums">{pct(g.achievementRate)}</p>
           <p className="text-ink-3 pb-1.5 text-[13px]">

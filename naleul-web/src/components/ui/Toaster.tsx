@@ -22,14 +22,14 @@ export function Toaster() {
             track(CE.toastDismissClick, { toast_tone: t.tone, seconds_shown: Math.round((Date.now() - t.at) / 1000) })
             dismiss(t.id)
           }}
+          // 디자인 시스템 Toast — bg/inverse · 모서리 12 · 12/16 · 간격 10 · Body/SM text/inverse
           className={cn(
-            'pointer-events-auto flex max-w-md items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium text-white',
-            'shadow-pop animate-[toast-in_180ms_ease-out]',
-            t.tone === 'error' ? 'bg-danger' : 'bg-inverse'
+            'bg-bg-inverse text-text-inverse rounded-toast text-body-sm pointer-events-auto flex max-w-md items-center gap-2.5 px-4 py-3 text-left',
+            'shadow-pop animate-[toast-in_180ms_ease-out]'
           )}
         >
-          {t.tone === 'success' && <CheckCircle2 className="text-success size-4 shrink-0" />}
-          {t.tone === 'error' && <AlertCircle className="size-4 shrink-0" />}
+          {t.tone === 'success' && <CheckCircle2 className="text-accent-mint size-4 shrink-0" strokeWidth={1.5} />}
+          {t.tone === 'error' && <AlertCircle className="text-action-danger-bg size-4 shrink-0" strokeWidth={1.5} />}
           {t.message}
         </button>
       ))}

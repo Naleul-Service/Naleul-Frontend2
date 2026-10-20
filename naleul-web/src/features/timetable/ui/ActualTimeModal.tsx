@@ -19,7 +19,7 @@ export interface ActualSegment {
 }
 
 const inputClass =
-  'border-line-strong focus:border-brand h-11 w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
+  'border-line-strong focus:border-border-focus h-11 w-full rounded-input border bg-surface px-3 text-[15px] outline-none'
 
 const MAX_SEGMENTS = 10
 
@@ -217,7 +217,7 @@ export function ActualTimeModal({
           <button
             type="button"
             onClick={addRow}
-            className="text-brand flex items-center gap-1 pt-1 text-[13px] font-semibold"
+            className="text-text-brand flex items-center gap-1 pt-1 text-[13px] font-semibold"
           >
             <Plus className="size-4" />
             {rows.length === 1 ? '나눠서 했어요 (구간 추가)' : '구간 추가'}

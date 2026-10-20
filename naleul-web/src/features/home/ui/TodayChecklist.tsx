@@ -6,13 +6,14 @@ import { ChevronDown, Flame, Plus, Repeat } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import type { Habit, HabitHome } from '@/features/habit/api'
-import { hexOf } from '@/features/timetable/layout'
+import { goalAccent } from '@/lib/goalTone'
 import { addDays, dDay, hm } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
 import { isDone } from '../today'
 import { EmptyStateView, HE, useHomeAnalytics } from '../analytics'
 import { BODY, FILL } from './fill'
 import { TaskCheck } from './TaskCheck'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 
 /** 오늘 할 일 — 루틴이 아닌 Task. 남은 일(시간순, 시간 미정은 아래) → 끝낸 일(접힘) */
 export function TodayTasks({
@@ -56,7 +57,7 @@ export function TodayTasks({
           <p className="text-ink-3 py-4 text-sm">
             <EmptyStateView section="tasks" />
             {dayLabel}로 정한 할 일이 없어요.{' '}
-            <Link href="/tasks/new" onClick={() => addClick('empty_state')} className="text-brand font-semibold">
+            <Link href="/tasks/new" onClick={() => addClick('empty_state')} className="text-text-brand font-semibold">
               할 일을 추가해 보세요
             </Link>
           </p>
@@ -153,7 +154,7 @@ export function TodayRoutines({
           <p className="text-ink-3 py-4 text-sm">
             <EmptyStateView section="routines" />
             {dayLabel} 할 루틴이 없어요.{' '}
-            <Link href="/goal" onClick={() => trackHome(HE.habitAddClick)} className="text-brand font-semibold">
+            <Link href="/goal" onClick={() => trackHome(HE.habitAddClick)} className="text-text-brand font-semibold">
               생활 습관 추가하기
             </Link>
           </p>
@@ -212,7 +213,7 @@ export function TodayRoutines({
                       {h.streak > 1 && (
                         <span
                           data-dead="streak"
-                          className="flex shrink-0 items-center text-[11px] font-semibold text-[#ea580c]"
+                          className="flex shrink-0 items-center text-[11px] font-semibold text-goal-orange-fg"
                         >
                           <Flame className="size-3" />
                           {h.streak}
@@ -253,12 +254,7 @@ function Header({
         <span className="ml-auto">{children}</span>
       </div>
       {total > 0 && (
-        <div className="bg-subtle mt-2 h-1.5 overflow-hidden rounded-full">
-          <div
-            className="bg-success h-full rounded-full transition-all"
-            style={{ width: `${(done / total) * 100}%` }}
-          />
-        </div>
+        <ProgressBar value={done / total} className="mt-2" />
       )}
     </div>
   )
@@ -323,7 +319,7 @@ function TaskRow({
           })
         }
       />
-      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hexOf(t.goalColorCode) }} aria-hidden />
+      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(t.goalColorCode) }} aria-hidden />
       <div className="min-w-0 flex-1">
         <p className={cn('truncate text-[14px]', done ? 'text-ink-3 line-through' : 'font-medium')}>
           {t.emoji ? `${t.emoji} ` : ''}

@@ -88,7 +88,7 @@ export function BarRow({
         {sub && <span className="text-ink-3 shrink-0 text-[12px] tabular-nums">{sub}</span>}
         <span className="shrink-0 font-bold tabular-nums">{value}</span>
       </div>
-      <div className="bg-subtle mt-1.5 h-1.5 overflow-hidden rounded-full">
+      <div className="bg-progress-track mt-1.5 h-1.5 overflow-hidden rounded-full">
         <div className={cn('h-full rounded-full', color)} style={{ width: `${Math.max(0, Math.min(1, ratio)) * 100}%` }} />
       </div>
     </li>

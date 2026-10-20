@@ -8,6 +8,7 @@ import { buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { RefreshCw } from 'lucide-react'
 import { track } from '@/lib/client/analytics'
 import { referrerType } from '@/lib/client/commonEvents'
@@ -182,7 +183,7 @@ function PatternScreen({ period }: { period: PatternPeriod }) {
                 type="button"
                 onClick={onRecalc}
                 disabled={recalc.isPending}
-                className="text-brand inline-flex items-center gap-1 font-semibold disabled:opacity-50"
+                className="text-text-brand inline-flex items-center gap-1 font-semibold disabled:opacity-50"
               >
                 <RefreshCw className={cn('size-3', recalc.isPending && 'animate-spin')} />
                 지금 다시 계산
@@ -196,7 +197,7 @@ function PatternScreen({ period }: { period: PatternPeriod }) {
       actions={
         <>
           <div
-            className="bg-surface border-line flex rounded-xl border p-1"
+            className={segmentedClass('flex')}
             role="tablist"
             aria-label="기간"
             data-share-exclude
@@ -207,10 +208,7 @@ function PatternScreen({ period }: { period: PatternPeriod }) {
                 role="tab"
                 aria-selected={period === p.value}
                 onClick={() => setPeriod(p.value)}
-                className={cn(
-                  'h-8 rounded-lg px-3.5 text-[14px] font-semibold transition-colors',
-                  period === p.value ? 'bg-ink text-on-ink' : 'text-ink-2 hover:text-ink'
-                )}
+                className={segmentClass(period === p.value)}
               >
                 {p.label}
               </button>

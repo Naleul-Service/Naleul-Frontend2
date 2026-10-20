@@ -46,7 +46,7 @@ export function WeekdayBars({ weekday }: { weekday?: PatternWeekday | null }) {
           </div>
           {weekday.insight && (
             <p className="bg-subtle text-ink-2 mt-5 rounded-2xl px-4 py-3 text-[14px] leading-relaxed">
-              <Emphasis text={weekday.insight} className="text-brand" />
+              <Emphasis text={weekday.insight} className="text-text-brand" />
             </p>
           )}
         </>

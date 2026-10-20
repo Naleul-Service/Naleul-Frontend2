@@ -1,8 +1,9 @@
 import type { HTMLAttributes } from 'react'
 import { cn } from '@/lib/cn'
 
+/** 디자인 시스템 Card — bg/surface · 1px border/subtle · 모서리 16 (안쪽 여백은 쓰는 곳에서, 기본 20) */
 export function Card({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('rounded-card border-line bg-surface shadow-card border', className)} {...rest} />
+  return <div className={cn('rounded-card border-border-subtle bg-bg-surface shadow-card border', className)} {...rest} />
 }
 
 export function CardHeader({
@@ -16,8 +17,8 @@ export function CardHeader({
 }) {
   return (
     <div className={cn('flex items-center justify-between gap-3', className)}>
-      <h2 className="text-[17px] font-bold">{title}</h2>
-      {aside && <div className="text-ink-3 text-[13px]">{aside}</div>}
+      <h2 className="text-h3 text-text-primary">{title}</h2>
+      {aside && <div className="text-caption-md text-text-secondary">{aside}</div>}
     </div>
   )
 }

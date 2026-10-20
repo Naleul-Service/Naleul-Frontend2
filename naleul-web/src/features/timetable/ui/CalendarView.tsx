@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { TaskAddPanel } from '@/features/brain-dump/ui/TaskAddPanel'
 import { track } from '@/lib/client/analytics'
 import { dateRelationOf, errorStatusOf } from '@/features/home/analytics'
@@ -153,7 +154,7 @@ export function CalendarView() {
                 Task 추가
               </Button>
             )}
-            <div className="bg-subtle flex rounded-xl p-1" role="tablist" aria-label="보기">
+            <div className={segmentedClass()} role="tablist" aria-label="보기">
               {(
                 [
                   ['day', '일간'],
@@ -171,10 +172,7 @@ export function CalendarView() {
                     close()
                     go({ view: v })
                   }}
-                  className={cn(
-                    'h-8 rounded-lg px-3.5 text-[13px] font-semibold transition-colors',
-                    view === v ? 'bg-surface text-ink shadow-card' : 'text-ink-3 hover:text-ink'
-                  )}
+                  className={segmentClass(view === v)}
                 >
                   {label}
                 </button>

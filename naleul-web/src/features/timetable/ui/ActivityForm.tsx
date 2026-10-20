@@ -38,7 +38,7 @@ export function draftOf(a: ActualActivity): ActivityDraft {
 }
 
 const input =
-  'border-line-strong bg-surface placeholder:text-ink-4 focus:border-ink-3 h-10 w-full min-w-0 rounded-xl border px-3 text-[14px] outline-none'
+  'border-line-strong bg-surface placeholder:text-text-placeholder focus:border-border-focus h-10 w-full min-w-0 rounded-input border px-3 text-[14px] outline-none'
 const label = 'text-ink-3 mb-1 block text-[12px] font-medium'
 
 /** 오늘(KST)부터 며칠 전인지 (오늘 0) */

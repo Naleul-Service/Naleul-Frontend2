@@ -55,7 +55,7 @@ const trackMetricResult = (goalId: number, action: 'record' | 'delete', err?: un
 const STATUS: Record<ProgressStatus, { label: string; tone: string }> = {
   ACHIEVED: { label: '목표 달성 🎉', tone: 'bg-success-soft text-success' },
   AHEAD: { label: '계획보다 앞서요', tone: 'bg-success-soft text-success' },
-  ON_TRACK: { label: '계획대로 가는 중', tone: 'bg-brand-soft text-brand' },
+  ON_TRACK: { label: '계획대로 가는 중', tone: 'bg-brand-soft text-text-brand' },
   BEHIND: { label: '계획보다 조금 늦어요', tone: 'bg-warning-soft text-warning' },
   NOT_STARTED: { label: '시작 전', tone: 'bg-subtle text-ink-3' },
   NO_PLAN: { label: '종료일 없음', tone: 'bg-subtle text-ink-3' },
@@ -519,7 +519,7 @@ function TaskView({ goalId, p }: { goalId: number; p: GoalProgress }) {
         <>
           <div className="flex items-end justify-between gap-2">
             <p className="text-[14px]">
-              오늘까지 할 Task <b>{t.dueByToday}개</b> 중 <b className="text-brand">{t.completed}개</b> 완료
+              오늘까지 할 Task <b>{t.dueByToday}개</b> 중 <b className="text-text-brand">{t.completed}개</b> 완료
             </p>
             <p className="text-[28px] leading-none font-bold tracking-tight">
               {Math.round(ratio * 100)}

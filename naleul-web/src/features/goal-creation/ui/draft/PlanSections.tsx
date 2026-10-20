@@ -71,7 +71,7 @@ export function PanelCard({
     <section
       data-vkey={vkey}
       className={cn(
-        'border-line bg-surface scroll-mt-28 rounded-[20px] border p-5 sm:p-6',
+        'border-line bg-surface scroll-mt-28 rounded-card border p-5 sm:p-6',
         messages && 'ring-danger ring-2'
       )}
     >
@@ -147,7 +147,7 @@ export function GoalHeroCard({
       : null
 
   return (
-    <section className="border-line bg-surface rounded-[20px] border p-5 sm:p-7">
+    <section className="border-line bg-surface rounded-card border p-5 sm:p-7">
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="brand">✦ AI가 설계한 목표</Badge>
         {styleChip}
@@ -195,7 +195,7 @@ export function GoalHeroCard({
             onClick={() => onColor(null)}
             className={cn(
               'h-8 rounded-full border px-3 text-xs font-semibold',
-              colorId === null ? 'border-ink bg-ink text-on-ink' : 'border-line-strong text-ink-2'
+              colorId === null ? 'border-text-brand bg-ai-tint-soft text-text-brand' : 'border-line-strong text-ink-2'
             )}
           >
             자동
@@ -389,7 +389,7 @@ export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: 
   ] as const
 
   return (
-    <section className="bg-brand rounded-[20px] p-6 text-white sm:p-7">
+    <section className="bg-brand rounded-card p-6 text-white sm:p-7">
       {goal.metric ? (
         <>
           <div className="flex items-end justify-between text-[13px] text-white/70">
@@ -625,7 +625,7 @@ export function RoutinesCard({
                       </span>
                       <span className="text-ink-3 mt-0.5 block text-[13px]">
                         {task.preferredStartTime ?? '시간 자동'} · {task.durationMinutes}분
-                        {period && <b className="text-brand font-semibold"> · {period}</b>}
+                        {period && <b className="text-text-brand font-semibold"> · {period}</b>}
                       </span>
                       <span className="mt-2 flex gap-1">
                         {DAYS.map((d) => {

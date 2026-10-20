@@ -43,7 +43,7 @@ export function useEditing(key: string) {
 // ─── 입력 폼 ───────────────────────────────────────────────
 
 export const inlineInput =
-  'border-line-strong bg-surface placeholder:text-ink-4 focus:border-ink-3 h-10 w-full min-w-0 rounded-xl border px-3 text-[14px] outline-none transition-colors'
+  'border-border-subtle bg-bg-surface placeholder:text-text-placeholder focus:border-border-focus text-body-md h-10 w-full min-w-0 rounded-input border px-3 outline-none transition-colors'
 
 export function Field({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
   return (
@@ -280,7 +280,7 @@ export function DaysPicker({ value, onChange }: { value: JavaDayOfWeek[]; onChan
   return (
     <div className="flex flex-wrap items-center gap-1">
       {JAVA_DAYS.map((d) => (
-        <Chip key={d} size="sm" selected={value.includes(d)} onClick={() => toggle(d)} className="w-8 px-0">
+        <Chip key={d} size="sm" variant="day" selected={value.includes(d)} onClick={() => toggle(d)} className="w-8 px-0">
           {JAVA_DAY_LABEL[d]}
         </Chip>
       ))}

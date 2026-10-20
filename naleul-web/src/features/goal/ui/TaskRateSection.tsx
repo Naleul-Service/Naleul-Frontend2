@@ -116,7 +116,7 @@ export function TaskRateSection({ goal }: { goal: GoalCategory }) {
                       />
                     )}
                   </div>
-                  <span className={cn('text-[10px] tabular-nums', b.current ? 'text-brand font-bold' : 'text-ink-3')}>
+                  <span className={cn('text-[10px] tabular-nums', b.current ? 'text-text-brand font-bold' : 'text-ink-3')}>
                     {b.current ? '이번 주' : `${Number(b.week.slice(5, 7))}/${Number(b.week.slice(8, 10))}`}
                   </span>
                 </div>

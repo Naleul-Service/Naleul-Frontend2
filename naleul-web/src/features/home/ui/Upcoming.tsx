@@ -6,7 +6,7 @@ import { Flag } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { dayLabel } from '@/features/work/format'
-import { hexOf } from '@/features/timetable/layout'
+import { goalAccent } from '@/lib/goalTone'
 import { hm, todayKst, weekdayIndex, WEEKDAY_LABEL } from '@/features/timetable/time'
 import type { TimeBlockTask, TimetableDay } from '@/features/timetable/types'
 import type { DeadlineType, HomeDeadline } from '../api'
@@ -92,13 +92,13 @@ function ScheduleRow({ t }: { t: TimeBlockTask }) {
       <span className="text-ink-3 w-[46px] shrink-0 text-[12px] tabular-nums">
         {t.plannedStartAt ? hm(t.plannedStartAt) : '미정'}
       </span>
-      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hexOf(t.goalColorCode) }} aria-hidden />
+      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(t.goalColorCode) }} aria-hidden />
       <span className={cn('min-w-0 flex-1 truncate text-[14px]', appointment && 'font-semibold')}>
         {t.emoji ? `${t.emoji} ` : ''}
         {t.taskName}
       </span>
       {appointment && (
-        <span className="bg-brand-soft text-brand shrink-0 rounded px-1.5 text-[10px] font-bold">약속</span>
+        <span className="bg-brand-soft text-text-brand shrink-0 rounded px-1.5 text-[10px] font-bold">약속</span>
       )}
     </li>
   )
@@ -114,7 +114,7 @@ function ddayText(d: HomeDeadline) {
 
 /** 점 — Task 는 작은 점, 업무형 주제는 테두리 점, 목표 종료는 깃발 */
 function Node({ d }: { d: HomeDeadline }) {
-  const color = hexOf(d.colorCode)
+  const color = goalAccent(d.colorCode)
   if (d.type === 'GOAL') {
     return (
       <span

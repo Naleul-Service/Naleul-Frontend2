@@ -1,16 +1,16 @@
 'use client'
 
 import type { CSSProperties, MouseEvent, PointerEvent } from 'react'
-import { Check, GripHorizontal, Pin, X } from 'lucide-react'
+import { Check, Clock, GripHorizontal, Pin, Sparkles, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { hexOf, shownTime, withAlpha, type Placed, type PlacedSleep } from '../layout'
+import { goalAccent, goalVars } from '@/lib/goalTone'
+import { shownTime, type Placed, type PlacedSleep } from '../layout'
 import { formatMinutes, minutesToTime, todayKst } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask } from '../types'
 
-/** 빗금 배경 (고정 시간) */
+/** 고정 시간 바탕 (디자인 시스템 Fixed event: bg/subtle) */
 export const HATCH: CSSProperties = {
-  backgroundColor: 'var(--color-hatch)',
-  backgroundImage: 'repeating-linear-gradient(135deg, var(--color-hatch-line) 0 1.5px, transparent 1.5px 8px)',
+  backgroundColor: 'var(--color-bg-subtle)',
 }
 
 interface Geometry {
@@ -32,11 +32,9 @@ const NO_CALLOUT: CSSProperties = { WebkitTouchCallout: 'none', WebkitUserSelect
 /** 블록 위·아래 가장자리를 잡고 늘리기/줄이기 (위 = 시작 시각, 아래 = 끝 시각) */
 function ResizeHandle({
   onDrag,
-  light,
   edge = 'bottom',
 }: {
   onDrag: BlockDrag
-  light?: boolean
   edge?: 'top' | 'bottom'
 }) {
   const top = edge === 'top'
@@ -54,7 +52,7 @@ function ResizeHandle({
         className={cn(
           'h-1 w-6 rounded-full opacity-0 transition-opacity group-hover/handle:opacity-100',
           top ? 'mt-0.5' : 'mb-0.5',
-          light ? 'bg-white/70' : 'bg-ink-4'
+          'bg-ink-4'
         )}
       />
     </span>
@@ -66,25 +64,23 @@ const pos = (p: Placed<unknown>, g: Geometry): CSSProperties => ({
   height: Math.max((p.bottom - p.top) * g.ppm - 2, 16),
 })
 
+/** 왼쪽 4px 목표 색 선 (모서리를 따라 잘려요) */
+const BAR = 'inset 4px 0 0 var(--goal-accent)'
+/** 연한 목표 바탕을 55% 로 (미완료 · 제안) */
+const SOFT_BG = 'color-mix(in srgb, var(--goal-bg) 55%, var(--color-surface))'
+
 /**
- * 블록 스타일 (명세 8)
- *  - 루틴: 연한 목표 색 + 왼쪽 진한 선
- *  - 일반 Task: 진한 목표 색 + 흰 글씨
- *  - 완료: ✓ 초록, 흐리게 / 놓침: ✕ 빨강 / 직접 정한 시간: 📌 (자물쇠는 "못 움직인다"로 보여서 핀으로 — 드래그로 옮길 수 있어요)
+ * 블록 스타일 (디자인 시스템 Event — 연한 목표 바탕 + 왼쪽 색 선 + 목표 글자색)
+ *  - 루틴 · 일반 Task 같은 모양 (목표 색은 lib/goalTone 이 팔레트로 맞춰요)
+ *  - 완료: 목표 색 원 ✓ / 놓침: 바탕 55% + 1px 목표 색 테두리 / 직접 정한 시간: 📌
  */
 export function taskColors(t: TimeBlockTask): CSSProperties {
-  const c = hexOf(t.goalColorCode)
-  if (t.sourceType === 'ROUTINE') {
-    // 아래 빗금(고정 시간)이 비치지 않도록 흰 바탕 위에 연한 색을 겹쳐요
-    const soft = withAlpha(c, 0.16)
-    return {
-      backgroundColor: 'var(--color-surface)',
-      backgroundImage: `linear-gradient(${soft}, ${soft})`,
-      borderLeft: `3px solid ${c}`,
-      color: 'var(--color-ink)',
-    }
+  return {
+    ...goalVars(t.goalColorCode),
+    backgroundColor: 'var(--goal-bg)',
+    boxShadow: BAR,
+    color: 'var(--goal-fg)',
   }
-  return { backgroundColor: c, color: '#fff' }
 }
 
 export function TaskBlock({
@@ -126,16 +122,22 @@ export function TaskBlock({
   const actual = !planned && (shownTime(t)?.actual ?? false)
   // 22시 이월 제안(아직 확인 안 함): 점선 + 연한 바탕 — "확정된 일정이 아니라 제안"으로 보이게
   const proposed = (!!t.carryPending || !!t.proposed) && !done
-  const solid = t.sourceType !== 'ROUTINE' && !proposed
+  const incomplete = !!t.missed && !done
   const width = 100 / placed.cols
-  const goalColor = hexOf(t.goalColorCode)
   const style: CSSProperties = {
     ...pos(placed, geometry),
     left: `calc(${placed.col * width}% + 2px)`,
     width: `calc(${width}% - 4px)`,
+    ...taskColors(t),
     ...(proposed
-      ? { backgroundColor: withAlpha(goalColor, 0.1), color: 'var(--color-ink)', border: `2px dashed ${goalColor}` }
-      : taskColors(t)),
+      ? {
+          // 제안 (Proposal) — 바탕 55% + 1.5px 목표 색 테두리, 확인 대기 중(focused)이면 바탕 100% (Proposal Active)
+          backgroundColor: focused ? 'var(--goal-bg)' : SOFT_BG,
+          border: '1.5px solid var(--goal-accent)',
+        }
+      : incomplete
+        ? { backgroundColor: SOFT_BG, border: '1px solid var(--goal-accent)' }
+        : {}),
     ...NO_CALLOUT,
   }
 
@@ -150,15 +152,14 @@ export function TaskBlock({
       style={style}
       aria-label={`${t.taskName} ${actual ? '실제 ' : ''}${formatMinutes(placed.start)}~${formatMinutes(placed.end)}`}
       className={cn(
-        'absolute z-10 flex flex-col overflow-hidden rounded-lg px-2 text-left text-xs leading-tight transition-shadow',
-        short ? 'justify-center rounded-md py-0 text-[11px]' : 'py-1',
-        'hover:shadow-[0_2px_8px_rgb(17_17_17/0.18)]',
-        done && 'opacity-55',
+        'rounded-event absolute z-10 flex flex-col overflow-hidden pr-2 pl-3 text-left text-label-sm transition-[filter,box-shadow]',
+        short ? 'justify-center py-0 text-[11px]' : 'py-1.5',
+        'hover:brightness-[.97]',
         drag && 'cursor-grab active:cursor-grabbing',
         dimmed && 'opacity-30',
         // 미리보기 중 제안 블록을 돋보이게 — 나머지는 흐리게(faded)
         faded && 'opacity-50 saturate-[.8]',
-        focused && 'ring-brand z-[12] shadow-[0_6px_18px_rgb(61_90_254/0.35)] ring-2 ring-offset-1 ring-offset-surface',
+        focused && 'shadow-primary z-[12]',
         selected && 'ring-ink ring-2 ring-offset-1',
         grouped && 'outline-brand z-[11] outline-2 outline-offset-1 outline-dashed',
         placed.clippedTop && 'rounded-t-none',
@@ -167,21 +168,24 @@ export function TaskBlock({
     >
       <span className="flex min-w-0 items-center gap-1">
         {done && (
-          <span className="bg-success grid size-3.5 shrink-0 place-items-center rounded-full text-white">
+          <span className="grid size-3.5 shrink-0 place-items-center rounded-full bg-(--goal-accent) text-white">
             <Check className="size-2.5" strokeWidth={3.5} />
           </span>
         )}
         {t.missed && (
-          <span className="bg-danger grid size-3.5 shrink-0 place-items-center rounded-full text-white">
+          <span className="bg-action-danger-bg text-action-danger-fg grid size-3.5 shrink-0 place-items-center rounded-full">
             <X className="size-2.5" strokeWidth={3.5} />
           </span>
         )}
-        <span className={cn('min-w-0 flex-1 truncate font-semibold', done && 'line-through')}>
+        {proposed && t.proposed && <Sparkles className="size-3.5 shrink-0 text-(--goal-accent)" strokeWidth={1.5} />}
+        <span className="min-w-0 flex-1 truncate">
           {t.emoji ? `${t.emoji} ` : ''}
           {t.taskName}
         </span>
         {isNew && (
-          <span className="bg-danger shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-white">NEW</span>
+          <span className="bg-action-danger-bg text-action-danger-fg shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold">
+            NEW
+          </span>
         )}
         {proposed && (
           <span className="bg-ink shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-on-ink">
@@ -191,20 +195,20 @@ export function TaskBlock({
         {t.locked && (
           <Pin
             aria-label="직접 정한 시간"
-            className={cn('size-3 shrink-0 rotate-45', solid ? 'text-white/85' : 'text-ink-3')}
+            className="size-3 shrink-0 rotate-45 opacity-70"
           />
         )}
       </span>
       {heightPx >= 34 && (
-        <span className={cn('mt-0.5 truncate', solid ? 'text-white/80' : 'text-ink-3')}>
+        <span className="text-caption-sm text-text-secondary mt-0.5 truncate">
           {actual && '실제 '}
           {formatMinutes(placed.start)} – {formatMinutes(placed.end)}
         </span>
       )}
       {drag && !placed.clippedTop && heightPx >= TOP_HANDLE_MIN_PX && (
-        <ResizeHandle onDrag={drag} light={solid} edge="top" />
+        <ResizeHandle onDrag={drag} edge="top" />
       )}
-      {drag && !placed.clippedBottom && <ResizeHandle onDrag={drag} light={solid} />}
+      {drag && !placed.clippedBottom && <ResizeHandle onDrag={drag} />}
     </button>
   )
 }
@@ -235,8 +239,8 @@ export function FixedBlockView({
       style={{ ...pos(placed, geometry), ...HATCH, ...NO_CALLOUT }}
       aria-label={`고정 시간 ${b.title} ${formatMinutes(placed.start)}~${formatMinutes(placed.end)}`}
       className={cn(
-        'border-line-strong text-ink-3 absolute inset-x-0.5 z-0 flex flex-col overflow-hidden rounded-lg border border-dashed px-2 py-1 text-left text-[11px] leading-tight',
-        'hover:border-ink-4',
+        'border-border-subtle text-text-secondary rounded-event-fixed text-caption-md absolute inset-x-0.5 z-0 flex flex-col overflow-hidden border px-2 py-1 text-left',
+        'hover:border-line-strong',
         drag && 'cursor-grab active:cursor-grabbing',
         dimmed && 'opacity-40',
         selected && 'ring-ink-3 ring-2',
@@ -244,11 +248,12 @@ export function FixedBlockView({
         placed.clippedBottom && 'rounded-b-none border-b-0'
       )}
     >
-      <span className="truncate font-semibold">
+      <span className="flex min-w-0 items-center gap-1 truncate">
+        <Clock className="size-3.5 shrink-0" strokeWidth={1.25} aria-hidden />
         {b.emoji ? `${b.emoji} ` : ''}
         {b.title}
         {/* 기본 시간과 다르게 바꾼 날 (이날만·이번 주로 바꾼 경우). 지난 날짜는 "앞으로" 변경 때 예전 시간으로 고정해 둔 것이라 표시하지 않아요 */}
-        {b.overridden && b.targetDate >= todayKst() && <span className="text-brand ml-1 font-medium">· 변경</span>}
+        {b.overridden && b.targetDate >= todayKst() && <span className="text-text-brand ml-1 font-medium">· 변경</span>}
       </span>
       {heightPx >= 30 && (
         <span className="truncate">
@@ -311,7 +316,7 @@ export function SleepBlockView({
         aria-hidden
         onPointerDown={drag ? (e) => drag(e, wake ? 'resize' : 'resize-top') : undefined}
         className={cn(
-          'flex h-6 shrink-0 items-center gap-1 border-[#8EA2FF] px-2 font-semibold text-sleep-ink',
+          'flex h-6 shrink-0 items-center gap-1 border-(--color-goal-purple-accent) px-2 font-semibold text-sleep-ink',
           wake ? 'border-b-2' : 'border-t-2',
           drag && 'cursor-ns-resize hover:bg-sleep-line'
         )}
@@ -343,7 +348,7 @@ export function ActivityBlock({
   const a = placed.item
   const heightPx = (placed.bottom - placed.top) * geometry.ppm
   const short = heightPx < 34
-  const color = a.goalColorCode ? (a.goalColorCode.startsWith('#') ? a.goalColorCode : `#${a.goalColorCode}`) : null
+  const color = a.goalColorCode ? goalAccent(a.goalColorCode) : null
   return (
     <button
       type="button"
@@ -363,8 +368,8 @@ export function ActivityBlock({
       }}
       aria-label={`실제로 한 일 ${a.title} ${formatMinutes(placed.start)}~${formatMinutes(placed.end)}`}
       className={cn(
-        'border-line bg-surface absolute inset-x-0.5 z-10 flex flex-col overflow-hidden rounded-lg border border-l-[3px] px-1.5 text-left text-[11px] leading-tight shadow-[0_1px_2px_rgb(17_17_17/0.06)]',
-        'hover:shadow-[0_2px_8px_rgb(17_17_17/0.16)]',
+        'border-border-subtle bg-surface rounded-event shadow-card absolute inset-x-0.5 z-10 flex flex-col overflow-hidden border border-l-4 px-1.5 text-left text-[11px] leading-tight',
+        'hover:shadow-pop',
         short ? 'justify-center py-0' : 'py-1',
         selected && 'ring-ink ring-2 ring-offset-1',
         placed.clippedTop && 'rounded-t-none',

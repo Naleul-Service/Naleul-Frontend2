@@ -11,7 +11,7 @@ interface SwitchProps {
   className?: string
 }
 
-/** iOS Toggle 같은 켜기/끄기 스위치 */
+/** 디자인 시스템 Toggle — 44×26, 손잡이 20 (켜짐 primary · 꺼짐 border/subtle) */
 export function Switch({ checked, onChange, label, disabled, className }: SwitchProps) {
   return (
     <button
@@ -22,16 +22,16 @@ export function Switch({ checked, onChange, label, disabled, className }: Switch
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors',
-        'disabled:pointer-events-none disabled:opacity-40',
-        checked ? 'bg-brand' : 'bg-line-strong',
+        'relative inline-flex h-[26px] w-11 shrink-0 items-center rounded-full transition-colors',
+        'disabled:bg-disabled-bg disabled:pointer-events-none',
+        checked ? 'bg-action-primary-bg' : 'bg-border-subtle',
         className
       )}
     >
       <span
         className={cn(
-          'inline-block size-6 rounded-full bg-white shadow-sm transition-transform',
-          checked ? 'translate-x-[22px]' : 'translate-x-0.5'
+          'bg-bg-surface inline-block size-5 rounded-full shadow-[0_1px_3px_rgb(0_0_0/0.15)] transition-transform',
+          checked ? 'translate-x-[21px]' : 'translate-x-[3px]'
         )}
       />
     </button>

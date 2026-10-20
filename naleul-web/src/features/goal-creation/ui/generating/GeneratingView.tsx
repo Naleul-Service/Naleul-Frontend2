@@ -226,7 +226,7 @@ export function GeneratingView({
                     className={cn(
                       'grid size-6 shrink-0 place-items-center rounded-full',
                       state === 'done' && 'bg-ink text-on-ink',
-                      state === 'current' && 'bg-brand-soft text-brand',
+                      state === 'current' && 'bg-brand-soft text-text-brand',
                       state === 'todo' && 'bg-subtle'
                     )}
                   >

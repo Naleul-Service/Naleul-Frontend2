@@ -131,7 +131,7 @@ export function RoutineHeatmapSection({ goal }: { goal: GoalCategory }) {
                     {s.completed} / {s.due}회{s.rate !== null ? ` · ${s.rate}%` : ''}
                   </span>
                   {r.currentStreak > 1 && (
-                    <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-[#ea580c]">
+                    <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-goal-orange-fg">
                       <Flame className="size-3.5" />
                       {r.currentStreak}회 연속
                     </span>

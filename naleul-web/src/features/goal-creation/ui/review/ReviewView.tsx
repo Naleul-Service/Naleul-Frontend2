@@ -190,7 +190,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
           <p className="text-ink-3 mt-1.5 text-[15px]">항목을 눌러 고칠 수 있어요. 확인되면 계획을 만들어 드릴게요.</p>
 
           <Section title="목표 정보">
-            <div className="border-line divide-line divide-y overflow-hidden rounded-[18px] border">
+            <div className="border-line divide-line divide-y overflow-hidden rounded-card border">
               <SummaryRow
                 label="목표"
                 value={summary?.goalStatement ?? null}
@@ -260,7 +260,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
                       selected ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
                     )}
                   >
-                    <span className={cn('block text-[15px] font-bold', selected && 'text-brand')}>
+                    <span className={cn('block text-[15px] font-bold', selected && 'text-text-brand')}>
                       {PLANNING_STYLE_LABEL[value]}
                     </span>
                     <span className="text-ink-3 mt-1 block text-[13px]">{STYLE_DESCRIPTION[value]}</span>
@@ -292,7 +292,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
                       selected ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
                     )}
                   >
-                    <span className={cn('block text-[15px] font-bold', selected && 'text-brand')}>
+                    <span className={cn('block text-[15px] font-bold', selected && 'text-text-brand')}>
                       {PLAN_INTENSITY_LABEL[value]}
                       {value === 'STEADY' && <span className="text-ink-3 ml-1.5 text-xs font-medium">추천</span>}
                     </span>

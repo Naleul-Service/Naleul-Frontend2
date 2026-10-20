@@ -243,7 +243,7 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
             track('goal_add.manual_metric_add_click')
             setShowMetric(true)
           }}
-          className="text-brand self-start text-[13px] font-semibold"
+          className="text-text-brand self-start text-[13px] font-semibold"
         >
           + 수치 목표 추가 (예: 체중 80 → 72kg)
         </button>
@@ -313,7 +313,7 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
     setOpen(mode)
   }
 
-  const card = 'border-line bg-surface flex flex-col rounded-[20px] border p-5 text-left transition-colors sm:p-6'
+  const card = 'border-line bg-surface flex flex-col rounded-card border p-5 text-left transition-colors sm:p-6'
 
   return (
     <>
@@ -379,7 +379,7 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
 
         {/* 목표형 */}
         <section className={cn(card, open === 'manual' && 'border-ink ring-ink ring-1')} aria-labelledby="goal-title">
-          <span className="bg-brand-soft text-brand grid size-11 place-items-center rounded-2xl">
+          <span className="bg-brand-soft text-text-brand grid size-11 place-items-center rounded-2xl">
             <Target className="size-5" />
           </span>
           <p id="goal-title" className="mt-4 flex flex-wrap items-center gap-2 text-[18px] font-bold">
@@ -394,7 +394,7 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
             <Link
               href="/goal/new"
               onClick={() => track('goal_add.ai_click', { form_open: formOpen })}
-              className="text-brand group flex items-center gap-1 text-sm font-semibold"
+              className="text-text-brand group flex items-center gap-1 text-sm font-semibold"
             >
               <MessageCircle className="size-4" />
               AI와 계획 세우기

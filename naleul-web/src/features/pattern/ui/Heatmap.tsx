@@ -98,7 +98,7 @@ export function Heatmap({ heatmap }: { heatmap?: PatternHeatmap | null }) {
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {heatmap.goldenTime && (
                 <div className="bg-brand-soft flex items-center gap-3 rounded-2xl px-4 py-3.5" onClick={onGoldenClick}>
-                  <span className="text-brand text-[13px] font-bold whitespace-nowrap">🌟 골든 타임</span>
+                  <span className="text-text-brand text-[13px] font-bold whitespace-nowrap">🌟 골든 타임</span>
                   <div>
                     <p className="text-[16px] font-bold">{windowLabel(heatmap.goldenTime)}</p>
                     <p className="text-ink-3 text-[13px]">실행률 {heatmap.goldenTime.rate}%</p>

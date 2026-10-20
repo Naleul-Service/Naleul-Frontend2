@@ -89,7 +89,7 @@ export function GoalKindPicker({
                 )}
               >
                 <span className="text-[22px] leading-none">{t.emoji}</span>
-                <span className={cn('mt-2 text-[15px] font-bold', selected && 'text-brand')}>{t.label}</span>
+                <span className={cn('mt-2 text-[15px] font-bold', selected && 'text-text-brand')}>{t.label}</span>
                 <span className="text-ink-3 mt-0.5 text-[12px]">{t.hint}</span>
               </button>
             )
@@ -128,7 +128,7 @@ export function GoalKindPicker({
               type?.value === 'ETC' ? '예) 악기 연습' : type?.value === 'HEALTH' ? '예) 필라테스' : '예) 주식 공부'
             }
             aria-label="카테고리 이름 직접 입력"
-            className="border-line-strong bg-surface placeholder:text-ink-4 focus:border-ink-3 h-10 w-full rounded-xl border pr-14 pl-3 text-[14px] outline-none"
+            className="border-line-strong bg-surface placeholder:text-text-placeholder focus:border-border-focus h-10 w-full rounded-input border pr-14 pl-3 text-[14px] outline-none"
           />
           <span className="text-ink-4 absolute top-1/2 right-3 -translate-y-1/2 text-[12px] tabular-nums">
             {label.length}/{KIND_LABEL_MAX}

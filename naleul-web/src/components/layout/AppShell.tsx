@@ -7,6 +7,8 @@ import { GuestBanner } from '@/components/auth/LoginRequiredDialog'
 import { GuestSessionTracker } from '@/components/analytics/GuestSessionTracker'
 import { COMMON_EVENTS as CE, track } from '@/lib/client/analytics'
 import { currentPath } from '@/lib/client/commonEvents'
+import { cn } from '@/lib/cn'
+import { iconButtonClass } from '@/components/ui/IconButton'
 import { Sidebar } from './Sidebar'
 
 const LG = 1024
@@ -50,11 +52,13 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
   return (
     <div className="min-h-dvh">
       <GuestSessionTracker isGuest={isGuestUser(user)} />
-      <aside className="border-line bg-surface fixed inset-y-0 left-0 z-30 hidden w-[272px] border-r lg:block">
+      {/* 디자인 시스템 Sidebar — 240 · bg/surface · 오른쪽 1px border/subtle */}
+      <aside className="border-border-subtle bg-bg-surface fixed inset-y-0 left-0 z-30 hidden w-60 border-r lg:block">
         <Sidebar user={user} />
       </aside>
 
-      <header className="border-line bg-surface/90 sticky top-0 z-20 flex h-14 items-center gap-2 border-b px-4 backdrop-blur lg:hidden">
+      {/* 디자인 시스템 MobileHeader — h48 */}
+      <header className="border-border-subtle bg-glass-bg sticky top-0 z-20 flex h-12 items-center gap-2 border-b px-4 backdrop-blur-[16px] lg:hidden">
         <button
           type="button"
           onClick={() => {
@@ -63,9 +67,9 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
             setDrawerOpen(true)
           }}
           aria-label="메뉴 열기"
-          className="hover:bg-subtle -ml-2 rounded-lg p-2"
+          className={cn(iconButtonClass('md'), '-ml-1.5')}
         >
-          <Menu className="size-5" />
+          <Menu className="size-5" strokeWidth={1.5} />
         </button>
         {/* 위쪽 바 로고는 링크가 아니에요 (사이드바 로고는 홈으로 감) → 눌러 보는지 확인 */}
         <span onClick={() => track(CE.mobileHeaderDeadClick, { dead_target: 'logo', current_path: currentPath() })}>
@@ -76,17 +80,17 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
       {drawerOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
           <div
-            className="absolute inset-0 animate-[fade-in_150ms_ease-out] bg-black/40"
+            className="bg-bg-overlay absolute inset-0 animate-[fade-in_150ms_ease-out]"
             onClick={() => closeWith('backdrop')}
             aria-hidden
           />
-          <aside className="bg-surface shadow-pop absolute inset-y-0 left-0 w-[280px] max-w-[85vw]">
+          <aside className="bg-bg-surface shadow-pop absolute inset-y-0 left-0 w-60 max-w-[85vw]">
             <Sidebar user={user} onNavigate={close} />
           </aside>
         </div>
       )}
 
-      <main className="lg:pl-[272px]">
+      <main className="lg:pl-60">
         {isGuestUser(user) && <GuestBanner />}
         <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</div>
       </main>

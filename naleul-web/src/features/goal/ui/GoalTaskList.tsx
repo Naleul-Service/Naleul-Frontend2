@@ -8,7 +8,9 @@ import { Badge, Chip } from '@/components/ui/Chip'
 import { Spinner } from '@/components/ui/Spinner'
 import { errorStatusOf } from '@/features/home/analytics'
 import { cn } from '@/lib/cn'
-import { hexOf, shownTime } from '@/features/timetable/layout'
+import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
+import { shownTime } from '@/features/timetable/layout'
+import { goalAccent } from '@/lib/goalTone'
 import { WEEKDAY_LABEL, addDays, hm, startOfWeek, todayKst, weekdayIndex } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
 import { useGoalTasks, useToggleGoalTask, type GoalCategory } from '../api'
@@ -191,7 +193,7 @@ function TaskRow({
         <p
           className={cn(
             'text-[13px] font-semibold',
-            day === today && !done ? 'text-brand' : t.missed ? 'text-danger' : done ? 'text-ink-4' : 'text-ink-2'
+            day === today && !done ? 'text-text-brand' : t.missed ? 'text-danger' : done ? 'text-ink-4' : 'text-ink-2'
           )}
         >
           {day ? dayLabel(day, today) : '날짜 미정'}
@@ -202,7 +204,7 @@ function TaskRow({
         </p>
       </div>
 
-      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hexOf(t.goalColorCode) }} />
+      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(t.goalColorCode) }} />
 
       <div className="min-w-0 flex-1">
         {day ? (
@@ -433,7 +435,7 @@ export function GoalTaskList({
       ) : (
         <>
           {/* 기간: 오늘 · 이번 주(기본) · 전체 */}
-          <div className="bg-subtle mb-2.5 inline-flex rounded-xl p-1" role="tablist" aria-label="기간">
+          <div className={segmentedClass('mb-2.5')} role="tablist" aria-label="기간">
             {(
               [
                 ['TODAY', '오늘'],
@@ -447,10 +449,7 @@ export function GoalTaskList({
                 role="tab"
                 aria-selected={period === key}
                 onClick={() => pickPeriod(key)}
-                className={cn(
-                  'h-8 rounded-lg px-3 text-[13px] font-semibold transition-colors',
-                  period === key ? 'bg-surface text-ink shadow-sm' : 'text-ink-3 hover:text-ink-2'
-                )}
+                className={segmentClass(period === key, 'px-3')}
               >
                 {label} <span className="tabular-nums">{periodCounts[key]}</span>
               </button>

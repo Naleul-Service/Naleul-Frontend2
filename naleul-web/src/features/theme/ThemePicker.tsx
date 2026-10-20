@@ -2,7 +2,7 @@
 
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import { track } from '@/lib/client/analytics'
-import { cn } from '@/lib/cn'
+import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { useThemePref, type ThemePref } from './theme'
 
 const OPTIONS: { value: ThemePref; label: string; icon: LucideIcon }[] = [
@@ -20,7 +20,7 @@ export function ThemePicker() {
         <p className="text-[15px] font-bold">화면 모드</p>
         <p className="text-ink-3 mt-0.5 text-[13px]">시스템을 고르면 기기 설정(라이트·다크)을 따라가요</p>
       </div>
-      <div role="radiogroup" aria-label="화면 모드" className="bg-subtle flex rounded-xl p-1">
+      <div role="radiogroup" aria-label="화면 모드" className={segmentedClass()}>
         {OPTIONS.map(({ value, label, icon: Icon }) => (
           <button
             key={value}
@@ -32,10 +32,7 @@ export function ThemePicker() {
               setPref(value)
               track('settings.theme_change', { theme_pref: value })
             }}
-            className={cn(
-              'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors',
-              pref === value ? 'bg-surface text-ink shadow-card' : 'text-ink-3 hover:text-ink'
-            )}
+            className={segmentClass(pref === value, 'px-3')}
           >
             <Icon className="size-3.5" />
             {label}

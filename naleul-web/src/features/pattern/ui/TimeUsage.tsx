@@ -1,6 +1,7 @@
 'use client'
 
 import type { PatternTimeUsage } from '../types'
+import { goalAccent } from '@/lib/goalTone'
 import { useChartInteract, useDeadClick } from '../analytics'
 import { hours1 } from '../format'
 import { NotEnough, Section } from './Section'
@@ -21,7 +22,7 @@ export function TimeUsage({ usage }: { usage?: PatternTimeUsage | null }) {
       ) : (
         <ul className="flex flex-col gap-5" {...chartProps}>
           {goals.map((g) => {
-            const color = g.colorCode ?? '#3d5afe'
+            const color = goalAccent(g.colorCode)
             return (
               <li key={g.goalCategoryId} onClick={onRowClick}>
                 <div className="flex items-baseline justify-between gap-3">

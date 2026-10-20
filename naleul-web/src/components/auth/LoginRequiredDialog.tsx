@@ -165,7 +165,7 @@ export function LoginRequiredDialog() {
 /** 둘러보기 중임을 알려주는 얇은 띠 (화면 맨 위) */
 export function GuestBanner() {
   return (
-    <div className="bg-brand-soft text-brand flex items-center justify-center gap-3 px-4 py-2 text-[13px] font-semibold">
+    <div className="bg-brand-soft text-text-brand flex items-center justify-center gap-3 px-4 py-2 text-[13px] font-semibold">
       <span>둘러보는 중이에요 · 로그인하면 내 목표와 계획이 저장돼요</span>
       <button
         type="button"

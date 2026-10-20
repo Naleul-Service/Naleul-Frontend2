@@ -25,7 +25,7 @@ function membershipStateOf(b: BillingStatus) {
   return b.otherPremium ? 'other_premium' : 'free'
 }
 
-const field = 'border-line-strong focus:border-brand w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
+const field = 'border-line-strong focus:border-border-focus w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
 
 /** /settings/withdraw — iOS WithdrawView(회원 탈퇴)를 옮긴 것 */
 export function WithdrawView() {
@@ -156,7 +156,7 @@ export function WithdrawView() {
             maxLength={500}
             placeholder="탈퇴 사유를 자유롭게 적어주세요"
             aria-label="탈퇴 상세 사유"
-            className={cn(field, 'placeholder:text-ink-4 mt-3 resize-none py-3 leading-relaxed')}
+            className={cn(field, 'placeholder:text-text-placeholder mt-3 resize-none py-3 leading-relaxed')}
           />
         )}
 

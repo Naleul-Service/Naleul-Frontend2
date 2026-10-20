@@ -76,7 +76,7 @@ export function WeeklyOverview({
                     type="button"
                     onClick={() => onSelect(seg.pattern)}
                     title={`${seg.pattern.title} ${minutesToTime(seg.start)}–${seg.end === 1440 ? '24:00' : minutesToTime(seg.end)}`}
-                    className="absolute inset-y-0.5 overflow-hidden rounded px-1 text-left text-[10px] leading-5 font-semibold whitespace-nowrap text-white hover:brightness-95"
+                    className="absolute inset-y-0.5 overflow-hidden rounded px-1 text-left text-[10px] leading-5 font-semibold whitespace-nowrap text-accent-on-mint hover:brightness-95"
                     style={{
                       left: `${(seg.start / 1440) * 100}%`,
                       width: `${((seg.end - seg.start) / 1440) * 100}%`,

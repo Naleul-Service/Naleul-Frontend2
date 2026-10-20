@@ -267,7 +267,7 @@ function ExtraMetricCard({
       <TrackBar m={m} />
       {/* "오늘은 여기까지" — 계획선 위 오늘 값 */}
       {m.expectedValue != null && m.status !== 'ACHIEVED' && (
-        <p className="bg-brand-soft text-brand mt-3 rounded-xl px-3 py-2 text-[13px] font-semibold">
+        <p className="bg-brand-soft text-text-brand mt-3 rounded-xl px-3 py-2 text-[13px] font-semibold">
           계획대로라면 오늘까지 {withUnit(Math.round(m.expectedValue * 10) / 10, m.unit)}
           {m.currentValue !== m.expectedValue && (
             <span className="text-ink-2 font-medium"> · 지금 {withUnit(m.currentValue, m.unit)}</span>

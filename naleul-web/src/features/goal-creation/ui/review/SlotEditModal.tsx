@@ -239,7 +239,7 @@ function PracticeForm({ slots, formId, onSubmit }: FormProps) {
         <span className="text-ink-2 mb-1.5 block text-[13px] font-semibold">실천하기 좋은 요일</span>
         <div className="flex flex-wrap gap-1.5">
           {DAYS.map((day) => (
-            <Chip key={day} size="sm" selected={days.includes(day)} onClick={() => toggleDay(day)} className="w-10">
+            <Chip key={day} size="sm" variant="day" selected={days.includes(day)} onClick={() => toggleDay(day)} className="w-10">
               {DAY_LABEL[day]}
             </Chip>
           ))}
@@ -280,7 +280,7 @@ function PracticeForm({ slots, formId, onSubmit }: FormProps) {
             <button
               type="button"
               onClick={() => setRanges((prev) => [...prev, { start: '19:00', end: '21:00' }])}
-              className="text-brand inline-flex items-center gap-1 text-sm font-semibold"
+              className="text-text-brand inline-flex items-center gap-1 text-sm font-semibold"
             >
               <Plus className="size-4" />
               시간대 추가

@@ -23,7 +23,7 @@ const PRIORITY_HINT: Record<TaskPriority, string> = {
 }
 
 const field =
-  'border-line-strong focus:border-brand h-11 w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
+  'border-line-strong focus:border-border-focus h-11 w-full rounded-input border bg-surface px-3 text-[15px] outline-none'
 const labelText = 'text-ink-3 mb-1 block text-xs font-medium'
 
 /** 선택 값 → goal_match (existing / temp / new_temp / none) */

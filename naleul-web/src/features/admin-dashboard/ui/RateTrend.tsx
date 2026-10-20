@@ -7,8 +7,8 @@ const H = 220
 const PAD = { left: 34, right: 12, top: 16, bottom: 28 }
 
 const LINES = [
-  { key: 'taskRate', label: 'Task 실천률', color: '#3d5afe' },
-  { key: 'routineRate', label: '루틴 실천률', color: '#12b76a' },
+  { key: 'taskRate', label: 'Task 실천률', color: 'var(--color-brand)' },
+  { key: 'routineRate', label: '루틴 실천률', color: 'var(--color-accent-mint)' },
 ] as const
 
 /**
@@ -31,8 +31,8 @@ export function RateTrend({ points }: { points: DailyPoint[] }) {
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Task · 루틴 실천률 추이">
         {[0, 25, 50, 75, 100].map((t) => (
           <g key={t}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} stroke="#eceef1" />
-            <text x={PAD.left - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#8b9099">
+            <line x1={PAD.left} x2={W - PAD.right} y1={y(t)} y2={y(t)} className="stroke-line" />
+            <text x={PAD.left - 8} y={y(t) + 4} textAnchor="end" fontSize="11" className="fill-ink-3">
               {t}
             </text>
           </g>
@@ -57,13 +57,13 @@ export function RateTrend({ points }: { points: DailyPoint[] }) {
                     <path
                       d={seg.map((p, k) => `${k ? 'L' : 'M'}${x(p.i)},${y(p.r)}`).join(' ')}
                       fill="none"
-                      stroke={color}
+                      style={{ stroke: color }}
                       strokeWidth="2.25"
                       strokeLinejoin="round"
                     />
                   )}
                   {seg.map((p) => (
-                    <circle key={p.i} cx={x(p.i)} cy={y(p.r)} r={points.length > 45 ? 2 : 3.5} fill={color}>
+                    <circle key={p.i} cx={x(p.i)} cy={y(p.r)} r={points.length > 45 ? 2 : 3.5} style={{ fill: color }}>
                       <title>
                         {dotDate(points[p.i].date)} {key === 'taskRate' ? 'Task' : '루틴'} {p.r}% (
                         {key === 'taskRate'
@@ -87,7 +87,7 @@ export function RateTrend({ points }: { points: DailyPoint[] }) {
               y={H - 8}
               textAnchor={i === 0 ? 'start' : i === points.length - 1 ? 'end' : 'middle'}
               fontSize="11"
-              fill="#8b9099"
+              className="fill-ink-3"
             >
               {dotDate(p.date)}
             </text>
@@ -111,7 +111,7 @@ export function MiniBars({
   points,
   value,
   format,
-  color = '#3d5afe',
+  color = 'var(--color-brand)',
   label,
 }: {
   points: DailyPoint[]
@@ -133,7 +133,7 @@ export function MiniBars({
         {points.map((p, i) => {
           const bh = values[i] > 0 ? Math.max((values[i] / max) * h, 1.5) : 0
           return (
-            <rect key={p.date} x={i * (bw + gap)} y={h - bh} width={bw} height={bh} rx="1.5" fill={color}>
+            <rect key={p.date} x={i * (bw + gap)} y={h - bh} width={bw} height={bh} rx="1.5" style={{ fill: color }}>
               <title>
                 {dotDate(p.date)} {format(values[i])}
               </title>

@@ -64,7 +64,7 @@ function OutcomePicker({
             )}
           >
             <span className="block text-xl">{o.emoji}</span>
-            <span className={cn('mt-1 block text-[13px] font-bold', selected && 'text-brand')}>{o.label}</span>
+            <span className={cn('mt-1 block text-[13px] font-bold', selected && 'text-text-brand')}>{o.label}</span>
           </button>
         )
       })}
@@ -386,7 +386,7 @@ export function GoalAdjustmentBanner({ goal }: { goal: GoalCategory }) {
       >
         <X className="size-4" />
       </button>
-      <p className={cn('flex items-center gap-1.5 pr-6 text-sm font-bold', down ? 'text-warning-ink' : 'text-brand')}>
+      <p className={cn('flex items-center gap-1.5 pr-6 text-sm font-bold', down ? 'text-warning-ink' : 'text-text-brand')}>
         <Icon className="size-4" />
         주간 점검 · {adj.routineName}
       </p>

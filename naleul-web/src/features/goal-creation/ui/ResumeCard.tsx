@@ -36,7 +36,7 @@ export function ResumeCard({ className }: { className?: string }) {
         className
       )}
     >
-      <span className="bg-brand-soft text-brand grid size-10 shrink-0 place-items-center rounded-full">
+      <span className="bg-brand-soft text-text-brand grid size-10 shrink-0 place-items-center rounded-full">
         <Sparkles className="size-5" />
       </span>
       <span className="min-w-0 flex-1">

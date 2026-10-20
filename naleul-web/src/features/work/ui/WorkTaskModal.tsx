@@ -5,7 +5,7 @@ import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { track } from '@/lib/client/analytics'
-import { cn } from '@/lib/cn'
+import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { Field, inlineInput } from '@/features/goal/edit/inline'
 import { todayKst } from '@/features/timetable/time'
 import { errorStatusOf } from '@/features/home/analytics'
@@ -240,7 +240,7 @@ export function WorkTaskModal({
 
         <div>
           <span className="text-ink-3 mb-1 block text-[12px] font-medium">칸</span>
-          <div className="bg-subtle inline-flex rounded-xl p-1" role="radiogroup" aria-label="칸">
+          <div className={segmentedClass()} role="radiogroup" aria-label="칸">
             {COLUMNS.map((c) => (
               <button
                 key={c}
@@ -249,10 +249,7 @@ export function WorkTaskModal({
                 aria-checked={f.status === c}
                 disabled={task.routine}
                 onClick={() => selectColumn(c)}
-                className={cn(
-                  'h-8 rounded-lg px-3 text-[13px] font-semibold transition-colors',
-                  f.status === c ? 'bg-surface text-ink shadow-sm' : 'text-ink-3 hover:text-ink-2'
-                )}
+                className={segmentClass(f.status === c, 'px-3 disabled:opacity-50')}
               >
                 {COLUMN_LABEL[c]}
               </button>

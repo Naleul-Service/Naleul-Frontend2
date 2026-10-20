@@ -85,7 +85,7 @@ export function RecordQuickLog({ goal, bare = false }: { goal: GoalCategory; bar
         한 줄로 적으면 시각·걸린 시간을 알아서 읽어요. 시각이 없으면 방금 끝낸 일로 기록돼요.
       </p>
 
-      <div className="border-line-strong bg-surface focus-within:border-ink-3 mt-4 flex items-center gap-2 rounded-2xl border px-3 py-2">
+      <div className="border-line-strong bg-surface focus-within:border-border-focus mt-4 flex items-center gap-2 rounded-2xl border px-3 py-2">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -93,7 +93,7 @@ export function RecordQuickLog({ goal, bare = false }: { goal: GoalCategory; bar
           maxLength={200}
           placeholder={`예) ${EXAMPLES[0]}`}
           aria-label="한 일"
-          className="placeholder:text-ink-4 h-9 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+          className="placeholder:text-text-placeholder h-9 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
           disabled={log.isPending}
         />
         <Button size="sm" onClick={() => submit('button')} loading={log.isPending} disabled={!value}>

@@ -320,7 +320,7 @@ export function LogDoneView({ goals, surface = 'page' }: { goals: GoalCategory[]
         onChange={(e) => setText(e.target.value)}
         rows={6}
         placeholder={PLACEHOLDER}
-        className="border-line-strong bg-surface placeholder:text-ink-4 focus:border-ink-3 mt-4 w-full resize-none rounded-2xl border px-4 py-3 text-[15px] leading-relaxed outline-none"
+        className="border-line-strong bg-surface placeholder:text-text-placeholder focus:border-border-focus mt-4 w-full resize-none rounded-2xl border px-4 py-3 text-[15px] leading-relaxed outline-none"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault()

@@ -22,7 +22,7 @@ export function UsageLine({
     <p
       className={cn(
         'flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px]',
-        tone === 'onDark' ? 'text-white/70' : empty ? 'text-danger' : 'text-ink-3',
+        tone === 'onDark' ? 'text-on-ink/70' : empty ? 'text-danger' : 'text-ink-3',
         className
       )}
     >
@@ -30,7 +30,7 @@ export function UsageLine({
       {limited.map((i, n) => (
         <span key={i.key}>
           {n > 0 && <span className="mr-2 opacity-50">·</span>}
-          {i.label} <b className={tone === 'onDark' ? 'text-white' : 'text-ink-2'}>{i.remaining}</b>/{i.limit}회 남음
+          {i.label} <b className={tone === 'onDark' ? 'text-on-ink' : 'text-ink-2'}>{i.remaining}</b>/{i.limit}회 남음
         </span>
       ))}
       <span className="opacity-70">

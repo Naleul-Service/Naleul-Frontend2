@@ -14,10 +14,10 @@ export const TYPE_LABEL: Record<LifePatternType, string> = {
 
 /** 종류별 색 (주간 미리보기 막대) */
 export const TYPE_COLOR: Record<LifePatternType, string> = {
-  SLEEP: '#8EA2FF',
-  LUNCH: '#F7B955',
-  DINNER: '#F08A6C',
-  CUSTOM: '#6BC5A4',
+  SLEEP: 'var(--color-goal-purple-accent)',
+  LUNCH: 'var(--color-goal-amber-accent)',
+  DINNER: 'var(--color-goal-coral-accent)',
+  CUSTOM: 'var(--color-goal-mint-accent)',
 }
 
 export interface LifePatternPreset {

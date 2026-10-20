@@ -113,7 +113,7 @@ export function InterviewChatView({ initial, onResync }: Props) {
               }}
               disabled={!canInteract}
             >
-              <Sparkles className="text-brand size-3.5" />
+              <Sparkles className="text-text-brand size-3.5" />
               <span className="hidden sm:inline">바로 계획 만들기</span>
               <span className="sm:hidden">바로 만들기</span>
             </Button>

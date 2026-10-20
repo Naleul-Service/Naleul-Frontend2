@@ -97,8 +97,8 @@ export function ProfileEditModal({
             autoFocus
             aria-invalid={!!error}
             className={cn(
-              'h-11 w-full rounded-xl border bg-surface px-3 text-[15px] outline-none',
-              error ? 'border-danger' : 'border-line-strong focus:border-brand'
+              'h-11 w-full rounded-input border bg-surface px-3 text-[15px] outline-none',
+              error ? 'border-danger' : 'border-line-strong focus:border-border-focus'
             )}
           />
         </label>

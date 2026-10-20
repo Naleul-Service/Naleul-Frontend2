@@ -421,7 +421,7 @@ function TaskForm({
             <span className="text-ink-2 mb-1.5 block text-[13px] font-semibold">반복 요일</span>
             <div className="flex flex-wrap gap-1.5">
               {DAYS.map((d) => (
-                <Chip key={d} size="sm" selected={days.includes(d)} onClick={() => toggleDay(d)} className="w-10">
+                <Chip key={d} size="sm" variant="day" selected={days.includes(d)} onClick={() => toggleDay(d)} className="w-10">
                   {DAY_LABEL[d]}
                 </Chip>
               ))}
@@ -594,7 +594,7 @@ export function InlineItemEditor({
       role="group"
       aria-label={titleOf(target)}
     >
-      <p className="text-brand mb-3 text-[13px] font-bold">{titleOf(target)}</p>
+      <p className="text-text-brand mb-3 text-[13px] font-bold">{titleOf(target)}</p>
       {target.kind === 'goal' && <GoalForm target={target} {...formProps} />}
       {target.kind === 'subGoal' && <SubGoalForm target={target} {...formProps} />}
       {target.kind === 'milestone' && <MilestoneForm target={target} {...formProps} />}

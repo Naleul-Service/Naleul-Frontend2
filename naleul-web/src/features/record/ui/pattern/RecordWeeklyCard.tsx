@@ -113,10 +113,10 @@ export function RecordWeeklyCard({ weeks }: { weeks: RecordPattern['rhythm']['we
 
       {recentAvg > 0 && (
         <p className="bg-subtle text-ink-2 mt-4 rounded-2xl px-4 py-3 text-[14px] leading-relaxed">
-          최근 4주는 한 주에 평균 <strong className="text-brand font-bold">{recentAvg}개</strong>
+          최근 4주는 한 주에 평균 <strong className="text-text-brand font-bold">{recentAvg}개</strong>
           {prevAvg > 0 && recentAvg > prevAvg ? (
             <>
-              , 그 전 4주보다 <strong className="text-brand font-bold">{round1(recentAvg - prevAvg)}개 더</strong>{' '}
+              , 그 전 4주보다 <strong className="text-text-brand font-bold">{round1(recentAvg - prevAvg)}개 더</strong>{' '}
               완료하고 있어요
             </>
           ) : (

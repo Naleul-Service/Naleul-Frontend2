@@ -107,7 +107,7 @@ export function RecordRhythmCard({
           </div>
 
           <p className="bg-subtle text-ink-2 mt-4 rounded-2xl px-4 py-3 text-[14px] leading-relaxed">
-            16주 중 <strong className="text-brand font-bold">{recordedWeeks}주</strong> Task를 완료했어요
+            16주 중 <strong className="text-text-brand font-bold">{recordedWeeks}주</strong> Task를 완료했어요
             {recordedWeeks >= 12 ? '. 거의 매주 이어오고 있어요' : recordedWeeks >= 6 ? '. 리듬이 생기고 있어요' : ''}
           </p>
         </>

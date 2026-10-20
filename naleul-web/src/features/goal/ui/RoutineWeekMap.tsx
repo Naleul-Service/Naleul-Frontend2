@@ -7,7 +7,7 @@ import { AlertTriangle, CalendarRange, ChevronDown, Sparkles } from 'lucide-reac
 import { api } from '@/lib/client/api'
 import { track } from '@/lib/client/analytics'
 import { cn } from '@/lib/cn'
-import { hexOf } from '@/features/timetable/layout'
+import { goalAccent, goalBg, goalFg } from '@/lib/goalTone'
 import { minutesToTime, timeToMinutes, todayKst } from '@/features/timetable/time'
 import { goalKeys, type JavaDayOfWeek } from '../api'
 import { JAVA_DAYS, JAVA_DAY_LABEL } from '../format'
@@ -217,7 +217,7 @@ export function RoutineWeekMap({
                   is_new: analytics.isNew,
                 })
               }
-              className="text-brand inline-flex items-center gap-0.5 font-semibold hover:underline"
+              className="text-text-brand inline-flex items-center gap-0.5 font-semibold hover:underline"
             >
               <Sparkles className="size-3" />
               캘린더에서 AI로 한 번에 정리
@@ -259,7 +259,7 @@ export function RoutineWeekMap({
                     key={d}
                     className={cn(
                       'pb-1 text-center text-[11px] font-bold',
-                      draft.days.includes(d) ? 'text-brand' : 'text-ink-3'
+                      draft.days.includes(d) ? 'text-text-brand' : 'text-ink-3'
                     )}
                   >
                     {JAVA_DAY_LABEL[d]}
@@ -305,13 +305,15 @@ export function RoutineWeekMap({
                         <span
                           key={s.key}
                           title={`${s.name} (${s.goalName}) ${minutesToTime(s.start % 1440)}–${minutesToTime(s.end % 1440)}`}
-                          className="pointer-events-none absolute overflow-hidden rounded-[4px] px-0.5 text-left text-[9px] leading-tight font-semibold text-white"
+                          className="pointer-events-none absolute overflow-hidden rounded-[4px] pr-0.5 pl-1 text-left text-[9px] leading-tight font-semibold"
                           style={{
                             ...sideStyle(s),
                             top: y(s.start),
                             height: Math.max(y(Math.min(s.end, to)) - y(s.start), 6),
-                            backgroundColor: hexOf(s.color),
-                            opacity: 0.85,
+                            // 디자인 시스템 Event — 연한 목표 바탕 + 왼쪽 색 선 + 목표 글자색
+                            backgroundColor: goalBg(s.color),
+                            color: goalFg(s.color),
+                            boxShadow: `inset 2px 0 0 ${goalAccent(s.color)}`,
                           }}
                         >
                           {s.end - s.start >= 40 ? s.name : ''}
@@ -322,7 +324,7 @@ export function RoutineWeekMap({
                       .map((s) => (
                         <span
                           key={s.key}
-                          className="border-brand bg-brand-soft/70 text-brand pointer-events-none absolute overflow-hidden rounded-[4px] border-2 border-dashed px-0.5 text-left text-[9px] leading-tight font-bold"
+                          className="border-brand bg-brand-soft/70 text-text-brand pointer-events-none absolute overflow-hidden rounded-[4px] border-2 border-dashed px-0.5 text-left text-[9px] leading-tight font-bold"
                           style={{
                             ...sideStyle(s),
                             top: y(s.start),

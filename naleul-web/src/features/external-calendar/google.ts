@@ -128,7 +128,7 @@ export async function listGoogleCalendars(token: string): Promise<GoogleCalendar
     .map((c) => ({
       id: c.id,
       name: c.summaryOverride || c.summary,
-      color: c.backgroundColor ?? '#3d5afe',
+      color: c.backgroundColor ?? '#0F7A9C', // 구글이 색을 안 주면 브랜드 색 (데이터 값이라 hex 그대로)
       primary: !!c.primary,
     }))
     .sort((a, b) => Number(b.primary) - Number(a.primary))

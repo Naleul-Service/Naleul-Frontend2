@@ -1,3 +1,4 @@
+import { goalAccent } from '@/lib/goalTone'
 import type { GoalStatus, JavaDayOfWeek } from './api'
 
 export const STATUS_LABEL: Record<GoalStatus, string> = {
@@ -25,9 +26,8 @@ export const JAVA_DAY_LABEL: Record<JavaDayOfWeek, string> = {
 /** "19:30:00" → "19:30" */
 export const hhmm = (t: string | null) => (t ? t.slice(0, 5) : null)
 
-/** "#3D5AFE" / "3D5AFE" / null → CSS 색 */
-export const goalColor = (code: string | null | undefined) =>
-  code ? (code.startsWith('#') ? code : `#${code}`) : '#B8BCC4'
+/** "#3D5AFE" / "3D5AFE" / null → 목표 팔레트 accent (CSS 값 · 다크 모드 따라감 — lib/goalTone) */
+export const goalColor = (code: string | null | undefined) => goalAccent(code)
 
 function parse(value: string) {
   const [y, m, d] = value.split('-').map(Number)

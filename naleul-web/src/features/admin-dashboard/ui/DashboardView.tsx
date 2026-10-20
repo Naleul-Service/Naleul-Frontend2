@@ -129,7 +129,7 @@ export function DashboardView() {
             points={data.series}
             value={(p) => p.aiUsd}
             format={(n) => `$${n.toFixed(n < 1 ? 3 : 2)}`}
-            color="#f59e0b"
+            color="var(--color-warning)"
             label="AI 비용 추이"
           />
         </Panel>

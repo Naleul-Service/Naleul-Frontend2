@@ -5,9 +5,10 @@ import { Check, Repeat } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import { dateRelationOf } from '@/features/home/analytics'
-import { hexOf } from '../layout'
+import { goalAccent } from '@/lib/goalTone'
 import { formatMonthDay, hm, minutesFrom } from '../time'
 import type { TimeBlockTask, TimetableDay } from '../types'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 
 /** 그날 정렬용 시작 분 (시간 미정은 맨 뒤) */
 const startOf = (day: string, t: TimeBlockTask) => (t.plannedStartAt ? minutesFrom(day, t.plannedStartAt) : Infinity)
@@ -81,12 +82,7 @@ export function DayTaskList({
         </span>
       </header>
       {all.length > 0 && (
-        <div className="bg-subtle mx-4 mt-3 h-1.5 shrink-0 overflow-hidden rounded-full">
-          <div
-            className="bg-success h-full rounded-full transition-all"
-            style={{ width: `${(done.length / all.length) * 100}%` }}
-          />
-        </div>
+        <ProgressBar value={done.length / all.length} className="mx-4 mt-3 shrink-0" />
       )}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
         {all.length === 0 ? (
@@ -151,7 +147,7 @@ function Row({
       >
         <span
           className="size-2 shrink-0 rounded-full"
-          style={{ backgroundColor: hexOf(t.goalColorCode) }}
+          style={{ backgroundColor: goalAccent(t.goalColorCode) }}
           aria-hidden
         />
         <span className={cn('min-w-0 flex-1 truncate text-[14px]', done && 'text-ink-3 line-through')}>

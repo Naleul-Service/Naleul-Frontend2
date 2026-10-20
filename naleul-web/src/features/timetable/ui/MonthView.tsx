@@ -9,7 +9,8 @@ import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import { dateRelationOf, errorStatusOf } from '@/features/home/analytics'
 import { useMonthlyTimetable } from '../api'
-import { hexOf, shownTime } from '../layout'
+import { shownTime } from '../layout'
+import { goalAccent, goalBg, goalFg } from '@/lib/goalTone'
 import { WEEKDAY_LABEL, dDay, dayOfMonth, formatMonthDay, hm, monthOf, monthWeeks, weekdayIndex, yearOf } from '../time'
 import type { MonthlyDay, TimeBlockTask, TimetableDay } from '../types'
 
@@ -78,7 +79,7 @@ export function MonthView({
               key={w}
               className={cn(
                 'py-2.5 text-center text-xs font-semibold',
-                i === 6 ? 'text-danger' : i === 5 ? 'text-brand' : 'text-ink-3'
+                i === 6 ? 'text-calendar-holiday' : i === 5 ? 'text-calendar-saturday' : 'text-ink-3'
               )}
             >
               {w}
@@ -193,13 +194,13 @@ function DayCell({
           className={cn(
             'grid size-6 shrink-0 place-items-center rounded-full text-[13px] font-bold',
             isToday
-              ? 'bg-brand text-white'
+              ? 'bg-calendar-today-bg text-calendar-today-fg'
               : !inMonth
                 ? 'text-ink-4'
                 : wd === 6
-                  ? 'text-danger'
+                  ? 'text-calendar-holiday'
                   : wd === 5
-                    ? 'text-brand'
+                    ? 'text-calendar-saturday'
                     : 'text-ink'
           )}
         >
@@ -214,7 +215,7 @@ function DayCell({
       </div>
 
       {inMonth && day && past && rate != null && (
-        <span className="bg-subtle block h-1 w-full overflow-hidden rounded-full" aria-hidden>
+        <span className="bg-progress-track block h-1 w-full overflow-hidden rounded-full" aria-hidden>
           <span
             className={cn('block h-full rounded-full', rateColor(rate))}
             style={{ width: `${Math.max(rate, 4)}%` }}
@@ -228,7 +229,7 @@ function DayCell({
             <span
               key={m.milestoneId}
               className="hidden truncate rounded px-1 py-0.5 text-[11px] font-semibold sm:block"
-              style={{ color: hexOf(m.colorCode), backgroundColor: 'var(--color-subtle)' }}
+              style={{ color: goalFg(m.colorCode), backgroundColor: goalBg(m.colorCode) }}
             >
               🏁 {m.title}
             </span>
@@ -237,7 +238,7 @@ function DayCell({
           <span className="hidden min-w-0 flex-col gap-0.5 sm:flex">
             {day.chips.map((c) => (
               <span key={c.taskId} className="flex min-w-0 items-center gap-1 text-[11px] leading-tight">
-                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: hexOf(c.colorCode) }} />
+                <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(c.colorCode) }} />
                 <span className={cn('truncate', c.completed ? 'text-ink-4 line-through' : 'text-ink-2')}>
                   {c.title}
                 </span>
@@ -251,7 +252,7 @@ function DayCell({
               <span
                 key={c.taskId}
                 className={cn('size-1.5 rounded-full', c.completed && 'opacity-40')}
-                style={{ backgroundColor: hexOf(c.colorCode) }}
+                style={{ backgroundColor: goalAccent(c.colorCode) }}
               />
             ))}
           </span>
@@ -300,7 +301,7 @@ function DayPanel({
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-[17px] font-bold">
           {formatMonthDay(date)}
-          {date === today && <span className="text-brand ml-1.5 text-[13px]">오늘</span>}
+          {date === today && <span className="text-text-brand ml-1.5 text-[13px]">오늘</span>}
         </h3>
         <Button
           variant="secondary"
@@ -349,7 +350,7 @@ function DayPanel({
           <ul className="space-y-1.5">
             {summary.milestones.map((m) => (
               <li key={m.milestoneId} className="flex items-center gap-2 text-sm">
-                <Flag className="size-3.5 shrink-0" style={{ color: hexOf(m.colorCode) }} />
+                <Flag className="size-3.5 shrink-0" style={{ color: goalAccent(m.colorCode) }} />
                 <span className="truncate">{m.title}</span>
               </li>
             ))}
@@ -365,9 +366,9 @@ function DayPanel({
             {deadlines.map((d) => (
               <li key={`${d.type}-${d.id}`} className="flex items-center gap-2 text-sm">
                 {d.type === 'MILESTONE' ? (
-                  <Flag className="size-3.5 shrink-0" style={{ color: hexOf(d.colorCode) }} />
+                  <Flag className="size-3.5 shrink-0" style={{ color: goalAccent(d.colorCode) }} />
                 ) : (
-                  <span className="mx-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: hexOf(d.colorCode) }} />
+                  <span className="mx-1 size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(d.colorCode) }} />
                 )}
                 <span className="min-w-0 flex-1 truncate">{d.title}</span>
                 <span
@@ -458,7 +459,7 @@ function TaskRow({
         <span className="text-ink-3 w-[52px] shrink-0 text-xs tabular-nums">
           {hm(shownTime(t)?.startAt) || '시간 미정'}
         </span>
-        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hexOf(t.goalColorCode) }} />
+        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(t.goalColorCode) }} />
         <span className={cn('min-w-0 flex-1 truncate text-sm', done && 'text-ink-4 line-through')}>
           {t.emoji ? `${t.emoji} ` : ''}
           {t.taskName}

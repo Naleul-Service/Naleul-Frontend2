@@ -96,17 +96,17 @@ export function Popover({ anchor, onClose, children, width = 320, label, classNa
 
   return createPortal(
     <>
-      {sheet && <div className="fixed inset-0 z-40 bg-black/30" aria-hidden />}
+      {sheet && <div className="bg-bg-overlay fixed inset-0 z-40" aria-hidden />}
       <div
         ref={ref}
         role="dialog"
         aria-label={label}
         style={sheet ? undefined : { top: anchor.top, left: anchor.right + GAP, width, visibility: 'hidden' }}
         className={cn(
-          'bg-surface shadow-pop border-line fixed z-50 border',
+          'bg-bg-elevated shadow-pop border-border-subtle fixed z-50 border',
           sheet
-            ? 'inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-3xl pb-[env(safe-area-inset-bottom)]'
-            : 'max-h-[calc(100dvh-24px)] overflow-y-auto rounded-2xl',
+            ? 'rounded-t-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]'
+            : 'rounded-card max-h-[calc(100dvh-24px)] overflow-y-auto',
           'animate-[modal-in_140ms_ease-out]',
           className
         )}
@@ -115,9 +115,9 @@ export function Popover({ anchor, onClose, children, width = 320, label, classNa
           type="button"
           onClick={onClose}
           aria-label="닫기"
-          className="text-ink-3 hover:bg-subtle hover:text-ink absolute top-3 right-3 rounded-lg p-1.5"
+          className="rounded-icon-btn text-text-secondary hover:bg-bg-subtle hover:text-text-primary absolute top-3 right-3 grid size-7 place-items-center"
         >
-          <X className="size-4" />
+          <X className="size-4" strokeWidth={1.25} />
         </button>
         {children}
       </div>

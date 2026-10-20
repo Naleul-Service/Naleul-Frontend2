@@ -94,7 +94,7 @@ export function CarryProposalBar({
         className="bg-surface shadow-pop border-line pointer-events-auto w-full max-w-[600px] animate-[modal-in_160ms_ease-out] rounded-2xl border p-4"
       >
         <div className="flex items-start gap-3">
-          <span className="bg-brand-soft text-brand grid size-9 shrink-0 place-items-center rounded-full">
+          <span className="bg-brand-soft text-text-brand grid size-9 shrink-0 place-items-center rounded-full">
             <CalendarClock className="size-4" />
           </span>
           <div className="min-w-0 flex-1">

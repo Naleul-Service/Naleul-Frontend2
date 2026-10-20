@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { track } from '@/lib/client/analytics'
 import { isApiError } from '@/lib/client/api'
-import { cn } from '@/lib/cn'
+import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { errorStatusOf } from '@/features/home/analytics'
 import { RecordPatternSection } from '@/features/record/ui/pattern/RecordPatternSection'
 import { HabitView } from '@/features/habit/ui/HabitView'
@@ -89,7 +89,7 @@ function Hero({ goal }: { goal: GoalCategory }) {
   }
 
   return (
-    <section className="bg-brand flex flex-col gap-6 rounded-[24px] p-6 text-white sm:p-8 lg:flex-row lg:items-center">
+    <section className="bg-brand flex flex-col gap-6 rounded-card p-6 text-white sm:p-8 lg:flex-row lg:items-center">
       <div className="flex items-center gap-6">
         <Ring ratio={ratio} label={`${Math.round(Math.min(Math.max(ratio, 0), 1) * 100)}%`} />
         <div>
@@ -153,7 +153,7 @@ function GoalTabBar<T extends string>({
   onChange: (t: T) => void
 }) {
   return (
-    <div className="bg-surface border-line mt-6 inline-flex rounded-xl border p-1" role="tablist" aria-label="보기">
+    <div className={segmentedClass('mt-6')} role="tablist" aria-label="보기">
       {tabs.map(({ value, label, icon: Icon }) => (
         <button
           key={value}
@@ -163,10 +163,7 @@ function GoalTabBar<T extends string>({
           aria-selected={tab === value}
           aria-controls={`goal-panel-${value}`}
           onClick={() => onChange(value)}
-          className={cn(
-            'flex h-9 items-center gap-1.5 rounded-lg px-4 text-[14px] font-semibold transition-colors',
-            tab === value ? 'bg-ink text-on-ink' : 'text-ink-2 hover:text-ink'
-          )}
+          className={segmentClass(tab === value, 'text-body-md h-9 px-4 font-medium')}
         >
           <Icon className="size-4" />
           {label}
@@ -191,7 +188,7 @@ function ReflectionsPanel({ goal, hint }: { goal: GoalCategory; hint: string }) 
               goal_mode: goal.goalMode ?? 'ACHIEVEMENT',
             })
           }
-          className="text-brand ml-auto text-[12px] font-semibold hover:underline"
+          className="text-text-brand ml-auto text-[12px] font-semibold hover:underline"
           title="모든 목표의 회고를 한 번에"
         >
           모든 목표 회고 보기

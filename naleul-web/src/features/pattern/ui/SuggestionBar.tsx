@@ -80,7 +80,7 @@ export function SuggestionBar({ suggestion }: { suggestion?: PatternSuggestionBa
           <Sparkles className="size-5" />
         </span>
         <p className="text-ink-2 min-w-0 flex-1 text-[15px] leading-relaxed">
-          <Emphasis text={suggestion.text} className="text-brand" />
+          <Emphasis text={suggestion.text} className="text-text-brand" />
         </p>
         <div className="flex shrink-0 gap-2">
           <Button size="lg" onClick={openModal}>
@@ -137,7 +137,7 @@ function ChangeRow({ item }: { item: PatternSuggestionItem }) {
         <span className="text-ink-3">{isTime ? '시간' : '요일'}</span>
         <span className="text-ink-4 line-through">{before}</span>
         <span aria-label="에서">→</span>
-        <span className="text-brand font-bold">{after}</span>
+        <span className="text-text-brand font-bold">{after}</span>
       </p>
     </li>
   )

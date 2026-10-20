@@ -41,7 +41,7 @@ export function ConfirmDialog({
       dismissible={!loading}
       footer={
         <>
-          <Button variant="secondary" onClick={() => onCancel('cancel_button')} disabled={loading}>
+          <Button variant="outline" onClick={() => onCancel('cancel_button')} disabled={loading}>
             {cancelLabel}
           </Button>
           <Button variant={tone === 'danger' ? 'danger' : 'primary'} onClick={onConfirm} loading={loading}>

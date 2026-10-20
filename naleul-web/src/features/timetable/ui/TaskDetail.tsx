@@ -28,7 +28,7 @@ import { useGoalCategory } from '@/features/goal/api'
 import { InlineConfirm } from '@/features/goal/edit/inline'
 import { useUpdateGoalTask, type GoalTaskInput } from '@/features/goal/edit/mutations'
 import { useRescheduleTask, useRoutineScopedReschedule, type ChangeScope } from '../api'
-import { hexOf } from '../layout'
+import { goalAccent } from '@/lib/goalTone'
 import {
   formatDuration,
   formatMonthDay,
@@ -132,7 +132,7 @@ const editKeys = (save: () => void, cancel: (method: 'esc') => void) => (e: Keyb
 }
 
 const field =
-  'border-line-strong bg-surface focus:border-ink-3 h-9 w-full min-w-0 rounded-lg border px-2.5 text-[14px] outline-none'
+  'border-line-strong bg-surface focus:border-border-focus h-9 w-full min-w-0 rounded-lg border px-2.5 text-[14px] outline-none'
 
 /** 한 줄 속성 — 누르면 그 자리에서 수정 (노션처럼) */
 function Prop({
@@ -274,7 +274,7 @@ export function TaskDetail({
   const perm = taskPermissions(t)
   const done = t.taskStatus === 'COMPLETED'
   const chain = actions.onSelectChain ? (actions.chainSize?.(t) ?? 0) : 0
-  const color = hexOf(t.goalColorCode)
+  const color = goalAccent(t.goalColorCode)
   const actual = t.taskStatus === 'COMPLETED' && t.actualStartAt && t.actualEndAt ? t : null
 
   const goalId = t.goalCategoryId ?? 0
@@ -673,7 +673,7 @@ export function TaskDetail({
       {/* 배치 이유 (명세: 항상 설명) */}
       {showReason && t.placementReason && (
         <div className="bg-brand-soft mt-4 rounded-xl px-3.5 py-3">
-          <p className="text-brand flex items-center gap-1 text-xs font-bold">
+          <p className="text-text-brand flex items-center gap-1 text-xs font-bold">
             <Sparkles className="size-3.5" />이 시간에 놓은 이유
           </p>
           <PlacementReason text={t.placementReason} codes={t.placementReasonCodes ?? []} />
@@ -894,7 +894,7 @@ function PlacementReason({ text, codes }: { text: string; codes: string[] }) {
         <ul className="text-ink-2 mt-1.5 space-y-0.5 text-[12px] leading-relaxed">
           {evidence.map((e) => (
             <li key={e} className="flex gap-1.5">
-              <span className="text-brand" aria-hidden>
+              <span className="text-text-brand" aria-hidden>
                 •
               </span>
               <span>{e}</span>

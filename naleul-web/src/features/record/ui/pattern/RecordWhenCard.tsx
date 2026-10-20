@@ -81,7 +81,7 @@ export function RecordWhenCard({
               }
             >
               <div className="bg-brand-soft rounded-2xl px-4 py-3.5">
-                <p className="text-brand text-[13px] font-bold">🌟 가장 많이 끝내는 때</p>
+                <p className="text-text-brand text-[13px] font-bold">🌟 가장 많이 끝내는 때</p>
                 <p className="mt-0.5 text-[16px] font-bold">
                   {DAY_SHORT[when.peakDay]}요일 {BAND_LABEL[when.peakBand]}
                 </p>

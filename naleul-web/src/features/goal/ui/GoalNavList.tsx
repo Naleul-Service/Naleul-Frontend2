@@ -60,16 +60,16 @@ export function GoalNavList({
         }}
         aria-current={pathname === habitHref ? 'page' : undefined}
         className={cn(
-          'flex h-10 items-center gap-2.5 rounded-xl px-3 text-[14px] transition-colors',
-          pathname === habitHref ? 'bg-subtle font-bold' : 'hover:bg-subtle/70'
+          'rounded-nav text-body-sm flex h-8 items-center gap-2.5 px-2 font-medium transition-colors',
+          pathname === habitHref ? 'bg-bg-subtle text-text-primary' : 'text-text-secondary hover:bg-bg-sunken'
         )}
       >
-        <span className="w-2.5 shrink-0 text-center text-[12px]" aria-hidden>
+        <span className="w-2 shrink-0 text-center text-[11px]" aria-hidden>
           {habit.data?.emoji ?? '🌱'}
         </span>
         <span className="min-w-0 flex-1 truncate">{habit.data?.goalName}</span>
         {habitDue.length > 0 && (
-          <span className={cn('text-xs tabular-nums', habitLeft ? 'text-ink-3' : 'text-success font-semibold')}>
+          <span className={cn('text-caption-sm tabular-nums', habitLeft ? 'text-text-tertiary' : 'text-success font-semibold')}>
             {habitLeft ? `${habitLeft}개 남음` : '완료'}
           </span>
         )}
@@ -79,7 +79,7 @@ export function GoalNavList({
 
   if (isPending) {
     return (
-      <div className="mt-2 space-y-2 px-3" aria-hidden>
+      <div className="mt-2 space-y-2 px-2" aria-hidden>
         {[0, 1, 2].map((i) => (
           <div key={i} className="bg-subtle h-5 animate-pulse rounded-md" />
         ))}
@@ -97,7 +97,7 @@ export function GoalNavList({
             track(CE.sidebarGoalEmptyClick, { goal_list_state: isError ? 'error' : 'empty', nav_surface: surface })
             onNavigate?.()
           }}
-          className="text-brand hover:bg-brand-soft mt-2 flex h-9 items-center gap-2 rounded-xl px-3 text-[14px] font-semibold"
+          className="text-text-brand hover:bg-action-ghost-hover rounded-nav text-body-sm mt-1 flex h-8 items-center gap-2 px-2 font-medium"
         >
           <Sparkles className="size-4" />
           {isError ? '목표 불러오기 실패 · 새로 만들기' : '첫 목표 만들기'}
@@ -107,7 +107,7 @@ export function GoalNavList({
   }
 
   return (
-    <ul className="mt-1.5 space-y-0.5">
+    <ul className="mt-1 space-y-0.5">
       {habitLink}
       {goals.map((g, i) => {
         const href = `/goal/${g.goalCategoryId}`
@@ -131,21 +131,22 @@ export function GoalNavList({
               }}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex h-10 items-center gap-2.5 rounded-xl px-3 text-[14px] transition-colors',
-                active ? 'bg-subtle font-bold' : 'hover:bg-subtle/70'
+                // 디자인 시스템 GoalItem — h32 · px8 · gap10 · 8px 점 + Body/SM·Medium
+                'rounded-nav text-body-sm flex h-8 items-center gap-2.5 px-2 font-medium transition-colors',
+                active ? 'bg-bg-subtle text-text-primary' : 'text-text-secondary hover:bg-bg-sunken'
               )}
             >
-              <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: goalColor(g.colorCode) }} />
+              <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalColor(g.colorCode) }} />
               <span className="min-w-0 flex-1 truncate">
                 {g.emoji ? `${g.emoji} ` : ''}
                 {g.goalCategoryName}
               </span>
               {g.temporary ? (
-                <span className="text-warning-ink text-xs">임시</span>
+                <span className="text-warning-ink text-caption-sm">임시</span>
               ) : g.goalMode === 'RECORD' ? (
-                <span className="text-ink-3 text-xs">업무</span>
+                <span className="text-text-tertiary text-caption-sm">업무</span>
               ) : (
-                notStarted && <span className="text-ink-3 text-xs">시작 전</span>
+                notStarted && <span className="text-text-tertiary text-caption-sm">시작 전</span>
               )}
             </Link>
           </li>

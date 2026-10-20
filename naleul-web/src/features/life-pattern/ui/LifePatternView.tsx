@@ -159,7 +159,7 @@ export function LifePatternView() {
           {/* 추천 */}
           <Card className="p-5">
             <p className="flex items-center gap-1.5 text-sm font-bold">
-              <Sparkles className="text-brand size-4" />
+              <Sparkles className="text-text-brand size-4" />
               추천으로 빠르게 추가
             </p>
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -204,7 +204,7 @@ export function LifePatternView() {
                         {p.crossesMidnight && ' (다음 날)'} · {durationOf(p)} ·{' '}
                         <span className="text-ink-2 font-medium">{formatDays(p.days)}</span>
                         {!!p.dayTimes?.length && (
-                          <span className="text-brand font-medium"> · 요일별 시간 {p.dayTimes.length}일</span>
+                          <span className="text-text-brand font-medium"> · 요일별 시간 {p.dayTimes.length}일</span>
                         )}
                       </p>
                     </div>

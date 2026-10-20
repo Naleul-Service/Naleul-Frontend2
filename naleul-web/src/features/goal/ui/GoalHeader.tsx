@@ -341,7 +341,7 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
             trackMetricToggle('add')
             setShowMetric(true)
           }}
-          className="text-brand text-[13px] font-semibold"
+          className="text-text-brand text-[13px] font-semibold"
         >
           + 수치 목표 추가 (예: 체중 80 → 72kg)
         </button>
@@ -493,7 +493,7 @@ export function GoalNotes({ goal }: { goal: GoalCategory }) {
       )}
       {goal.aiNote && (
         <p className="bg-canvas flex gap-2 rounded-2xl px-4 py-3 text-[14px] leading-relaxed">
-          <Sparkles className="text-brand mt-0.5 size-4 shrink-0" />
+          <Sparkles className="text-text-brand mt-0.5 size-4 shrink-0" />
           {goal.aiNote}
         </p>
       )}

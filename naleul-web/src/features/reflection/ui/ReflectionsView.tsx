@@ -9,13 +9,14 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { track } from '@/lib/client/analytics'
 import { referrerType } from '@/lib/client/commonEvents'
 import { errorStatusOf } from '@/features/home/analytics'
 import { useGoalCategories, type GoalCategory } from '@/features/goal/api'
 import { MOODS, moodOf } from '@/features/goal/ui/progress/DailyCheckInCard'
 import { useReflectionRange, type ReflectionEntry, type ReflectionPeriod } from '@/features/home/api'
-import { hexOf } from '@/features/timetable/layout'
+import { goalAccent } from '@/lib/goalTone'
 import {
   addDays,
   addMonths,
@@ -141,7 +142,7 @@ export function ReflectionsView() {
           >
             <span
               className="size-2 shrink-0 rounded-full"
-              style={{ backgroundColor: hexOf(g.colorCode) }}
+              style={{ backgroundColor: goalAccent(g.colorCode) }}
               aria-hidden
             />
             <span className="truncate">
@@ -349,7 +350,7 @@ export function ReflectionTimeline({
     <div className="flex flex-col gap-4">
       {/* 기간 고르기 + 이동 */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="bg-surface border-line inline-flex rounded-xl border p-1" role="tablist" aria-label="기간">
+        <div className={segmentedClass()} role="tablist" aria-label="기간">
           {PERIODS.map((p) => (
             <button
               key={p.value}
@@ -357,10 +358,7 @@ export function ReflectionTimeline({
               role="tab"
               aria-selected={period === p.value}
               onClick={() => changePeriod(p.value)}
-              className={cn(
-                'h-8 rounded-lg px-3.5 text-[13px] font-semibold transition-colors',
-                period === p.value ? 'bg-ink text-on-ink' : 'text-ink-2 hover:text-ink'
-              )}
+              className={segmentClass(period === p.value)}
             >
               {p.label}
             </button>
@@ -391,7 +389,7 @@ export function ReflectionTimeline({
             <button
               type="button"
               onClick={() => move('today', today)}
-              className="text-brand hover:bg-brand-soft h-8 rounded-lg px-2 text-[12px] font-semibold"
+              className="text-text-brand hover:bg-brand-soft h-8 rounded-lg px-2 text-[12px] font-semibold"
             >
               {period === 'DAY' ? '오늘' : period === 'WEEK' ? '이번 주' : '이번 달'}
             </button>
@@ -524,7 +522,7 @@ function FilterChip({
       aria-pressed={active}
       className={cn(
         'flex h-8 max-w-[220px] items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold transition-colors',
-        active ? 'border-ink bg-ink text-on-ink' : 'border-line-strong bg-surface text-ink-2 hover:border-ink-4'
+        active ? 'border-text-brand bg-ai-tint-soft text-text-brand' : 'border-border-subtle bg-bg-surface text-text-primary hover:bg-bg-sunken'
       )}
     >
       {children}
@@ -562,7 +560,7 @@ function EntryRow({
       <span
         className={cn(
           'mt-0.5 grid size-7 shrink-0 place-items-center rounded-full',
-          isRetro ? 'bg-subtle text-ink-2' : 'bg-brand-soft text-brand'
+          isRetro ? 'bg-subtle text-ink-2' : 'bg-brand-soft text-text-brand'
         )}
         title={isRetro ? '회고 글' : '오늘 기록'}
       >
@@ -586,7 +584,7 @@ function EntryRow({
             >
               <span
                 className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: hexOf(e.colorCode) }}
+                style={{ backgroundColor: goalAccent(e.colorCode) }}
                 aria-hidden
               />
               <span className="truncate">

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { inlineInput } from '@/features/goal/edit/inline'
-import { hexOf } from '@/features/timetable/layout'
+import { goalAccent } from '@/lib/goalTone'
 import { todayKst } from '@/features/timetable/time'
 import {
   checkInWritten,
@@ -130,7 +130,7 @@ export function RetroPanel({
   }
 
   if (failed) return <p className="text-ink-3 text-sm">회고할 목표를 불러오지 못했어요.</p>
-  if (!goals) return <div className="bg-subtle h-60 animate-pulse rounded-[20px]" />
+  if (!goals) return <div className="bg-subtle h-60 animate-pulse rounded-card" />
   if (goals.length === 0)
     return (
       <p className="text-ink-3 text-sm">
@@ -224,14 +224,14 @@ export function RetroPanel({
       className={cn(
         'flex h-8 max-w-full items-center gap-1 rounded-full border px-2.5 text-[12px] font-semibold transition-colors',
         current?.goalCategoryId === g.goalCategoryId
-          ? 'border-ink bg-ink text-on-ink'
-          : 'border-line-strong bg-surface text-ink-2 hover:border-ink-4'
+          ? 'border-text-brand bg-ai-tint-soft text-text-brand'
+          : 'border-border-subtle bg-bg-surface text-text-primary hover:bg-bg-sunken'
       )}
     >
       {hasRetro(g) ? (
         <Check className="text-success size-3.5 shrink-0" strokeWidth={3} />
       ) : (
-        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hexOf(g.colorCode) }} aria-hidden />
+        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(g.colorCode) }} aria-hidden />
       )}
       <span className="truncate">
         {g.emoji ? `${g.emoji} ` : ''}
@@ -259,7 +259,7 @@ export function RetroPanel({
       <Link
         href="/reflections?from=home_retro"
         onClick={() => trackHome(HE.retroReflectionsLinkClick)}
-        className="text-brand hover:bg-brand-soft mt-1 -ml-1 inline-flex items-center gap-1 rounded-lg px-1 py-0.5 text-[12px] font-semibold"
+        className="text-text-brand hover:bg-brand-soft mt-1 -ml-1 inline-flex items-center gap-1 rounded-lg px-1 py-0.5 text-[12px] font-semibold"
       >
         <Library className="size-3.5" />
         지난 회고 모아보기
@@ -286,7 +286,7 @@ export function RetroPanel({
       {current ? (
         <div className="mt-4">
           <div className="text-ink-3 flex items-center gap-1.5 text-[12px]">
-            <span className="size-2 rounded-full" style={{ backgroundColor: hexOf(current.colorCode) }} aria-hidden />
+            <span className="size-2 rounded-full" style={{ backgroundColor: goalAccent(current.colorCode) }} aria-hidden />
             <Link
               href={`/goal/${current.goalCategoryId}`}
               onClick={() => {

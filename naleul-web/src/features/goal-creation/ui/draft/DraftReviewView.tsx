@@ -525,7 +525,7 @@ export function DraftReviewView({ session, draft }: Props) {
           </div>
 
           {/* 대화에서 정리한 조건 */}
-          <div className="border-line bg-surface mt-5 flex flex-wrap items-center gap-3 rounded-[20px] border px-5 py-4">
+          <div className="border-line bg-surface mt-5 flex flex-wrap items-center gap-3 rounded-card border px-5 py-4">
             <div className="min-w-0 flex-1">
               <p className="text-ink-3 text-xs">이루고 싶은 목표</p>
               <p className="truncate text-[17px] font-bold">{summary?.goalStatement ?? plan.goal.title}</p>
@@ -588,9 +588,9 @@ export function DraftReviewView({ session, draft }: Props) {
           )}
 
           {/* 말로 고치기: 트리를 몰라도 한 문장으로 */}
-          <div className="border-line bg-surface mt-4 rounded-[20px] border px-4 py-3 sm:px-5">
+          <div className="border-line bg-surface mt-4 rounded-card border px-4 py-3 sm:px-5">
             <div className="flex items-center gap-2">
-              <MessageSquareText className="text-brand size-5 shrink-0" />
+              <MessageSquareText className="text-text-brand size-5 shrink-0" />
               <input
                 value={quickFix}
                 onChange={(e) => setQuickFix(e.target.value.slice(0, FEEDBACK_MAX))}
@@ -603,7 +603,7 @@ export function DraftReviewView({ session, draft }: Props) {
                 disabled={busy}
                 placeholder="바꾸고 싶은 걸 말로 적어 보세요. 예) 운동은 주 2회로 줄여줘"
                 aria-label="말로 고치기"
-                className="placeholder:text-ink-4 h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+                className="placeholder:text-text-placeholder h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
               />
               <Button
                 size="sm"
@@ -663,7 +663,7 @@ export function DraftReviewView({ session, draft }: Props) {
           {/* 아래: 세부 구조 (접힘) — 세부 목표 · 마일스톤. 날짜·수치는 자동으로 맞춰져요
               V52: AI 초안은 마일스톤 없이 세부 목표 1개로 와서, 그럴 땐 이 칸을 아예 숨겨요 (예전 초안 · 문제가 있을 때만) */}
           {(plan.milestones.length > 0 || plan.subGoals.length > 1 || structureHasIssue) && (
-            <section className="border-line bg-surface mt-5 rounded-[20px] border">
+            <section className="border-line bg-surface mt-5 rounded-card border">
               <button
                 type="button"
                 onClick={() => {
@@ -704,11 +704,11 @@ export function DraftReviewView({ session, draft }: Props) {
 
       {/* 하단 고정 바 */}
       <div className="bg-canvas px-4 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
-        <div className="bg-inverse mx-auto flex max-w-[1280px] flex-col gap-3 rounded-[20px] px-5 py-4 text-white sm:flex-row sm:items-center sm:px-6">
+        <div className="bg-inverse mx-auto flex max-w-[1280px] flex-col gap-3 rounded-card px-5 py-4 text-on-ink sm:flex-row sm:items-center sm:px-6">
           <div className="flex-1">
-            <p className="text-[14px] text-white/85">
-              이 목표로 시작하면 <b className="text-[#8EA2FF]">Task {oneTimes}개</b>와{' '}
-              <b className="text-[#8EA2FF]">루틴 {routines.length}개</b>가 내일부터 TimeBlock에 자동 배치돼요.
+            <p className="text-[14px] text-on-ink/85">
+              이 목표로 시작하면 <b className="text-on-inverse-accent">Task {oneTimes}개</b>와{' '}
+              <b className="text-on-inverse-accent">루틴 {routines.length}개</b>가 내일부터 TimeBlock에 자동 배치돼요.
             </p>
             {/* 다시 생성은 한 대화 최대 횟수 + 하루 횟수가 있어요 — 누르기 전에 남은 횟수를 보여줘요 */}
             <UsageLine tone="onDark" className="mt-1" items={[regenLeft, draftLeft]} />
@@ -723,7 +723,7 @@ export function DraftReviewView({ session, draft }: Props) {
               }}
             >
               <Button
-                className="flex-1 bg-white/10 hover:bg-white/20 sm:flex-none"
+                className="bg-on-ink/10 hover:bg-on-ink/20 text-on-ink flex-1 shadow-none sm:flex-none"
                 onClick={() => {
                   track('goal_draft.regen_open', {
                     session_id: sessionId,
@@ -739,11 +739,11 @@ export function DraftReviewView({ session, draft }: Props) {
               >
                 <RefreshCw className="size-4" />
                 다시 생성
-                {regenRemaining != null && <span className="text-white/60">({regenRemaining}회 남음)</span>}
+                {regenRemaining != null && <span className="text-on-ink/60">({regenRemaining}회 남음)</span>}
               </Button>
             </span>
             <Button
-              className="flex-1 bg-white text-[#111111] hover:bg-white/90 sm:flex-none"
+              className="bg-on-ink text-inverse hover:bg-on-ink/90 flex-1 shadow-none sm:flex-none"
               onClick={confirm}
               loading={confirming}
               disabled={busy && !confirming}
@@ -825,7 +825,7 @@ export function DraftReviewView({ session, draft }: Props) {
                 }}
                 className={cn(
                   'w-full rounded-2xl border px-4 py-3.5 text-left text-[15px] font-semibold',
-                  current ? 'border-brand bg-brand-soft text-brand' : 'border-line-strong hover:border-ink-4'
+                  current ? 'border-brand bg-brand-soft text-text-brand' : 'border-line-strong hover:border-ink-4'
                 )}
               >
                 {PLANNING_STYLE_LABEL[value]}
@@ -862,7 +862,7 @@ export function DraftReviewView({ session, draft }: Props) {
                   current ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
                 )}
               >
-                <span className={cn('block text-[15px] font-semibold', current && 'text-brand')}>
+                <span className={cn('block text-[15px] font-semibold', current && 'text-text-brand')}>
                   {PLAN_INTENSITY_LABEL[value]}
                   {current && <span className="ml-2 text-xs font-medium">현재</span>}
                 </span>
@@ -938,7 +938,7 @@ function PlanFitCard({
     <div className="border-line bg-surface mt-4 rounded-2xl border px-5 py-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 text-sm font-bold">
-          <UserCheck className="text-brand size-4" />
+          <UserCheck className="text-text-brand size-4" />
           나에게 맞춘 점
         </p>
         <button

@@ -260,12 +260,12 @@ export function ScopeChooser({
                   choose(o.scope, method)
                 }}
                 className={cn(
-                  'border-line-strong hover:border-brand hover:bg-brand-soft focus-visible:border-brand focus-visible:bg-brand-soft flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors outline-none',
+                  'border-line-strong hover:border-brand hover:bg-brand-soft focus-visible:border-border-focus focus-visible:bg-brand-soft flex flex-col items-start gap-1 rounded-input border px-3 py-2.5 text-left transition-colors outline-none',
                   'disabled:hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent'
                 )}
               >
                 <span className="flex w-full items-center gap-1.5 text-[14px] font-bold">
-                  <Icon className="text-brand size-4" />
+                  <Icon className="text-text-brand size-4" />
                   {o.label}
                   <kbd className="text-ink-4 ml-auto hidden text-[10px] font-medium sm:inline">{i + 1}</kbd>
                 </span>

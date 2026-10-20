@@ -44,7 +44,7 @@ export function RecordRoutineCard({ routines }: { routines: RecordPattern['routi
                   </span>
                 </p>
               </div>
-              <div className="bg-subtle mt-1.5 h-2 overflow-hidden rounded-full">
+              <div className="bg-progress-track mt-1.5 h-2 overflow-hidden rounded-full">
                 <div
                   className={i === 0 && value > 0 ? 'bg-brand h-full rounded-full' : 'h-full rounded-full bg-heat-2'}
                   style={{ width: `${(value / max) * 100}%` }}
@@ -70,7 +70,7 @@ export function RecordRoutineCard({ routines }: { routines: RecordPattern['routi
       {byTime && top && top.minutes > 0 && items.length > 1 && (
         <p className="bg-subtle text-ink-2 mt-5 rounded-2xl px-4 py-3 text-[14px] leading-relaxed">
           루틴 시간의{' '}
-          <strong className="text-brand font-bold">{Math.round((top.minutes / totalMinutes) * 100)}%</strong>를{' '}
+          <strong className="text-text-brand font-bold">{Math.round((top.minutes / totalMinutes) * 100)}%</strong>를{' '}
           <strong className="font-bold">{top.routineName}</strong>에 썼어요
         </p>
       )}

@@ -416,14 +416,14 @@ function DayNav({
 }: DayNavProps & { className?: string; dark?: boolean }) {
   const btn = cn(
     'grid size-7 place-items-center rounded-lg',
-    dark ? 'text-white/70 hover:bg-white/10 hover:text-white' : 'text-ink-3 hover:bg-subtle hover:text-ink'
+    dark ? 'text-on-ink/70 hover:bg-on-ink/10 hover:text-on-ink' : 'text-ink-3 hover:bg-subtle hover:text-ink'
   )
   return (
     <div className={cn('flex items-center gap-1', className)}>
       <button type="button" onClick={onPrev} aria-label="이전 날" className={btn}>
         <ChevronLeft className="size-4" />
       </button>
-      <span className={cn('text-[13px] font-semibold tabular-nums', dark ? 'text-white/80' : 'text-ink-2')}>
+      <span className={cn('text-[13px] font-semibold tabular-nums', dark ? 'text-on-ink/80' : 'text-ink-2')}>
         {monthOf(today)}월 {dayOfMonth(today)}일 {WEEKDAY_FULL[weekdayIndex(today)]}
       </span>
       <button type="button" onClick={onNext} aria-label="다음 날" className={btn}>
@@ -435,7 +435,7 @@ function DayNav({
           onClick={onToday}
           className={cn(
             'ml-1 rounded-full px-2.5 py-0.5 text-[12px] font-semibold',
-            dark ? 'bg-white/15 text-white hover:bg-white/25' : 'bg-subtle text-ink hover:bg-line'
+            dark ? 'bg-on-ink/15 text-on-ink hover:bg-on-ink/25' : 'bg-subtle text-ink hover:bg-line'
           )}
         >
           오늘
@@ -488,7 +488,7 @@ function Summary({
   const focus = current ?? next
 
   return (
-    <section className="bg-inverse flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 rounded-[20px] px-5 py-4 text-white">
+    <section className="bg-inverse flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 rounded-card px-5 py-4 text-on-ink">
       <div className="min-w-0">
         <DayNav {...nav} dark className="-ml-1.5" />
         <h1 className="truncate text-[19px] leading-snug font-bold">
@@ -511,10 +511,10 @@ function Summary({
       <div data-dead="progress" className="flex min-w-[180px] items-center gap-3">
         <span className="text-[26px] leading-none font-bold tabular-nums">{percent}%</span>
         <div>
-          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-white/15">
-            <div className="h-full rounded-full bg-white transition-all" style={{ width: `${percent}%` }} />
+          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-on-ink/15">
+            <div className="h-full rounded-full bg-on-ink transition-all" style={{ width: `${percent}%` }} />
           </div>
-          <p className="mt-1 text-[11px] whitespace-nowrap text-white/65 tabular-nums">
+          <p className="mt-1 text-[11px] whitespace-nowrap text-on-ink/65 tabular-nums">
             할 일 {taskDone}/{tasks.length}
             {routines.length > 0 && ` · 루틴 ${routineDone}/${routines.length}`}
             {habitTotal > 0 && ` · 습관 ${habitDone}/${habitTotal}`}
@@ -537,16 +537,16 @@ function Summary({
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {isToday && (
-          <div data-dead="focus_box" className="max-w-[260px] min-w-0 rounded-xl bg-white/8 px-3 py-1.5">
-            <p className="text-[11px] font-semibold text-white/60">{current ? '지금 할 일' : '다음 일정'}</p>
+          <div data-dead="focus_box" className="max-w-[260px] min-w-0 rounded-xl bg-on-ink/8 px-3 py-1.5">
+            <p className="text-[11px] font-semibold text-on-ink/60">{current ? '지금 할 일' : '다음 일정'}</p>
             {focus ? (
               <p className="truncate text-[13px] font-bold">
                 {formatMinutes(focus.start)} {focus.task.emoji ? `${focus.task.emoji} ` : ''}
                 {focus.task.taskName}
-                {!current && <span className="font-medium text-white/70"> · {inLabel(focus.start - nowMinutes)}</span>}
+                {!current && <span className="font-medium text-on-ink/70"> · {inLabel(focus.start - nowMinutes)}</span>}
               </p>
             ) : (
-              <p className="text-[13px] font-semibold text-white/80">남은 일정이 없어요</p>
+              <p className="text-[13px] font-semibold text-on-ink/80">남은 일정이 없어요</p>
             )}
           </div>
         )}
@@ -571,10 +571,10 @@ function Pill({ children, tone, dead }: { children: React.ReactNode; tone?: 'dan
       className={cn(
         'rounded-full px-2.5 py-0.5 font-semibold tabular-nums',
         tone === 'danger'
-          ? 'bg-[#EF4444]/25 text-[#FECACA]'
+          ? 'bg-action-danger-bg text-action-danger-fg'
           : tone === 'warning'
-            ? 'bg-[#F59E0B]/25 text-[#FDE68A]'
-            : 'bg-white/12 text-white/90'
+            ? 'bg-warning text-accent-on-mint'
+            : 'bg-on-ink/12 text-on-ink/90'
       )}
     >
       {children}

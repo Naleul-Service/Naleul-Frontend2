@@ -20,6 +20,8 @@ import { COMMON_EVENTS as CE, EVENTS, track } from '@/lib/client/analytics'
 import { currentPath } from '@/lib/client/commonEvents'
 import { Logo } from '@/components/brand/Logo'
 import { buttonClass } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Chip'
+import { iconButtonClass } from '@/components/ui/IconButton'
 import { GoalNavList } from '@/features/goal/ui/GoalNavList'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { openLoginDialog } from '@/components/auth/loginHref'
@@ -76,12 +78,15 @@ function NavLink({
         onNavigate?.()
       }}
       aria-current={active ? 'page' : undefined}
+      // 디자인 시스템 NavItem — h40 · px8 · gap8 · 모서리 8 · 아이콘 20 + Body/SM·Medium
       className={cn(
-        'flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] transition-colors',
-        active ? 'bg-subtle text-ink font-bold' : 'text-ink-2 hover:bg-subtle/70 hover:text-ink'
+        'rounded-nav text-body-sm flex h-10 items-center gap-2 px-2 font-medium transition-colors',
+        active
+          ? 'bg-action-ghost-hover text-text-brand'
+          : 'text-text-tertiary hover:bg-bg-subtle hover:text-text-primary'
       )}
     >
-      <Icon className="size-[18px]" strokeWidth={active ? 2.4 : 2} />
+      <Icon className="size-5" strokeWidth={1.5} />
       {item.label}
     </Link>
   )
@@ -93,17 +98,21 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
   const ev = { nav_surface: surface, current_path: currentPath() }
 
   return (
-    <div className="flex h-full flex-col px-4 pt-6 pb-4">
-      <Link
-        href="/"
-        onClick={() => {
-          track(CE.sidebarLogoClick, { ...ev, current_path: currentPath(), is_current: pathname === '/' })
-          onNavigate?.()
-        }}
-        className="px-2"
-      >
-        <Logo />
-      </Link>
+    <div className="flex h-full flex-col">
+      {/* 머리 56 — 워드마크 */}
+      <div className="border-border-subtle flex h-14 shrink-0 items-center border-b px-4">
+        <Link
+          href="/"
+          onClick={() => {
+            track(CE.sidebarLogoClick, { ...ev, current_path: currentPath(), is_current: pathname === '/' })
+            onNavigate?.()
+          }}
+        >
+          <Logo />
+        </Link>
+      </div>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
 
       {/* 캘린더를 보면서 추가하도록 캘린더 오른쪽 패널로 열어요 (/tasks/new 전체 화면도 그대로 있어요) */}
       <Link
@@ -112,24 +121,24 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
           track(CE.sidebarTaskAddClick, { ...ev, current_path: currentPath() })
           onNavigate?.()
         }}
-        className={cn(buttonClass('primary', 'lg', true), 'mt-6')}
+        className={buttonClass('primary', 'md', true)}
       >
-        <Plus className="size-4" strokeWidth={2.6} />
+        <Plus className="size-[18px]" strokeWidth={1.5} />
         Task 추가
       </Link>
 
-      <nav className="mt-6 flex flex-col gap-1" aria-label="주 메뉴">
+      <nav className="mt-4 flex flex-col gap-1" aria-label="주 메뉴">
         {NAV.map((item) => (
           <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} surface={surface} />
         ))}
       </nav>
 
-      <section className="mt-8" aria-labelledby="my-goals-heading">
-        <div className="flex items-center justify-between px-3">
+      <section className="mt-6" aria-labelledby="my-goals-heading">
+        <div className="flex h-7 items-center justify-between px-2">
           <h2
             id="my-goals-heading"
             onClick={() => track(CE.sidebarDeadClick, { dead_target: 'goals_heading', nav_surface: surface })}
-            className="text-ink-3 text-[13px] font-medium"
+            className="text-label-xs text-text-secondary"
           >
             내 목표
           </h2>
@@ -140,15 +149,15 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
               onNavigate?.()
             }}
             aria-label="목표 추가"
-            className="text-ink-3 hover:bg-subtle hover:text-ink rounded-md p-1"
+            className={iconButtonClass('sm')}
           >
-            <Plus className="size-4" />
+            <Plus className="size-3.5" strokeWidth={1.25} />
           </Link>
         </div>
         <GoalNavList onNavigate={onNavigate} surface={surface} />
       </section>
 
-      <div className="mt-6">
+      <div className="mt-4">
         <NavLink
           item={{ href: '/settings', label: '설정', icon: Settings, key: 'settings' }}
           pathname={pathname}
@@ -159,11 +168,12 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
 
       {/* 아래 프로필을 바닥으로 밀어요 (광고가 안 보일 때도) */}
       <div className="mt-auto" />
-      <AdSlot placement="sidebar" role={user.role} className="mb-3" />
+      <AdSlot placement="sidebar" role={user.role} className="mt-3" />
+      </div>
 
       {isGuestUser(user) ? (
-        <div className="border-line border-t px-1 pt-4">
-          <p className="text-ink-3 px-1 text-[13px]">둘러보는 중이에요. 로그인하면 만든 목표와 Task가 저장돼요.</p>
+        <div className="border-border-subtle border-t p-4">
+          <p className="text-body-sm text-text-secondary px-1">둘러보는 중이에요. 로그인하면 만든 목표와 Task가 저장돼요.</p>
           <button
             type="button"
             onClick={() => {
@@ -178,25 +188,25 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
           </button>
         </div>
       ) : (
-        <div className="border-line flex items-center gap-3 border-t px-2 pt-4">
+        // 디자인 시스템 UserCard — 56 · 아바타 28 + 이름 + 플랜 Tag + 버튼
+        <div className="border-border-subtle flex h-14 shrink-0 items-center gap-2 border-t px-4">
           <span
             onClick={() => track(CE.sidebarDeadClick, { dead_target: 'avatar', nav_surface: surface })}
-            className="grid size-10 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#8EA2FF] to-[#B49CFF] text-sm font-bold text-white"
+            className="from-ai-gradient-start to-ai-gradient-end text-label-sm grid size-7 shrink-0 place-items-center rounded-full bg-linear-to-br text-white"
           >
             {user.name.slice(0, 1)}
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <p
               onClick={() => track(CE.sidebarDeadClick, { dead_target: 'profile_name', nav_surface: surface })}
-              className="truncate text-[15px] font-bold"
+              className="text-body-md text-text-primary min-w-0 truncate font-medium"
             >
               {user.name}
             </p>
-            <p
-              onClick={() => track(CE.sidebarDeadClick, { dead_target: 'plan_label', nav_surface: surface })}
-              className="text-ink-3 text-xs"
-            >
-              {PLAN_LABEL[user.role ?? 'FREE'] ?? 'Free plan'}
+            <p onClick={() => track(CE.sidebarDeadClick, { dead_target: 'plan_label', nav_surface: surface })}>
+              <Badge tone={user.role === 'PRO' || user.role === 'ADMIN' ? 'mint' : 'neutral'} className="h-5 px-2">
+                {PLAN_LABEL[user.role ?? 'FREE'] ?? 'Free plan'}
+              </Badge>
             </p>
           </div>
           <button
@@ -205,9 +215,9 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
             onClick={() => void logout(EVENTS.sidebarLogoutClick)}
             aria-label="로그아웃"
             title="로그아웃"
-            className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-2"
+            className={iconButtonClass('md')}
           >
-            <LogOut className="size-4" />
+            <LogOut className="size-[18px]" strokeWidth={1.5} />
           </button>
         </div>
       )}

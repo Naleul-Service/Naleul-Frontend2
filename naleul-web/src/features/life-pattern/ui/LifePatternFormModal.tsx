@@ -383,6 +383,7 @@ export function LifePatternFormModal({
             {ALL_DAYS.map((d) => (
               <Chip
                 key={d}
+                variant="day"
                 selected={form.days.includes(d)}
                 onClick={() => toggleDay(d)}
                 className={cn('px-0', (d === 'SATURDAY' || d === 'SUNDAY') && !form.days.includes(d) && 'text-ink-3')}
@@ -534,7 +535,7 @@ export function LifePatternFormModal({
                   setDayMap({})
                 }
               }}
-              className="text-brand self-start text-[13px] font-semibold"
+              className="text-text-brand self-start text-[13px] font-semibold"
             >
               + 요일마다 시간을 다르게 하기{isSleep ? ' (예: 주말엔 늦게 일어나기)' : ''}
             </button>

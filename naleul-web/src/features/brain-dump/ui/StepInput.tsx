@@ -244,7 +244,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
                     track('task_add_input.pro_click', { surface, quota_remaining: quotaRemaining })
                     toast.show('Pro 플랜은 곧 만나볼 수 있어요.')
                   }}
-                  className="text-brand font-semibold hover:underline"
+                  className="text-text-brand font-semibold hover:underline"
                 >
                   Pro 알아보기
                 </button>
@@ -254,7 +254,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
             )}
           </div>
         ) : (
-          <label className="border-line-strong focus-within:border-brand flex items-center gap-2 rounded-2xl border bg-surface px-4 py-1.5">
+          <label className="border-line-strong focus-within:border-border-focus flex items-center gap-2 rounded-2xl border bg-surface px-4 py-1.5">
             <span className="text-ink-4 w-5 shrink-0 text-right text-sm tabular-nums">{lines.length + 1}</span>
             <input
               ref={inputRef}
@@ -269,7 +269,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
               placeholder={
                 lines.length ? '다음 할 일 (비워 두고 Enter = 다음 단계)' : '예) 저녁 8시 정기 회의 · 인강 듣기 3시간'
               }
-              className="placeholder:text-ink-4 h-11 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
+              className="placeholder:text-text-placeholder h-11 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
             />
             <button
               type="button"

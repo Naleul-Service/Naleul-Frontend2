@@ -30,7 +30,7 @@ const formHasInput = (root: HTMLElement | null) =>
   ].some((i) => i.value.trim() !== '')
 
 const field =
-  'border-line-strong bg-surface focus:border-ink-3 h-10 w-full min-w-0 rounded-xl border px-3 text-[14px] outline-none'
+  'border-line-strong bg-surface focus:border-border-focus h-10 w-full min-w-0 rounded-input border px-3 text-[14px] outline-none'
 
 /**
  * Task 직접 추가 — 목표를 고르고, 이름·날짜·시간(선택)·영역(선택)을 정해 Enter.

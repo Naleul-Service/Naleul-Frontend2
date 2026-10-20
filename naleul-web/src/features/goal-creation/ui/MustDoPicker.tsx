@@ -112,7 +112,7 @@ export function MustDoPicker({
               aria-pressed={on}
               className={cn(
                 'inline-flex h-9 items-center gap-1 rounded-full border px-3.5 text-[14px] font-medium transition-colors disabled:opacity-40',
-                on ? 'border-brand bg-brand-soft text-brand' : 'border-line-strong text-ink-2 hover:border-ink-4'
+                on ? 'border-brand bg-brand-soft text-text-brand' : 'border-line-strong text-ink-2 hover:border-ink-4'
               )}
             >
               {on && <Check className="size-3.5" strokeWidth={3} />}
@@ -123,7 +123,7 @@ export function MustDoPicker({
         {custom.map((s) => (
           <span
             key={s}
-            className="border-brand bg-brand-soft text-brand inline-flex h-9 items-center gap-1 rounded-full border pr-1.5 pl-3.5 text-[14px] font-medium"
+            className="border-brand bg-brand-soft text-text-brand inline-flex h-9 items-center gap-1 rounded-full border pr-1.5 pl-3.5 text-[14px] font-medium"
           >
             {s}
             <button
@@ -139,7 +139,7 @@ export function MustDoPicker({
         ))}
       </div>
 
-      <div className="border-line-strong bg-surface focus-within:border-ink-3 mt-3 flex items-center gap-2 rounded-xl border px-3">
+      <div className="border-line-strong bg-surface focus-within:border-border-focus mt-3 flex items-center gap-2 rounded-xl border px-3">
         <input
           ref={inputRef}
           value={draft}
@@ -155,7 +155,7 @@ export function MustDoPicker({
                 : '직접 적어 주세요 (예: 주말 등산)'
           }
           aria-label="꼭 하고 싶은 일 직접 적기"
-          className="placeholder:text-ink-4 h-10 min-w-0 flex-1 bg-transparent text-[14px] outline-none"
+          className="placeholder:text-text-placeholder h-10 min-w-0 flex-1 bg-transparent text-[14px] outline-none"
         />
         <button
           type="button"

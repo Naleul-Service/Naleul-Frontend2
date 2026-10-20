@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { track } from '@/lib/client/analytics'
 import { errorStatusOf } from '@/features/home/analytics'
 import type { GoalCategory } from '@/features/goal/api'
@@ -113,12 +114,12 @@ function Meter({ label, value, right }: { label: string; value: number | null; r
   if (value === null) return null
   return (
     <div>
-      <div className="mb-1 flex justify-between text-[12px] text-white/75">
+      <div className="mb-1 flex justify-between text-[12px] text-on-ink/75">
         <span>{label}</span>
-        <span className="font-semibold text-white tabular-nums">{right ?? `${value}%`}</span>
+        <span className="font-semibold text-on-ink tabular-nums">{right ?? `${value}%`}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/15">
-        <div className="h-full rounded-full bg-white" style={{ width: `${Math.min(Math.max(value, 0), 100)}%` }} />
+      <div className="h-2 overflow-hidden rounded-full bg-on-ink/15">
+        <div className="h-full rounded-full bg-on-ink" style={{ width: `${Math.min(Math.max(value, 0), 100)}%` }} />
       </div>
     </div>
   )
@@ -157,11 +158,11 @@ function SummaryHero({
   const topicPercent = s.topicsTotal ? Math.round((s.topicsDone / s.topicsTotal) * 100) : null
 
   return (
-    <section className="bg-inverse rounded-[24px] p-6 text-white sm:p-7">
+    <section className="bg-inverse rounded-card p-6 text-on-ink sm:p-7">
       <div className="flex flex-wrap items-start gap-x-8 gap-y-5">
         {/* 다음 마감 */}
         <div className="max-w-full min-w-[200px]">
-          <p className="flex items-center gap-1.5 text-[13px] text-white/70">
+          <p className="flex items-center gap-1.5 text-[13px] text-on-ink/70">
             <Flag className="size-4" />
             다음 마감
           </p>
@@ -174,12 +175,12 @@ function SummaryHero({
               <p
                 className={cn(
                   'mt-1 text-[44px] leading-none font-bold tracking-tight',
-                  next.dDay! < 0 && 'text-[#FCA5A5]'
+                  next.dDay! < 0 && 'text-action-danger-bg'
                 )}
               >
                 {goalDDay(next.dDay)}
               </p>
-              <p className="mt-1.5 text-[14px] text-white/80">
+              <p className="mt-1.5 text-[14px] text-on-ink/80">
                 {fullDate(next.dueDate!)}까지
                 {next.remaining > 0 && ` · 남은 ${next.remaining}개`}
               </p>
@@ -193,7 +194,7 @@ function SummaryHero({
                     ? '모든 주제를 끝냈어요'
                     : '마감 정한 주제가 없어요'}
               </p>
-              <p className="mt-1.5 text-[13px] text-white/70">
+              <p className="mt-1.5 text-[13px] text-on-ink/70">
                 {s.topicsTotal === 0
                   ? '로드맵에 주제를 만들고 마감을 정해 보세요'
                   : s.topicsDone === s.topicsTotal
@@ -206,10 +207,10 @@ function SummaryHero({
 
         {/* 진행 */}
         <div className="min-w-[220px] flex-1">
-          <p className="text-[13px] text-white/70">진행</p>
+          <p className="text-[13px] text-on-ink/70">진행</p>
           <p className="mt-1 text-[32px] leading-none font-bold">
             {s.done}
-            <span className="text-[18px] font-semibold text-white/60"> / {s.total}개 완료</span>
+            <span className="text-[18px] font-semibold text-on-ink/60"> / {s.total}개 완료</span>
           </p>
           <div className="mt-4 space-y-2.5">
             <Meter label="Task 완료" value={s.progressPercent} />
@@ -266,10 +267,10 @@ function Pill({
       className={cn(
         'rounded-full px-3 py-1 font-semibold',
         tone === 'danger'
-          ? 'bg-[#EF4444]/25 text-[#FECACA]'
+          ? 'bg-action-danger-bg text-action-danger-fg'
           : tone === 'warning'
-            ? 'bg-[#F59E0B]/25 text-[#FDE68A]'
-            : 'bg-white/12 text-white/90'
+            ? 'bg-warning text-accent-on-mint'
+            : 'bg-on-ink/12 text-on-ink/90'
       )}
     >
       {children}
@@ -491,7 +492,7 @@ function TopicTasks({
         <button
           type="button"
           onClick={onAdd}
-          className="text-ink-3 hover:text-brand flex items-center gap-0.5 text-[12px] font-semibold"
+          className="text-ink-3 hover:text-text-brand flex items-center gap-0.5 text-[12px] font-semibold"
         >
           <Plus className="size-3.5" />할 일
         </button>
@@ -595,7 +596,7 @@ function RoadmapItem({
           className={cn(
             'relative z-[1] grid size-7 shrink-0 place-items-center rounded-full border-2 transition-colors',
             NODE_CLASS[t.status],
-            !done && 'hover:border-brand hover:text-brand/60',
+            !done && 'hover:border-brand hover:text-text-brand/60',
             autoDone && 'pointer-events-none'
           )}
         >
@@ -616,7 +617,7 @@ function RoadmapItem({
             className={cn(
               'min-w-0 flex-1 text-left text-[15px] leading-snug font-bold',
               done && 'text-ink-3 line-through decoration-1',
-              selected && 'text-brand'
+              selected && 'text-text-brand'
             )}
           >
             {t.emoji ? `${t.emoji} ` : ''}
@@ -640,7 +641,7 @@ function RoadmapItem({
                 t.status === 'OVERDUE'
                   ? 'text-danger'
                   : t.status === 'NEXT'
-                    ? 'text-brand'
+                    ? 'text-text-brand'
                     : t.dDay! <= 3 && 'text-warning-ink'
               )}
             >
@@ -655,9 +656,9 @@ function RoadmapItem({
         </p>
         {t.total > 0 && (
           <div className="mt-1.5 flex items-center gap-2">
-            <div className="bg-subtle h-1.5 flex-1 overflow-hidden rounded-full">
+            <div className="bg-progress-track h-1.5 flex-1 overflow-hidden rounded-full">
               <div
-                className={cn('h-full rounded-full', done ? 'bg-success' : 'bg-brand')}
+                className={cn('h-full rounded-full', done ? 'bg-success' : 'bg-progress-fill')}
                 style={{ width: `${t.progressPercent ?? 0}%` }}
               />
             </div>
@@ -966,8 +967,8 @@ function TaskMeta({ task, today, showTopic = true }: { task: WorkTask; today: st
   return (
     <span className="text-ink-3 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px]">
       {showTopic && task.topicName && <span className="bg-subtle text-ink-2 rounded px-1.5">{task.topicName}</span>}
-      {task.routine && <span className="text-brand font-semibold">반복</span>}
-      {task.status === 'IN_PROGRESS' && <span className="text-brand font-semibold">진행 중</span>}
+      {task.routine && <span className="text-text-brand font-semibold">반복</span>}
+      {task.status === 'IN_PROGRESS' && <span className="text-text-brand font-semibold">진행 중</span>}
       {task.date && task.date !== today && <span>{dayLabel(task.date, today)}</span>}
       {task.startTime && <span>{task.startTime}</span>}
       {due && (
@@ -1101,7 +1102,7 @@ function TaskCompose({
         className={`${inlineInput} mt-2 h-auto resize-none py-2.5 leading-relaxed`}
       />
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <div className="bg-subtle inline-flex rounded-lg p-0.5" role="radiogroup" aria-label="언제 할지">
+        <div className={segmentedClass()} role="radiogroup" aria-label="언제 할지">
           {(
             [
               ['BACKLOG', '나중에'],
@@ -1118,10 +1119,7 @@ function TaskCompose({
                 if (v !== when) track('work_compose.when_select', { goal_category_id: goalId, when_option: v })
                 setWhen(v)
               }}
-              className={cn(
-                'h-7 rounded-md px-2.5 text-[12px] font-semibold',
-                when === v ? 'bg-surface text-ink shadow-sm' : 'text-ink-3'
-              )}
+              className={segmentClass(when === v, 'text-label-sm h-7 px-2.5')}
             >
               {label}
             </button>
@@ -1227,7 +1225,7 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
                   item_count: board.retrospectives.length,
                 })
               }
-              className="text-brand ml-auto text-[12px] font-semibold hover:underline"
+              className="text-text-brand ml-auto text-[12px] font-semibold hover:underline"
             >
               모두 보기
             </Link>
@@ -1297,7 +1295,7 @@ function ComposePanel({
         <PencilLine className="size-4" />
         적기
       </h2>
-      <div className="bg-subtle mt-3 grid grid-cols-3 rounded-xl p-1" role="tablist" aria-label="무엇을 적을지">
+      <div className={segmentedClass('mt-3 grid grid-cols-3')} role="tablist" aria-label="무엇을 적을지">
         {COMPOSE_TABS.map(({ value, label, icon: Icon }) => (
           <button
             key={value}
@@ -1305,10 +1303,7 @@ function ComposePanel({
             role="tab"
             aria-selected={tab === value}
             onClick={() => onTab(value)}
-            className={cn(
-              'flex h-9 items-center justify-center gap-1 rounded-lg text-[13px] font-semibold transition-colors',
-              tab === value ? 'bg-surface text-ink shadow-sm' : 'text-ink-3 hover:text-ink-2'
-            )}
+            className={segmentClass(tab === value, 'h-9 gap-1 px-0')}
           >
             <Icon className="size-3.5" />
             {label}
@@ -1349,7 +1344,7 @@ function TopicBar({
   const chip = (selected: boolean) =>
     cn(
       'inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors',
-      selected ? 'border-ink bg-ink text-on-ink' : 'border-line-strong bg-surface text-ink-2 hover:border-ink-4'
+      selected ? 'border-text-brand bg-ai-tint-soft text-text-brand' : 'border-border-subtle bg-bg-surface text-text-primary hover:bg-bg-sunken'
     )
 
   return (
@@ -1420,7 +1415,7 @@ function BoardCard({
       }}
       onDragEnd={onDragEnd}
       className={cn(
-        'border-line bg-surface hover:border-line-strong group cursor-grab rounded-xl border p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] active:cursor-grabbing',
+        'border-line bg-surface hover:border-line-strong group cursor-grab rounded-xl border p-3 shadow-card active:cursor-grabbing',
         task.overdue && 'border-danger/40'
       )}
     >
@@ -1446,7 +1441,7 @@ function BoardCard({
         <button
           type="button"
           onClick={() => onMove(next, 'next_button')}
-          className="text-ink-3 hover:text-brand mt-2 ml-8 text-[12px] font-semibold [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:block"
+          className="text-ink-3 hover:text-text-brand mt-2 ml-8 text-[12px] font-semibold [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:block"
         >
           {COLUMN_LABEL[next]}으로 →
         </button>
@@ -1544,7 +1539,7 @@ function Kanban({
               <Icon
                 className={cn(
                   'size-4',
-                  key === 'DONE' ? 'text-success' : key === 'IN_PROGRESS' ? 'text-brand' : 'text-ink-3'
+                  key === 'DONE' ? 'text-success' : key === 'IN_PROGRESS' ? 'text-text-brand' : 'text-ink-3'
                 )}
               />
               {COLUMN_LABEL[key]}

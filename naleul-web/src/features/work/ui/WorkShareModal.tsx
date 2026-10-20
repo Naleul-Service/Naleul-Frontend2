@@ -5,7 +5,7 @@ import { Copy, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { Spinner } from '@/components/ui/Spinner'
-import { cn } from '@/lib/cn'
+import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { track } from '@/lib/client/analytics'
 import { errorStatusOf } from '@/features/home/analytics'
 import { toast } from '@/stores/toastStore'
@@ -105,7 +105,7 @@ export function WorkShareModal({ goalId, open, onClose }: { goalId: number; open
         </>
       }
     >
-      <div className="bg-subtle inline-flex rounded-xl p-1" role="radiogroup" aria-label="공유할 범위">
+      <div className={segmentedClass()} role="radiogroup" aria-label="공유할 범위">
         {SCOPES.map((s) => (
           <button
             key={s.value}
@@ -114,10 +114,7 @@ export function WorkShareModal({ goalId, open, onClose }: { goalId: number; open
             aria-checked={scope === s.value}
             title={s.hint}
             onClick={() => selectScope(s.value)}
-            className={cn(
-              'h-8 rounded-lg px-3 text-[13px] font-semibold transition-colors',
-              scope === s.value ? 'bg-surface text-ink shadow-sm' : 'text-ink-3 hover:text-ink-2'
-            )}
+            className={segmentClass(scope === s.value, 'px-3')}
           >
             {s.label}
           </button>

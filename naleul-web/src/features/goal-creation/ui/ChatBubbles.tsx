@@ -6,7 +6,7 @@ import type { ChatItem } from '../hooks/useInterviewChat'
 
 function AiAvatar() {
   return (
-    <span className="bg-brand-soft text-brand grid size-8 shrink-0 place-items-center rounded-full" aria-hidden>
+    <span className="bg-ai-tint text-text-brand grid size-8 shrink-0 place-items-center rounded-full" aria-hidden>
       <Sparkles className="size-4" />
     </span>
   )
@@ -16,7 +16,8 @@ export function AssistantBubble({ content }: { content: string | null }) {
   return (
     <div className="flex items-start gap-2.5">
       <AiAvatar />
-      <p className="bg-subtle text-ink max-w-[85%] rounded-2xl rounded-tl-md px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap sm:max-w-[75%]">
+      {/* 디자인 시스템 ChatBubble AI — 말풍선 없이 Body/LG */}
+      <p className="text-body-lg text-text-primary max-w-[85%] pt-1 whitespace-pre-wrap sm:max-w-[75%]">
         {content}
       </p>
     </div>
@@ -36,13 +37,14 @@ export function UserBubble({
   return (
     <div className="flex flex-col items-end gap-1.5">
       {item.skip ? (
-        <p className="border-line-strong text-ink-3 rounded-2xl rounded-tr-md border border-dashed px-4 py-2.5 text-sm">
+        <p className="border-border-subtle text-text-tertiary text-body-md rounded-[18px] rounded-br-[6px] border border-dashed px-4 py-2.5">
           건너뛸게요
         </p>
       ) : (
         <p
           className={cn(
-            'bg-ink max-w-[85%] rounded-2xl rounded-tr-md px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap text-on-ink sm:max-w-[75%]',
+            // 디자인 시스템 ChatBubble 사용자 — ai/tint-soft · 11/16 · 모서리 18/18/6/18
+            'bg-ai-tint-soft text-text-primary text-body-lg max-w-[85%] rounded-[18px] rounded-br-[6px] px-4 py-[11px] whitespace-pre-wrap sm:max-w-[75%]',
             item.sendState === 'sending' && 'opacity-70',
             failed && 'opacity-50'
           )}
@@ -79,7 +81,7 @@ export function TypingIndicator() {
   return (
     <div className="flex items-start gap-2.5" role="status" aria-label="AI가 답변을 준비하고 있어요">
       <AiAvatar />
-      <span className="bg-subtle flex h-[46px] items-center gap-1 rounded-2xl rounded-tl-md px-4">
+      <span className="flex h-[46px] items-center gap-1 px-1">
         {[0, 1, 2].map((i) => (
           <span
             key={i}

@@ -39,6 +39,7 @@ import {
 import { HABIT_SUGGESTIONS, HabitForm } from './HabitForm'
 import { GoalTaskList } from '@/features/goal/ui/GoalTaskList'
 import { HabitHeatmap } from './HabitHeatmap'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 
 // ─── 표시 도우미 ───────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ function HabitRow({ habit, day, isToday, daysAgo }: { habit: Habit; day: string;
           'grid size-10 shrink-0 place-items-center rounded-full border-2 transition-all active:scale-95',
           habit.checked
             ? 'border-brand bg-brand text-white'
-            : 'border-line-strong hover:border-brand hover:text-brand/40 text-transparent',
+            : 'border-line-strong hover:border-brand hover:text-text-brand/40 text-transparent',
           paused && 'cursor-not-allowed'
         )}
       >
@@ -218,7 +219,7 @@ function HabitRow({ habit, day, isToday, daysAgo }: { habit: Habit; day: string;
       </div>
 
       {habit.streak > 1 && (
-        <span className="hidden shrink-0 items-center gap-0.5 text-[12px] font-semibold text-[#ea580c] sm:flex">
+        <span className="hidden shrink-0 items-center gap-0.5 text-[12px] font-semibold text-goal-orange-fg sm:flex">
           <Flame className="size-3.5" />
           {habit.streak}일
         </span>
@@ -452,7 +453,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
               <button
                 type="button"
                 onClick={() => changeDay(today, 'today')}
-                className="text-brand text-[13px] font-semibold"
+                className="text-text-brand text-[13px] font-semibold"
               >
                 오늘로
               </button>
@@ -462,9 +463,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
               <span className="text-ink-3 font-semibold"> / {due.length}</span>
             </span>
           </div>
-          <div className="bg-subtle mt-3 h-2 overflow-hidden rounded-full" aria-hidden>
-            <div className="bg-brand h-full rounded-full transition-all" style={{ width: `${ratio * 100}%` }} />
-          </div>
+          <ProgressBar value={ratio} className="mt-3" />
           {due.length > 0 && done === due.length && (
             <p className="text-success mt-2 text-[13px] font-semibold">
               {isToday ? '오늘 할 습관을 모두 챙겼어요 🎉' : '이날 할 습관을 모두 챙겼어요'}
