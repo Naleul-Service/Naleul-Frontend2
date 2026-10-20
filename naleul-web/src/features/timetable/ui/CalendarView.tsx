@@ -307,7 +307,13 @@ export function CalendarView() {
             viewMode={view}
           />
           {/* 일간: TimeTable(계획 | 실제) 오른쪽에 그날 할 일 목록 — Task 추가 패널이 열려 있으면 자리가 좁아 숨겨요 */}
-          <div className={cn(view === 'day' && !add && 'grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]')}>
+          <div
+            className={cn(
+              view === 'day' && !add && 'grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]',
+              // 주간 모바일: 머리 줄 아래(날짜 줄 · 격자)는 양옆 10 (명세 10.3)
+              view === 'week' && 'max-lg:-mx-2.5'
+            )}
+          >
             <TimeGrid
               {...gridEvents}
               days={days}

@@ -146,7 +146,7 @@ function SubGoalCard({ goal, sub }: { goal: GoalCategory; sub: SubGoalInfo }) {
     )
   }
   return (
-    <div className="group bg-canvas relative rounded-2xl p-4">
+    <div className="group bg-bg-sunken relative rounded-2xl p-4">
       <div className="flex items-start justify-between gap-2">
         <span
           className="mt-1.5 block h-1 w-8 rounded-full"

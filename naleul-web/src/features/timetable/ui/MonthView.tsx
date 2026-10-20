@@ -363,7 +363,7 @@ function DayPanel({
       </div>
 
       {/* 실행률 */}
-      <div className="bg-bg-sunken rounded-2xl p-4">
+      <div className={cn('bg-bg-sunken p-4', inSheet ? 'rounded-xl' : 'rounded-2xl')}>
         <div className="flex items-end justify-between">
           <div>
             <p className="text-caption-md text-text-secondary">{date > today ? '계획된 Task' : '실행률'}</p>

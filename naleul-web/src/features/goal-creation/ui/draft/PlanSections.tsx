@@ -106,7 +106,7 @@ function AddButton({ label, onClick, disabled }: { label: string; onClick: () =>
   )
 }
 
-function EmojiBox({ emoji, tone = 'bg-canvas' }: { emoji: string | null; tone?: string }) {
+function EmojiBox({ emoji, tone = 'bg-bg-sunken' }: { emoji: string | null; tone?: string }) {
   return (
     <span className={cn('grid size-10 shrink-0 place-items-center rounded-xl text-lg', tone)} aria-hidden>
       {emoji || '•'}
@@ -158,7 +158,7 @@ export function GoalHeroCard({
           <button
             type="button"
             onClick={() => onEdit({ kind: 'goal' })}
-            className="group hover:bg-canvas w-full rounded-2xl px-2 py-1 text-left"
+            className="group hover:bg-bg-sunken w-full rounded-2xl px-2 py-1 text-left"
           >
             <h2 className="flex items-center gap-2 text-h2 sm:text-h1">
               {goal.emoji && <span>{goal.emoji}</span>}
@@ -181,7 +181,7 @@ export function GoalHeroCard({
       </IssueFrame>
 
       {goal.aiNote && (
-        <p className="bg-canvas mt-4 rounded-2xl px-4 py-3.5 text-[14px] leading-relaxed">💡 {goal.aiNote}</p>
+        <p className="bg-bg-sunken mt-4 rounded-2xl px-4 py-3.5 text-[14px] leading-relaxed">💡 {goal.aiNote}</p>
       )}
 
       {/* 목표 색상 */}
@@ -282,7 +282,7 @@ export function MilestoneTimeline({
                     type="button"
                     onClick={() => onEdit({ kind: 'milestone', index: i })}
                     className={cn(
-                      'group hover:bg-canvas w-full rounded-2xl p-2 text-left',
+                      'group hover:bg-bg-sunken w-full rounded-2xl p-2 text-left',
                       editingIndex === i && 'bg-brand-soft ring-brand/40 ring-1'
                     )}
                   >
@@ -543,7 +543,7 @@ export function OneTimeTasksCard({
                 <button
                   type="button"
                   onClick={() => onEdit({ kind: 'task', index, taskType: 'ONE_TIME' })}
-                  className="hover:bg-canvas flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left"
+                  className="hover:bg-bg-sunken flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold">
@@ -614,7 +614,7 @@ export function RoutinesCard({
                   <button
                     type="button"
                     onClick={() => onEdit({ kind: 'task', index, taskType: 'ROUTINE' })}
-                    className="group hover:bg-canvas flex w-full gap-3 rounded-xl px-2 py-3 text-left"
+                    className="group hover:bg-bg-sunken flex w-full gap-3 rounded-xl px-2 py-3 text-left"
                   >
                     <span className="w-6 shrink-0 text-lg" aria-hidden>
                       {task.emoji}

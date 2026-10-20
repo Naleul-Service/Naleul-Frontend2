@@ -271,7 +271,7 @@ export function ScheduleAiBar({
                       <label
                         className={cn(
                           'flex cursor-pointer items-start gap-3 rounded-2xl border p-3 transition-colors',
-                          picked[i] ? 'border-ink/30 bg-surface' : 'border-line bg-canvas opacity-60'
+                          picked[i] ? 'border-ink/30 bg-surface' : 'border-line bg-bg-sunken opacity-60'
                         )}
                       >
                         <input

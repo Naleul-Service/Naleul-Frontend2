@@ -92,7 +92,7 @@ export function TaskRateSection({ goal }: { goal: GoalCategory }) {
       </div>
 
       {recent.length === 0 ? (
-        <p className="bg-canvas text-ink-3 mt-4 rounded-2xl px-4 py-6 text-center text-sm">
+        <p className="bg-bg-sunken text-ink-3 mt-4 rounded-2xl px-4 py-6 text-center text-sm">
           아직 날짜가 지난 {kind === 'ALL' ? 'Task' : '할 일'}이 없어요. 날짜가 지나면 여기서 실천률을 보여드려요.
         </p>
       ) : (

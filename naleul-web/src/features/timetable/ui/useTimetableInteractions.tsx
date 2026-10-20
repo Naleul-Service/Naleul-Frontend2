@@ -395,10 +395,12 @@ export function useTimetableInteractions(
   }
 
   // ⚠️ e.currentTarget 은 이벤트 처리 중에만 값이 있어요 → setState 콜백 밖에서 먼저 위치를 읽어 둬요
-  const onSelectTask = (task: TimeBlockTask, e: MouseEvent<HTMLElement>) => {
-    // Shift · ⌘ · Ctrl + 클릭 → 묶음에 넣기/빼기 (상세 창은 열지 않아요)
-    if ((e.shiftKey || e.metaKey || e.ctrlKey) && groupable(task)) {
-      e.preventDefault()
+  /**
+   * 묶음에 넣기/빼기 — Shift·⌘·Ctrl+클릭, 터치 3초 꾹(long_press), 묶음 고르는 중 터치 탭(touch_tap)
+   * method 는 터치일 때만 timetable.group_select 의 select_method 로 보내요 (Shift+클릭은 예전 그대로)
+   */
+  const toggleGroup = (task: TimeBlockTask, method?: 'long_press' | 'touch_tap', onlyAdd = false) => {
+    {
       const date = blockDay(task)
       const all = days.flatMap((d) => d.tasks)
       // 묶음은 같은 날 Task 끼리만 — 다른 날 Task 를 고르면 새로 시작해요
@@ -410,15 +412,32 @@ export function useTimetableInteractions(
           : []
       const base = [...seed, ...sameDay]
       const removing = base.includes(task.taskId)
+      if (removing && onlyAdd) return
       const next = removing ? base.filter((id) => id !== task.taskId) : [...base, task.taskId]
       trackGrid('timetable.group_select', {
         task_id: task.taskId,
         group_action: removing ? 'remove' : 'add',
         group_size: next.length,
+        ...(method ? { select_method: method } : {}),
       })
       setGroup(next)
       setOpened(null)
       setConfirmDeleteId(null)
+    }
+  }
+  const onSelectTask = (task: TimeBlockTask, e: MouseEvent<HTMLElement>) => {
+    // Shift · ⌘ · Ctrl + 클릭 → 묶음에 넣기/빼기 (상세 창은 열지 않아요)
+    if ((e.shiftKey || e.metaKey || e.ctrlKey) && groupable(task)) {
+      e.preventDefault()
+      toggleGroup(task)
+      return
+    }
+    // 터치로 묶음을 고르는 중이면 탭 = 넣기/빼기 (명세 10.5)
+    const touchTap =
+      'pointerType' in e.nativeEvent && (e.nativeEvent as globalThis.PointerEvent).pointerType === 'touch'
+    if (touchTap && groupIds.size > 0 && groupable(task)) {
+      e.preventDefault()
+      toggleGroup(task, 'touch_tap')
       return
     }
     const anchor = rectOf(e.currentTarget)
@@ -1042,6 +1061,14 @@ export function useTimetableInteractions(
      * TimeGrid 에 그대로 펼쳐 넘겨요: <TimeGrid {...gridEvents} … />. 홈(surface='home')에서는 아무것도 안 보내요.
      */
     gridEvents: {
+      // 터치 묶음 고르기 (명세 10.5) — 3초 꾹 = 묶음에 넣기 · 빈 곳 탭 = 묶음 풀기
+      onTaskHold: (t: TimeBlockTask) => {
+        if (groupable(t)) toggleGroup(t, 'long_press', true)
+      },
+      onGroupClear: () => {
+        trackGrid('timetable.group_clear', { group_size: groupIds.size, close_method: 'empty_tap' })
+        setGroup([])
+      },
       onDragCancel: (source: DragSource, mode: DragMode, reason: DragCancelReason, invalid?: string) =>
         trackGrid('timetable.drag_cancel', {
           drag_source: dragSourceOf(source),

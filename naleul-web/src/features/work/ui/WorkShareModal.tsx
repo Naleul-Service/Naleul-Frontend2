@@ -121,7 +121,7 @@ export function WorkShareModal({ goalId, open, onClose }: { goalId: number; open
         ))}
       </div>
       <p className="text-ink-3 mt-1.5 text-[12px]">{SCOPES.find((s) => s.value === scope)?.hint}</p>
-      <div className="border-line bg-canvas relative mt-3 min-h-[160px] rounded-2xl border p-4">
+      <div className="border-line bg-bg-sunken relative mt-3 min-h-[160px] rounded-2xl border p-4">
         {isFetching && !text ? (
           <div className="grid h-32 place-items-center">
             <Spinner className="text-ink-3 size-5" />

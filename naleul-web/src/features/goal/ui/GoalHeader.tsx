@@ -486,7 +486,7 @@ export function GoalNotes({ goal }: { goal: GoalCategory }) {
             trackEditOpen(goal, 'notes')
             edit.open()
           }}
-          className="hover:bg-canvas -m-2 block w-[calc(100%+16px)] rounded-xl p-2 text-left"
+          className="hover:bg-bg-sunken -m-2 block w-[calc(100%+16px)] rounded-xl p-2 text-left"
         >
           <p className="text-ink-3 text-[13px] font-medium">{motiveLabel(goal)}</p>
           <p className="mt-1 text-[15px] leading-relaxed whitespace-pre-wrap">{goal.motive}</p>

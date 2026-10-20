@@ -155,7 +155,7 @@ export function RecordJournal({ goalId, goalName }: { goalId: number; goalName: 
           <Spinner className="text-ink-3 size-5" />
         </div>
       ) : isError ? (
-        <div className="bg-canvas flex items-center justify-between gap-3 rounded-2xl px-4 py-4 text-sm">
+        <div className="bg-bg-sunken flex items-center justify-between gap-3 rounded-2xl px-4 py-4 text-sm">
           <span className="text-ink-2">일지를 불러오지 못했어요.</span>
           <Button
             variant="secondary"
@@ -169,7 +169,7 @@ export function RecordJournal({ goalId, goalName }: { goalId: number; goalName: 
           </Button>
         </div>
       ) : days.length === 0 ? (
-        <p className="bg-canvas text-ink-3 rounded-2xl px-4 py-6 text-center text-sm leading-relaxed">
+        <p className="bg-bg-sunken text-ink-3 rounded-2xl px-4 py-6 text-center text-sm leading-relaxed">
           {hasNextPage
             ? '최근 2주에는 일지가 없어요. 아래에서 이전 일지를 볼 수 있어요.'
             : '아직 일지가 없어요. 이 목표의 Task를 완료하거나 위에서 한 일을 남기면 날짜별로 쌓여요.'}

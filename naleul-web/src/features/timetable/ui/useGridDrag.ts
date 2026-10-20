@@ -72,6 +72,8 @@ interface Options {
   onActivate?: () => void
   /** 끌기 시작 후 저장 없이 끝났을 때 (분석용) — invalid 면 놓을 수 없던 이유 문구 */
   onCancel?: (source: DragSource, mode: DragMode, reason: DragCancelReason, invalid?: string) => void
+  /** 터치로 Task 를 3초 꾹 눌렀을 때 (드래그는 접혀요) — 묶음 고르기 */
+  onHold?: (source: DragSource) => void
 }
 
 /** esc · 터치 취소(pointer_cancel) · 자리 밖(no_target) · 놓을 수 없는 자리(invalid) */
@@ -80,6 +82,8 @@ export type DragCancelReason = 'esc' | 'pointer_cancel' | 'no_target' | 'invalid
 const MOUSE_THRESHOLD = 4
 const TOUCH_HOLD_MS = 350
 const TOUCH_SLOP = 8
+/** 터치로 이만큼 꾹 누르고 있으면 묶음 고르기 (명세 10.5) */
+const GROUP_HOLD_MS = 3000
 const EDGE = 48
 const MAX_SCROLL_SPEED = 14
 const DEFAULT_MINUTES = 60
@@ -116,13 +120,24 @@ export function groupMoves(
   ]
 }
 
-export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onDrop, onActivate, onCancel }: Options) {
+export function useGridDrag({
+  scrollRef,
+  from,
+  to,
+  ppm,
+  stickyTop,
+  validate,
+  onDrop,
+  onActivate,
+  onCancel,
+  onHold,
+}: Options) {
   const [drag, setDrag] = useState<DragState | null>(null)
 
   // 이벤트 리스너 안에서 최신 값을 쓰기 위해 ref 에 보관
-  const opts = useRef({ from, to, ppm, stickyTop, validate, onDrop, onActivate, onCancel })
+  const opts = useRef({ from, to, ppm, stickyTop, validate, onDrop, onActivate, onCancel, onHold })
   useEffect(() => {
-    opts.current = { from, to, ppm, stickyTop, validate, onDrop, onActivate, onCancel }
+    opts.current = { from, to, ppm, stickyTop, validate, onDrop, onActivate, onCancel, onHold }
   })
 
   const session = useRef<{
@@ -138,6 +153,8 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
     active: boolean
     holdTimer: number | null
     raf: number | null
+    /** 터치로 3초 꾹 누르면 묶음 고르기 (명세 10.5) */
+    groupTimer: number | null
     state: DragState | null
     cleanup: () => void
   } | null>(null)
@@ -299,6 +316,11 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
         s.lastX = ev.clientX
         s.lastY = ev.clientY
         const dist = Math.hypot(ev.clientX - s.startX, ev.clientY - s.startY)
+        // 손가락이 움직이면 "3초 꾹 = 묶음 고르기" 는 취소 (보통 드래그로 계속)
+        if (s.groupTimer && dist > TOUCH_SLOP) {
+          window.clearTimeout(s.groupTimer)
+          s.groupTimer = null
+        }
         if (!s.active) {
           if (s.touch) {
             if (dist > TOUCH_SLOP) finish(false) // 길게 누르기 전에 움직임 → 스크롤로 보고 포기
@@ -347,11 +369,28 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
         grab,
         active: false,
         holdTimer: touch ? window.setTimeout(activate, TOUCH_HOLD_MS) : null,
+        // 터치로 Task 를 움직이지 않고 3초 꾹 누르면 → 드래그를 접고 묶음 고르기로 (Shift+클릭과 같은 묶음)
+        groupTimer:
+          touch && source.kind === 'task' && mode === 'move' && opts.current.onHold
+            ? window.setTimeout(() => {
+                const s = session.current
+                if (!s) return
+                s.cleanup()
+                session.current = null
+                setDrag(null)
+                // 손을 뗄 때 생기는 click 이 상세 창 · 묶음 토글로 이어지지 않게 한 번 막아요
+                suppressClick.current = true
+                window.setTimeout(() => (suppressClick.current = false), 400)
+                if (navigator.vibrate) navigator.vibrate(20)
+                opts.current.onHold?.(source)
+              }, GROUP_HOLD_MS)
+            : null,
         raf: null,
         state: null,
         cleanup: () => {
           const s = session.current
           if (s?.holdTimer) window.clearTimeout(s.holdTimer)
+          if (s?.groupTimer) window.clearTimeout(s.groupTimer)
           if (s?.raf) window.cancelAnimationFrame(s.raf)
           window.removeEventListener('pointermove', onMove)
           window.removeEventListener('pointerup', onUp)

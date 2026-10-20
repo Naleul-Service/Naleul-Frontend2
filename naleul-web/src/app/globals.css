@@ -16,7 +16,7 @@
   --color-ink-2: #6b7685;
   --color-ink-3: #98a2b0;
   --color-ink-4: #c3cad3;
-  --color-canvas: #f8fafc;
+  --color-canvas: #ffffff; /* 명세 10.4 — 페이지 바탕 흰색 */
   --color-surface: #ffffff;
   --color-subtle: #f1f4f8;
   --color-line: #e7ecf2;
@@ -47,7 +47,7 @@
   --color-heat-5: #0b5d77;
 
   /* ── 새 시맨틱 토큰 (Figma Component_ver.2 · Semantic Color) ── */
-  --color-bg-canvas: #f8fafc;
+  --color-bg-canvas: #ffffff;
   --color-bg-surface: #ffffff;
   --color-bg-elevated: #ffffff;
   --color-bg-subtle: #f1f4f8;

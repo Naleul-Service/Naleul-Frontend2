@@ -97,6 +97,10 @@ interface Props {
   onUnscheduledMore?: (date: string, remaining: number) => void
   /** 습관 블록을 눌러 체크·해제할 때 (분석용) — habit.checked 는 누르기 전 상태 */
   onHabitToggle?: (habit: HabitBlock, date: string) => void
+  /** 터치: Task 를 3초 꾹 → 묶음에 넣기 (명세 10.5) */
+  onTaskHold?: (t: TimeBlockTask) => void
+  /** 터치: 묶음 고르는 중 빈 곳을 탭 → 묶음 풀기 */
+  onGroupClear?: () => void
 }
 
 /** 기상은 취침보다, 취침은 기상보다 30분 이상 떨어져야 해요 (같은 날 칸 기준) */
@@ -174,6 +178,8 @@ export function TimeGrid({
   planVsActual = false,
   onUnscheduledMore,
   onHabitToggle,
+  onTaskHold,
+  onGroupClear,
 }: Props) {
   const now = useNowKst()
   const from = startHour * 60
@@ -274,6 +280,7 @@ export function TimeGrid({
     },
     onActivate: onDragStart,
     onCancel: onDragCancel,
+    onHold: onTaskHold ? (source) => source.kind === 'task' && onTaskHold(source.task) : undefined,
   })
   const enabled = !!onDrop
 
@@ -339,7 +346,14 @@ export function TimeGrid({
   }
   // 블록이 없는 빈 곳을 누르면 그 시각(30분 단위)으로 실제 기록 열기 — 지난 시간만
   const clickEmpty = (date: string, e: MouseEvent<HTMLDivElement>) => {
-    if (!onEmptyClick || consumeClick() || e.target !== e.currentTarget) return
+    if (e.target !== e.currentTarget) return
+    // 터치로 묶음을 고르는 중이면 빈 곳 탭 = 묶음 풀기
+    const touch = 'pointerType' in e.nativeEvent && (e.nativeEvent as globalThis.PointerEvent).pointerType === 'touch'
+    if (touch && groupIds?.size && onGroupClear) {
+      onGroupClear()
+      return
+    }
+    if (!onEmptyClick || consumeClick()) return
     const rect = e.currentTarget.getBoundingClientRect()
     const minutes = Math.floor((from + (e.clientY - rect.top) / PPM) / 30) * 30
     // 자정 뒤 칸(24:00~)은 다음 날 시각
@@ -570,7 +584,8 @@ export function TimeGrid({
                 )}
               >
                 {tasks.map((p) => {
-                  const grouped = !!groupIds && groupIds.size > 1 && groupIds.has(p.item.taskId)
+                  // 묶음 고르는 중이면 1개부터 점선 테두리 (터치 3초 꾹 · Shift+클릭 같은 모양)
+                  const grouped = !!groupIds && groupIds.size > 0 && groupIds.has(p.item.taskId)
                   // 묶음에 든 Task 를 옮기면(크기 조절 말고) 같은 날의 나머지 묶음도 같이 움직여요
                   const group: GroupMember[] = grouped
                     ? tasks

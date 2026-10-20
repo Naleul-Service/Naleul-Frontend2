@@ -31,7 +31,7 @@ function SummaryRow({ label, value, onClick }: { label: string; value: string | 
     <button
       type="button"
       onClick={onClick}
-      className="hover:bg-canvas group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors"
+      className="hover:bg-bg-sunken group flex w-full items-center gap-4 px-5 py-4 text-left transition-colors"
     >
       <span className="text-ink-3 w-16 shrink-0 text-[13px]">{label}</span>
       <span className={cn('min-w-0 flex-1 text-[15px] leading-relaxed', value ? 'font-semibold' : 'text-ink-4')}>

@@ -34,7 +34,7 @@ export function Chip({
         variant === 'day'
           ? selected
             ? 'bg-action-primary-bg text-action-primary-fg border border-transparent'
-            : 'bg-bg-canvas text-text-secondary hover:text-text-primary border-border-subtle border'
+            : 'bg-bg-sunken text-text-secondary hover:text-text-primary border-border-subtle border'
           : selected
             ? 'bg-ai-tint-soft text-text-brand border-[1.5px] border-text-brand'
             : 'border-border-subtle bg-bg-surface text-text-primary hover:bg-bg-sunken border',

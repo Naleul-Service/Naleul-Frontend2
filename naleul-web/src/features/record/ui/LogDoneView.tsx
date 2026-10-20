@@ -245,7 +245,7 @@ export function LogDoneView({ goals, surface = 'page' }: { goals: GoalCategory[]
                   value={r.title}
                   onChange={(e) => update(r.clientKey, { title: e.target.value.slice(0, 60) })}
                   aria-label="제목"
-                  className="focus:bg-canvas h-9 min-w-0 flex-1 rounded-lg bg-transparent px-1 text-[15px] font-semibold outline-none"
+                  className="focus:bg-bg-sunken h-9 min-w-0 flex-1 rounded-lg bg-transparent px-1 text-[15px] font-semibold outline-none"
                 />
                 <button
                   type="button"

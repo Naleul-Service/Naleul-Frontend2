@@ -166,7 +166,7 @@ export function InterviewChatView({ initial, onResync }: Props) {
           {pending && <TypingIndicator />}
 
           {rejectedMessage && (
-            <div className="border-line bg-canvas mt-2 rounded-2xl border p-5">
+            <div className="border-line bg-bg-sunken mt-2 rounded-2xl border p-5">
               <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{rejectedMessage}</p>
               <Button
                 className="mt-4"

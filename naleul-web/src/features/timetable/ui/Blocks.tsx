@@ -170,7 +170,7 @@ export function TaskBlock({
         faded && 'opacity-50 saturate-[.8]',
         focused && 'shadow-primary z-[12]',
         selected && 'ring-ink ring-2 ring-offset-1',
-        grouped && 'outline-brand z-[11] outline-2 outline-offset-1 outline-dashed',
+        grouped && 'outline-action-primary-bg z-[11] outline-[1.5px] outline-offset-1 outline-dashed',
         placed.clippedTop && 'rounded-t-none',
         placed.clippedBottom && 'rounded-b-none'
       )}
