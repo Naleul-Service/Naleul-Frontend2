@@ -1,3 +1,4 @@
+import type { PointerEvent } from 'react'
 import { JAVA_DAYS } from '@/features/goal/format'
 import { DAY_SHORT } from '@/features/pattern/format'
 import { NotEnough, Section } from '@/features/pattern/ui/Section'
@@ -8,11 +9,17 @@ import { BAND_LABEL, BAND_RANGE, BANDS, LEVEL_BG, levelOf, shortDuration } from 
 export function RecordWhenCard({
   when,
   wide = false,
+  onCellHover,
 }: {
   when: RecordPattern['when']
   /** 한 줄을 혼자 쓸 때(루틴 카드가 없을 때): 넓은 화면에서 표와 강조 박스를 옆으로 나란히 */
   wide?: boolean
+  /** 마우스를 칸에 올려 말풍선을 볼 때 (분석용) */
+  onCellHover?: () => void
 }) {
+  const hover = (e: PointerEvent) => {
+    if (e.pointerType === 'mouse') onCellHover?.()
+  }
   const total = when.bands.reduce((n, b) => n + b.count, 0)
   const cell = new Map(when.cells.map((c) => [`${c.dayOfWeek}-${c.band}`, c]))
   const max = Math.max(0, ...when.cells.map((c) => c.count))
@@ -49,6 +56,7 @@ export function RecordWhenCard({
                     return (
                       <td
                         key={b}
+                        onPointerEnter={hover}
                         title={`${DAY_SHORT[d]} ${BAND_LABEL[b]} · ${c?.count ? `Task ${c.count}개${c.minutes ? ` · ${shortDuration(c.minutes)}` : ''}` : '완료 없음'}`}
                         className={
                           level

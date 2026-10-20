@@ -20,6 +20,7 @@ import { HOME_EVENTS, type HomeEventName } from './homeEvents'
 import { COMMON_EVENTS, type CommonEventName } from './commonEvents'
 import type { GoalCreationEventName } from './goalCreationEvents'
 import type { GoalDetailEventName } from './goalDetailEvents'
+import type { WorkGoalEventName } from './workGoalEvents'
 
 /** 화면별 이벤트 이름 모음 (홈은 개수가 많아 homeEvents.ts 로 나눴어요) */
 export { HOME_EVENTS, COMMON_EVENTS }
@@ -49,7 +50,12 @@ export const EVENTS = {
 } as const
 
 export type AnalyticsEventName =
-  (typeof EVENTS)[keyof typeof EVENTS] | HomeEventName | CommonEventName | GoalCreationEventName | GoalDetailEventName
+  | (typeof EVENTS)[keyof typeof EVENTS]
+  | HomeEventName
+  | CommonEventName
+  | GoalCreationEventName
+  | GoalDetailEventName
+  | WorkGoalEventName
 
 /** event property. Tracking Plan 의 varchar → string, int → number, boolean → boolean */
 export type EventProps = Record<string, string | number | boolean | null | undefined>

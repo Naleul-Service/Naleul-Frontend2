@@ -1,12 +1,14 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Copy, PenLine, Repeat, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Spinner } from '@/components/ui/Spinner'
 import { toast } from '@/stores/toastStore'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { addDays, formatDuration, formatMonthDay, startOfWeek, todayKst } from '@/features/timetable/time'
 import { useDeleteRecord, useRecordJournal, type JournalDay, type JournalItem } from '../api'
 import { journalText } from '../journalText'
@@ -17,12 +19,18 @@ function dayLabel(ymd: string, today: string) {
   return formatMonthDay(ymd)
 }
 
+/** 오늘부터 며칠 전 날짜인지 (오늘 0) */
+const daysAgoOf = (ymd: string, today: string) => Math.round((Date.parse(today) - Date.parse(ymd)) / 86_400_000)
+
+/** 복사하고 성공 여부를 돌려줘요 */
 async function copy(text: string) {
   try {
     await navigator.clipboard.writeText(text)
     toast.success('복사했어요. 원하는 곳에 붙여 넣으세요.')
+    return true
   } catch {
     toast.error('복사하지 못했어요. 다시 시도해 주세요.')
+    return false
   }
 }
 
@@ -33,19 +41,94 @@ async function copy(text: string) {
  */
 export function RecordJournal({ goalId, goalName }: { goalId: number; goalName: string }) {
   const today = todayKst()
-  const { data, isPending, isError, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } = useRecordJournal(goalId)
+  const { data, isPending, isError, error, refetch, hasNextPage, fetchNextPage, isFetchingNextPage } =
+    useRecordJournal(goalId)
   const days = useMemo(() => data?.pages.flatMap((p) => p.days) ?? [], [data])
   const del = useDeleteRecord()
-  const [pending, setPending] = useState<JournalItem | null>(null)
+  const [pending, setPending] = useState<{ item: JournalItem; daysAgo: number } | null>(null)
+
+  // '일지를 불러오지 못했어요'가 보일 때 (실패할 때마다 1회)
+  const failSent = useRef(false)
+  useEffect(() => {
+    if (!isError) {
+      failSent.current = false
+      return
+    }
+    if (failSent.current) return
+    failSent.current = true
+    track('work_journal.load_fail', { goal_category_id: goalId, error_status: errorStatusOf(error) })
+  }, [isError, error, goalId])
+
+  // '아직 일지가 없어요' / '최근 2주에는 일지가 없어요'가 보일 때 (보일 때마다 1회)
+  const isEmpty = !isPending && !isError && days.length === 0
+  const hasOlder = !!hasNextPage
+  const emptySent = useRef(false)
+  useEffect(() => {
+    if (!isEmpty) {
+      emptySent.current = false
+      return
+    }
+    if (emptySent.current) return
+    emptySent.current = true
+    track('work_journal.empty_view', { goal_category_id: goalId, has_older: hasOlder })
+  }, [isEmpty, hasOlder, goalId])
+
+  const copyAndTrack = async (target: 'week' | 'day', text: string) => {
+    const ok = await copy(text)
+    track('work_journal.copy_result', {
+      goal_category_id: goalId,
+      copy_target: target,
+      result: ok ? 'success' : 'fail',
+    })
+  }
 
   const copyWeek = () => {
     const weekStart = startOfWeek(today)
     const week = days.filter((d) => d.date >= weekStart)
+    track('work_journal.copy_week_click', {
+      goal_category_id: goalId,
+      day_count: week.length,
+      item_count: week.reduce((n, d) => n + d.items.length, 0),
+      was_empty: week.length === 0,
+    })
     if (!week.length) {
       toast.show('이번 주 일지가 아직 없어요.')
       return
     }
-    copy(journalText(`${goalName} · 업무 일지 · ${formatMonthDay(weekStart)} – ${formatMonthDay(today)}`, week))
+    copyAndTrack(
+      'week',
+      journalText(`${goalName} · 업무 일지 · ${formatMonthDay(weekStart)} – ${formatMonthDay(today)}`, week)
+    )
+  }
+
+  const copyDay = (day: JournalDay) => {
+    track('work_journal.copy_day_click', {
+      goal_category_id: goalId,
+      days_ago: daysAgoOf(day.date, today),
+      item_count: day.items.length,
+    })
+    copyAndTrack('day', journalText(`${goalName} · 업무 일지`, [day]))
+  }
+
+  const askDelete = (item: JournalItem, date: string) => {
+    const daysAgo = daysAgoOf(date, today)
+    track('work_journal.record_delete_click', { goal_category_id: goalId, days_ago: daysAgo })
+    setPending({ item, daysAgo })
+  }
+
+  const confirmDelete = () => {
+    if (!pending) return
+    track('work_journal.record_delete_confirm', { goal_category_id: goalId, days_ago: pending.daysAgo })
+    del.mutate(pending.item.id, {
+      onSuccess: () => track('work_journal.record_delete_result', { goal_category_id: goalId, result: 'success' }),
+      onError: (e) =>
+        track('work_journal.record_delete_result', {
+          goal_category_id: goalId,
+          result: 'fail',
+          error_status: errorStatusOf(e),
+        }),
+      onSettled: () => setPending(null),
+    })
   }
 
   return (
@@ -73,7 +156,14 @@ export function RecordJournal({ goalId, goalName }: { goalId: number; goalName: 
       ) : isError ? (
         <div className="bg-canvas flex items-center justify-between gap-3 rounded-2xl px-4 py-4 text-sm">
           <span className="text-ink-2">일지를 불러오지 못했어요.</span>
-          <Button variant="secondary" size="sm" onClick={() => refetch()}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              track('work_journal.retry_click', { goal_category_id: goalId })
+              refetch()
+            }}
+          >
             다시 시도
           </Button>
         </div>
@@ -86,13 +176,28 @@ export function RecordJournal({ goalId, goalName }: { goalId: number; goalName: 
       ) : (
         <div className="space-y-5">
           {days.map((d) => (
-            <JournalDaySection key={d.date} day={d} today={today} goalName={goalName} onDelete={setPending} />
+            <JournalDaySection
+              key={d.date}
+              day={d}
+              today={today}
+              onCopy={() => copyDay(d)}
+              onDelete={(item) => askDelete(item, d.date)}
+            />
           ))}
         </div>
       )}
 
       {hasNextPage && (
-        <Button variant="ghost" fullWidth className="mt-4" loading={isFetchingNextPage} onClick={() => fetchNextPage()}>
+        <Button
+          variant="ghost"
+          fullWidth
+          className="mt-4"
+          loading={isFetchingNextPage}
+          onClick={() => {
+            track('work_journal.load_more_click', { goal_category_id: goalId, day_count: days.length })
+            fetchNextPage()
+          }}
+        >
           이전 2주 더 보기
         </Button>
       )}
@@ -101,11 +206,14 @@ export function RecordJournal({ goalId, goalName }: { goalId: number; goalName: 
         open={!!pending}
         tone="danger"
         title="이 기록을 지울까요?"
-        description={pending ? `"${pending.title}" 기록이 사라져요.` : undefined}
+        description={pending ? `"${pending.item.title}" 기록이 사라져요.` : undefined}
         confirmLabel="지우기"
         loading={del.isPending}
-        onConfirm={() => pending && del.mutate(pending.id, { onSettled: () => setPending(null) })}
-        onCancel={() => setPending(null)}
+        onConfirm={confirmDelete}
+        onCancel={(method) => {
+          track('work_journal.record_delete_cancel', { goal_category_id: goalId, close_method: method })
+          setPending(null)
+        }}
       />
     </Card>
   )
@@ -114,12 +222,12 @@ export function RecordJournal({ goalId, goalName }: { goalId: number; goalName: 
 function JournalDaySection({
   day,
   today,
-  goalName,
+  onCopy,
   onDelete,
 }: {
   day: JournalDay
   today: string
-  goalName: string
+  onCopy: () => void
   onDelete: (item: JournalItem) => void
 }) {
   const summary = [
@@ -138,7 +246,7 @@ function JournalDaySection({
           <span className="text-ink-3 text-xs tabular-nums">{summary}</span>
           <button
             type="button"
-            onClick={() => copy(journalText(`${goalName} · 업무 일지`, [day]))}
+            onClick={onCopy}
             aria-label={`${formatMonthDay(day.date)} 일지 복사`}
             title="이 날 일지 복사"
             className="text-ink-4 hover:bg-subtle hover:text-ink rounded-lg p-1.5"

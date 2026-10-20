@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Copy, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { toast } from '@/stores/toastStore'
 import { useWorkShareText, type ShareScope } from '../api'
 
@@ -24,27 +26,67 @@ export function WorkShareModal({ goalId, open, onClose }: { goalId: number; open
   const { data, isFetching, isError, error } = useWorkShareText(goalId, scope, open)
   const text = data?.text ?? ''
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+  // 이번에 연 창에서 복사·공유를 했는지 (work_share.close 의 copied)
+  const copiedRef = useRef(false)
+
+  // 창 안에 빨간 오류 문구가 보일 때 (실패할 때마다 1회)
+  const failSent = useRef(false)
+  useEffect(() => {
+    if (!open || !isError) {
+      failSent.current = false
+      return
+    }
+    if (failSent.current) return
+    failSent.current = true
+    track('work_share.text_load_fail', {
+      goal_category_id: goalId,
+      share_scope: scope,
+      error_status: errorStatusOf(error),
+    })
+  }, [open, isError, error, goalId, scope])
+
+  const sendShareResult = (target: 'share_copy' | 'share_native', result: 'success' | 'fail' | 'cancel') =>
+    track('work_share.share_result', { goal_category_id: goalId, copy_target: target, share_scope: scope, result })
+
+  const selectScope = (next: ShareScope) => {
+    if (next !== scope) track('work_share.scope_select', { goal_category_id: goalId, share_scope: next })
+    setScope(next)
+  }
+
+  const close = (method: ModalCloseMethod) => {
+    track('work_share.close', { goal_category_id: goalId, close_method: method, copied: copiedRef.current })
+    copiedRef.current = false
+    onClose()
+  }
 
   const copy = async () => {
+    track('work_share.copy_click', { goal_category_id: goalId, share_scope: scope, text_length: text.length })
+    copiedRef.current = true
     try {
       await navigator.clipboard.writeText(text)
       toast.success('복사했어요. 원하는 곳에 붙여 넣어 주세요.')
+      sendShareResult('share_copy', 'success')
     } catch {
       toast.error('복사하지 못했어요. 글을 길게 눌러 직접 복사해 주세요.')
+      sendShareResult('share_copy', 'fail')
     }
   }
   const share = async () => {
+    track('work_share.native_share_click', { goal_category_id: goalId, share_scope: scope, text_length: text.length })
+    copiedRef.current = true
     try {
       await navigator.share({ text })
-    } catch {
-      // 사용자가 공유 창을 닫은 경우 — 아무것도 안 해요
+      sendShareResult('share_native', 'success')
+    } catch (e) {
+      // 사용자가 공유 창을 닫은 경우(AbortError) — 화면엔 아무것도 안 해요
+      sendShareResult('share_native', e instanceof DOMException && e.name === 'AbortError' ? 'cancel' : 'fail')
     }
   }
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
       title="Task 공유하기"
       description="팀 채팅방에 붙여 넣기 좋게 정리했어요."
       size="lg"
@@ -71,7 +113,7 @@ export function WorkShareModal({ goalId, open, onClose }: { goalId: number; open
             role="radio"
             aria-checked={scope === s.value}
             title={s.hint}
-            onClick={() => setScope(s.value)}
+            onClick={() => selectScope(s.value)}
             className={cn(
               'h-8 rounded-lg px-3 text-[13px] font-semibold transition-colors',
               scope === s.value ? 'bg-surface text-ink shadow-sm' : 'text-ink-3 hover:text-ink-2'

@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, type KeyboardEvent } from 'react'
+import { useRef, useState, type KeyboardEvent } from 'react'
 import { Clock, CornerDownLeft, Timer } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { toast } from '@/stores/toastStore'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { parseLine } from '@/features/brain-dump/parseLine'
 import { formatDuration, todayKst } from '@/features/timetable/time'
 import type { GoalCategory } from '@/features/goal/api'
@@ -25,34 +27,52 @@ export function RecordQuickLog({ goal, bare = false }: { goal: GoalCategory; bar
   const log = useLogActivities()
   const value = text.trim()
   const preview = value ? parseLine(value, todayKst()) : null
+  // 예시 칩으로 채운 글 — 그대로 보냈는지 (분석용 name_from_example)
+  const fromExample = useRef<string | null>(null)
+  const goalId = goal.goalCategoryId
 
-  const submit = () => {
+  const submit = (method: 'button' | 'enter') => {
     if (!value || log.isPending) return
-    log.mutate(
-      {
+    track('work_compose.log_submit', {
+      goal_category_id: goalId,
+      text_length: value.length,
+      has_parsed_time: !!preview?.startTime,
+      has_parsed_duration: !!preview?.minutes,
+      name_from_example: fromExample.current === value,
+      submit_method: method,
+    })
+    log
+      .mutateAsync({
         items: [
           {
             clientKey: newClientKey(),
             text: value,
-            goalCategoryId: goal.goalCategoryId,
+            goalCategoryId: goalId,
           },
         ],
-      },
-      {
-        onSuccess: (res) => {
+      })
+      .then(
+        (res) => {
+          track('work_compose.log_result', { goal_category_id: goalId, result: 'success' })
           setText('')
+          fromExample.current = null
           const a = res.activities[0]
           // 서버가 정한 시간을 알려줘야 "시간 없이 적으면 어떻게 되지?"가 풀려요
           if (a) toast.success(`기록했어요 · ${a.startAt.slice(11, 16)}–${a.endAt.slice(11, 16)}`)
         },
-      }
-    )
+        (e: unknown) =>
+          track('work_compose.log_result', {
+            goal_category_id: goalId,
+            result: 'fail',
+            error_status: errorStatusOf(e) ?? 0,
+          })
+      )
   }
 
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      submit()
+      submit('enter')
     }
   }
 
@@ -76,7 +96,7 @@ export function RecordQuickLog({ goal, bare = false }: { goal: GoalCategory; bar
           className="placeholder:text-ink-4 h-9 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
           disabled={log.isPending}
         />
-        <Button size="sm" onClick={submit} loading={log.isPending} disabled={!value}>
+        <Button size="sm" onClick={() => submit('button')} loading={log.isPending} disabled={!value}>
           <CornerDownLeft className="size-3.5" />
           기록
         </Button>
@@ -102,11 +122,15 @@ export function RecordQuickLog({ goal, bare = false }: { goal: GoalCategory; bar
           </>
         ) : (
           !value &&
-          EXAMPLES.map((ex) => (
+          EXAMPLES.map((ex, i) => (
             <button
               key={ex}
               type="button"
-              onClick={() => setText(ex)}
+              onClick={() => {
+                track('work_compose.log_example_click', { goal_category_id: goalId, example_index: i })
+                fromExample.current = ex
+                setText(ex)
+              }}
               className="border-line text-ink-3 hover:border-line-strong hover:text-ink-2 h-6 rounded-full border px-2"
             >
               {ex}

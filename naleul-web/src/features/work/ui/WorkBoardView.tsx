@@ -1,6 +1,15 @@
 'use client'
 
-import { Fragment, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type RefObject } from 'react'
+import {
+  Fragment,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type KeyboardEvent,
+  type RefObject,
+} from 'react'
 import {
   AlertTriangle,
   Check,
@@ -23,10 +32,12 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import type { GoalCategory } from '@/features/goal/api'
 import { inlineInput } from '@/features/goal/edit/inline'
 import { Section } from '@/features/goal/ui/sections'
-import { GoalNotes } from '@/features/goal/ui/GoalHeader'
+import { GoalNotes, routineCountOf } from '@/features/goal/ui/GoalHeader'
 import { RoutinesSection } from '@/features/goal/ui/RoutinesSection'
 import { RecordJournal } from '@/features/record/ui/RecordJournal'
 import { RecordQuickLog } from '@/features/record/ui/RecordQuickLog'
@@ -47,7 +58,7 @@ import {
   type WorkTask,
   type WorkTopic,
 } from '../api'
-import { COLUMN_LABEL, dayLabel, dueLabel, fullDate, goalDDay } from '../format'
+import { COLUMN_LABEL, dayLabel, daysAgo, dueLabel, fullDate, goalDDay } from '../format'
 import { WorkShareModal } from './WorkShareModal'
 import { WorkTaskModal } from './WorkTaskModal'
 
@@ -56,6 +67,45 @@ type TopicFilter = 'ALL' | 'NONE' | number
 
 const matchTopic = (t: WorkTask, f: TopicFilter) =>
   f === 'ALL' ? true : f === 'NONE' ? t.topicId === null : t.topicId === f
+
+// ─── 분석 (Tracking Plan 「업무형 목표」) ───────────────────────────
+
+/** 같은 부품이 쓰인 화면 — 로드맵 · 보드 */
+type Surface = 'roadmap' | 'board'
+type MoveMethod = 'check' | 'drag' | 'next_button'
+type TopicAction = 'create' | 'update' | 'delete' | 'complete' | 'reopen'
+type PillKind = 'remaining' | 'in_progress' | 'pace' | 'overdue_topic' | 'overdue_task' | 'due_this_week'
+/** 보드 필터를 바꾼 곳 — 보드 위 주제 칩 · 로드맵 주제 이름 · 새 주제를 만든 직후 */
+type FilterEntry = 'topic_chip' | 'roadmap_topic' | 'topic_created'
+
+/** 실패한 요청의 HTTP 상태코드 (네트워크 끊김 0) */
+const failStatus = (e: unknown) => errorStatusOf(e) ?? 0
+
+const filterKind = (f: TopicFilter) => (f === 'ALL' ? 'ALL' : f === 'NONE' ? 'NONE' : 'TOPIC')
+
+/** 주제 요청이 끝나면 work_roadmap.topic_result — 성공했는지 돌려줘요 */
+const trackTopicResult = (goalId: number, topicId: number | null, action: TopicAction, req: Promise<unknown>) =>
+  req.then(
+    () => {
+      track('work_roadmap.topic_result', {
+        goal_category_id: goalId,
+        topic_id: topicId,
+        topic_action: action,
+        result: 'success',
+      })
+      return true
+    },
+    (e: unknown) => {
+      track('work_roadmap.topic_result', {
+        goal_category_id: goalId,
+        topic_id: topicId,
+        topic_action: action,
+        result: 'fail',
+        error_status: failStatus(e),
+      })
+      return false
+    }
+  )
 
 // ─── 1. 다음 마감 · 진행 요약 ────────────────────────────────────
 
@@ -91,7 +141,16 @@ function topicDueLabel(dDay: number | null) {
 const shortDate = (ymd: string) =>
   `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}(${WEEKDAY_LABEL[weekdayIndex(ymd)]})`
 
-function SummaryHero({ board, onShare }: { board: WorkBoard; onShare: () => void }) {
+function SummaryHero({
+  board,
+  onShare,
+  onPill,
+}: {
+  board: WorkBoard
+  onShare: () => void
+  /** 알약은 눌러도 아무 일이 없어요 — 눌러 보는지만 남겨요 */
+  onPill: (kind: PillKind) => void
+}) {
   const s = board.summary
   const next = s.nextTopic
   const overdueTopics = board.timeline.filter((t) => t.status === 'OVERDUE').length
@@ -165,24 +224,45 @@ function SummaryHero({ board, onShare }: { board: WorkBoard; onShare: () => void
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2 text-[13px]">
-        <Pill>남은 Task {s.remaining}개</Pill>
-        {s.inProgress > 0 && <Pill>진행 중 {s.inProgress}개</Pill>}
+        <Pill onClick={() => onPill('remaining')}>남은 Task {s.remaining}개</Pill>
+        {s.inProgress > 0 && <Pill onClick={() => onPill('in_progress')}>진행 중 {s.inProgress}개</Pill>}
         {next?.remainingPerDay != null && next.remainingPerDay > 0 && next.dDay! >= 0 && (
-          <Pill>
+          <Pill onClick={() => onPill('pace')}>
             {next.name} 마감까지 {paceLabel(next.remainingPerDay)}
           </Pill>
         )}
-        {overdueTopics > 0 && <Pill tone="danger">마감 지난 주제 {overdueTopics}개</Pill>}
-        {s.overdue > 0 && <Pill tone="danger">마감 지난 Task {s.overdue}개</Pill>}
-        {s.dueThisWeek > 0 && <Pill tone="warning">이번 주 마감 {s.dueThisWeek}개</Pill>}
+        {overdueTopics > 0 && (
+          <Pill tone="danger" onClick={() => onPill('overdue_topic')}>
+            마감 지난 주제 {overdueTopics}개
+          </Pill>
+        )}
+        {s.overdue > 0 && (
+          <Pill tone="danger" onClick={() => onPill('overdue_task')}>
+            마감 지난 Task {s.overdue}개
+          </Pill>
+        )}
+        {s.dueThisWeek > 0 && (
+          <Pill tone="warning" onClick={() => onPill('due_this_week')}>
+            이번 주 마감 {s.dueThisWeek}개
+          </Pill>
+        )}
       </div>
     </section>
   )
 }
 
-function Pill({ children, tone }: { children: React.ReactNode; tone?: 'danger' | 'warning' }) {
+function Pill({
+  children,
+  tone,
+  onClick,
+}: {
+  children: React.ReactNode
+  tone?: 'danger' | 'warning'
+  onClick?: () => void
+}) {
   return (
     <span
+      onClick={onClick}
       className={cn(
         'rounded-full px-3 py-1 font-semibold',
         tone === 'danger'
@@ -207,19 +287,47 @@ const NODE_CLASS: Record<TopicStatus, string> = {
   NO_DUE: 'border-line-strong border-dashed bg-surface text-transparent',
 }
 
-function TopicEditor({ goalId, topic, onDone }: { goalId: number; topic: WorkTopic; onDone: () => void }) {
+function TopicEditor({
+  goalId,
+  topic,
+  onDone,
+  onCancel,
+}: {
+  goalId: number
+  topic: WorkTopic
+  onDone: () => void
+  onCancel: (method: 'esc' | 'cancel_button') => void
+}) {
   const update = useUpdateWorkTopic(goalId)
   const remove = useDeleteWorkTopic(goalId)
   const [name, setName] = useState(topic.name)
   const [due, setDue] = useState(topic.dueDate ?? '')
+  // Enter 로 저장했는지 (keydown 에서 켜고 submit 에서 읽어요)
+  const enterRef = useRef(false)
   const id = topic.topicId!
   const save = () => {
+    const method = enterRef.current ? 'enter' : 'button'
+    enterRef.current = false
     const v = name.trim()
     if (!v) return
-    update.mutate(
-      { topicId: id, name: v, ...(due ? { dueDate: due } : topic.dueDate ? { clearDueDate: true } : {}) },
-      { onSuccess: onDone }
-    )
+    const changed = [v !== topic.name && 'name', (due || null) !== topic.dueDate && 'due_date'].filter(Boolean)
+    track('work_roadmap.topic_edit_save', {
+      goal_category_id: goalId,
+      topic_id: id,
+      has_due_date: !!due,
+      changed_fields: changed.join(','),
+      submit_method: method,
+    })
+    trackTopicResult(
+      goalId,
+      id,
+      'update',
+      update.mutateAsync({
+        topicId: id,
+        name: v,
+        ...(due ? { dueDate: due } : topic.dueDate ? { clearDueDate: true } : {}),
+      })
+    ).then((ok) => ok && onDone())
   }
   return (
     <form
@@ -227,7 +335,12 @@ function TopicEditor({ goalId, topic, onDone }: { goalId: number; topic: WorkTop
         e.preventDefault()
         save()
       }}
-      onKeyDown={(e) => e.key === 'Escape' && onDone()}
+      onPointerDown={() => (enterRef.current = false)}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onCancel('esc')
+        else if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.target instanceof HTMLInputElement)
+          enterRef.current = true
+      }}
       className="border-line bg-subtle/60 mt-2 space-y-2 rounded-xl border p-3"
     >
       <input
@@ -259,13 +372,25 @@ function TopicEditor({ goalId, topic, onDone }: { goalId: number; topic: WorkTop
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => remove.mutate(id, { onSuccess: onDone })}
+          onClick={() => {
+            track('work_roadmap.topic_delete_click', {
+              goal_category_id: goalId,
+              topic_id: id,
+              topic_task_count: topic.remaining,
+              has_due_date: !!topic.dueDate,
+            })
+            trackTopicResult(goalId, id, 'delete', remove.mutateAsync(id)).then((ok) => ok && onDone())
+          }}
           className="text-ink-3 hover:text-danger flex items-center gap-0.5 text-[12px] font-semibold"
         >
           <Trash2 className="size-3" />
           주제 지우기
         </button>
-        <button type="button" onClick={onDone} className="text-ink-3 hover:text-ink ml-auto text-[12px] font-semibold">
+        <button
+          type="button"
+          onClick={() => onCancel('cancel_button')}
+          className="text-ink-3 hover:text-ink ml-auto text-[12px] font-semibold"
+        >
           취소
         </button>
         <Button size="sm" type="submit" loading={update.isPending} disabled={!name.trim()}>
@@ -307,6 +432,8 @@ function RoadmapTask({
 
 /** 주제에 딸린 할 일 — 남은 일은 펼치고, 끝낸 일은 접어 둬요 */
 function TopicTasks({
+  goalId,
+  topicId,
   open,
   done,
   today,
@@ -315,6 +442,9 @@ function TopicTasks({
   onToggle,
   onAdd,
 }: {
+  goalId: number
+  /** null = 주제 없음 */
+  topicId: number | null
   open: WorkTask[]
   done: WorkTask[]
   today: string
@@ -344,7 +474,14 @@ function TopicTasks({
         ) : (
           <button
             type="button"
-            onClick={() => setShowOpen(true)}
+            onClick={() => {
+              track('work_roadmap.open_tasks_expand', {
+                goal_category_id: goalId,
+                topic_id: topicId,
+                item_count: open.length,
+              })
+              setShowOpen(true)
+            }}
             className="text-ink-3 hover:text-ink text-[12px] font-semibold"
           >
             남은 할 일 {open.length}개 보기
@@ -361,7 +498,15 @@ function TopicTasks({
         {done.length > 0 && (
           <button
             type="button"
-            onClick={() => setShowDone((v) => !v)}
+            onClick={() => {
+              track('work_roadmap.done_tasks_toggle', {
+                goal_category_id: goalId,
+                topic_id: topicId,
+                expanded: !showDone,
+                item_count: done.length,
+              })
+              setShowDone(!showDone)
+            }}
             aria-expanded={showDone}
             className="text-success flex items-center gap-0.5 text-[12px] font-semibold"
           >
@@ -402,31 +547,65 @@ function RoadmapItem({
   const autoDone = done && !t.completed
   const due = done ? null : topicDueLabel(t.dDay)
 
+  const toggleDone = () => {
+    const checked = !t.completed
+    track('work_roadmap.topic_complete_toggle', {
+      goal_category_id: goalId,
+      topic_id: t.topicId,
+      checked,
+      topic_task_count: t.remaining,
+      d_day: t.dDay,
+    })
+    trackTopicResult(
+      goalId,
+      t.topicId,
+      checked ? 'complete' : 'reopen',
+      update.mutateAsync({ topicId: t.topicId!, completed: checked })
+    )
+  }
+  const toggleEdit = () => {
+    if (editing)
+      track('work_roadmap.topic_edit_cancel', { goal_category_id: goalId, topic_id: t.topicId, close_method: 'toggle' })
+    else track('work_roadmap.topic_edit_open', { goal_category_id: goalId, topic_id: t.topicId })
+    setEditing(!editing)
+  }
+
   return (
     <li className="relative flex gap-3 pb-5">
       {/* 세로 선 */}
       <span aria-hidden className="bg-line absolute top-7 bottom-0 left-[13px] w-0.5" />
-      <button
-        type="button"
-        disabled={autoDone || update.isPending}
-        onClick={() => update.mutate({ topicId: t.topicId!, completed: !t.completed })}
-        aria-pressed={done}
-        aria-label={
-          autoDone ? `${t.name}: Task를 모두 끝냈어요` : `${t.name} ${t.completed ? '다시 열기' : '끝냈어요'}`
-        }
+      {/* 자동으로 끝난 주제의 점은 비활성 — 감싼 요소에서 누른 것만 남겨요 */}
+      <span
+        className="relative z-[1] flex shrink-0 self-start"
         title={autoDone ? 'Task를 모두 끝내서 끝난 주제예요' : t.completed ? '다시 열기' : '끝냈어요로 표시'}
-        className={cn(
-          'relative z-[1] grid size-7 shrink-0 place-items-center rounded-full border-2 transition-colors',
-          NODE_CLASS[t.status],
-          !done && 'hover:border-brand hover:text-brand/60'
-        )}
+        onPointerDown={
+          autoDone
+            ? () => track('work_roadmap.topic_locked_click', { goal_category_id: goalId, topic_id: t.topicId })
+            : undefined
+        }
       >
-        {t.status === 'OVERDUE' ? (
-          <AlertTriangle className="size-3.5" strokeWidth={2.5} />
-        ) : (
-          <Check className="size-3.5" strokeWidth={3} />
-        )}
-      </button>
+        <button
+          type="button"
+          disabled={autoDone || update.isPending}
+          onClick={toggleDone}
+          aria-pressed={done}
+          aria-label={
+            autoDone ? `${t.name}: Task를 모두 끝냈어요` : `${t.name} ${t.completed ? '다시 열기' : '끝냈어요'}`
+          }
+          className={cn(
+            'relative z-[1] grid size-7 shrink-0 place-items-center rounded-full border-2 transition-colors',
+            NODE_CLASS[t.status],
+            !done && 'hover:border-brand hover:text-brand/60',
+            autoDone && 'pointer-events-none'
+          )}
+        >
+          {t.status === 'OVERDUE' ? (
+            <AlertTriangle className="size-3.5" strokeWidth={2.5} />
+          ) : (
+            <Check className="size-3.5" strokeWidth={3} />
+          )}
+        </button>
+      </span>
 
       <div className="min-w-0 flex-1 pt-0.5">
         <div className="flex items-start gap-2">
@@ -445,7 +624,7 @@ function RoadmapItem({
           </button>
           <button
             type="button"
-            onClick={() => setEditing((v) => !v)}
+            onClick={toggleEdit}
             aria-label={`${t.name} 고치기`}
             className="text-ink-4 hover:text-ink shrink-0 p-0.5"
           >
@@ -487,7 +666,21 @@ function RoadmapItem({
             </span>
           </div>
         )}
-        {editing && <TopicEditor goalId={goalId} topic={t} onDone={() => setEditing(false)} />}
+        {editing && (
+          <TopicEditor
+            goalId={goalId}
+            topic={t}
+            onDone={() => setEditing(false)}
+            onCancel={(method) => {
+              track('work_roadmap.topic_edit_cancel', {
+                goal_category_id: goalId,
+                topic_id: t.topicId,
+                close_method: method,
+              })
+              setEditing(false)
+            }}
+          />
+        )}
         {children}
       </div>
     </li>
@@ -522,16 +715,29 @@ function TodayMarker() {
   )
 }
 
-function AddTopic({ goalId, onCreated }: { goalId: number; onCreated: (id: number) => void }) {
+function AddTopic({
+  goalId,
+  topicCount,
+  onCreated,
+}: {
+  goalId: number
+  topicCount: number
+  onCreated: (id: number) => void
+}) {
   const create = useCreateWorkTopic(goalId)
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [due, setDue] = useState('')
+  // Enter 로 만들었는지 (keydown 에서 켜고 submit 에서 읽어요)
+  const enterRef = useRef(false)
   if (!open) {
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          track('work_roadmap.add_topic_click', { goal_category_id: goalId, topic_count: topicCount })
+          setOpen(true)
+        }}
         className="text-ink-3 hover:text-ink border-line-strong mt-1 flex h-9 w-full items-center justify-center gap-1 rounded-xl border border-dashed text-[13px] font-semibold"
       >
         <Plus className="size-3.5" />
@@ -539,19 +745,41 @@ function AddTopic({ goalId, onCreated }: { goalId: number; onCreated: (id: numbe
       </button>
     )
   }
+  const cancel = (method: 'x_button' | 'esc') => {
+    track('work_roadmap.add_topic_cancel', { goal_category_id: goalId, close_method: method })
+    setOpen(false)
+  }
   const submit = () => {
+    const method = enterRef.current ? 'enter' : 'button'
+    enterRef.current = false
     const v = name.trim()
     if (!v) return
-    create.mutate(
-      { name: v, dueDate: due || null },
-      {
-        onSuccess: (t) => {
-          setName('')
-          setDue('')
-          setOpen(false)
-          onCreated(t.topicId)
-        },
-      }
+    track('work_roadmap.add_topic_submit', {
+      goal_category_id: goalId,
+      has_due_date: !!due,
+      topic_count: topicCount,
+      submit_method: method,
+    })
+    create.mutateAsync({ name: v, dueDate: due || null }).then(
+      (t) => {
+        track('work_roadmap.topic_result', {
+          goal_category_id: goalId,
+          topic_id: t.topicId,
+          topic_action: 'create',
+          result: 'success',
+        })
+        setName('')
+        setDue('')
+        setOpen(false)
+        onCreated(t.topicId)
+      },
+      (e: unknown) =>
+        track('work_roadmap.topic_result', {
+          goal_category_id: goalId,
+          topic_action: 'create',
+          result: 'fail',
+          error_status: failStatus(e),
+        })
     )
   }
   return (
@@ -560,7 +788,12 @@ function AddTopic({ goalId, onCreated }: { goalId: number; onCreated: (id: numbe
         e.preventDefault()
         submit()
       }}
-      onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+      onPointerDown={() => (enterRef.current = false)}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') cancel('esc')
+        else if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.target instanceof HTMLInputElement)
+          enterRef.current = true
+      }}
       className="border-brand/40 mt-1 space-y-2 rounded-xl border p-3"
     >
       <input
@@ -584,7 +817,7 @@ function AddTopic({ goalId, onCreated }: { goalId: number; onCreated: (id: numbe
         </label>
         <button
           type="button"
-          onClick={() => setOpen(false)}
+          onClick={() => cancel('x_button')}
           aria-label="취소"
           className="text-ink-3 hover:text-ink ml-auto p-1"
         >
@@ -614,7 +847,7 @@ function Roadmap({
   goalId: number
   board: WorkBoard
   filter: TopicFilter
-  onFilter: (f: TopicFilter) => void
+  onFilter: (f: TopicFilter, entry: FilterEntry) => void
   onOpen: (t: WorkTask) => void
   onToggle: (t: WorkTask) => void
   /** 이 주제(null = 주제 없음)에 할 일 적기 — 오른쪽 "적기" 패널로 */
@@ -653,9 +886,11 @@ function Roadmap({
                 goalId={goalId}
                 topic={t}
                 selected={filter === t.topicId}
-                onSelect={() => onFilter(filter === t.topicId ? 'ALL' : t.topicId!)}
+                onSelect={() => onFilter(filter === t.topicId ? 'ALL' : t.topicId!, 'roadmap_topic')}
               >
                 <TopicTasks
+                  goalId={goalId}
+                  topicId={t.topicId}
                   open={byTopic.open.get(t.topicId) ?? []}
                   done={byTopic.done.get(t.topicId) ?? []}
                   today={today}
@@ -671,6 +906,8 @@ function Roadmap({
           {noTopicOpen.length > 0 && (
             <NoTopicItem count={noTopicOpen.length}>
               <TopicTasks
+                goalId={goalId}
+                topicId={null}
                 open={noTopicOpen}
                 done={[]}
                 today={today}
@@ -692,7 +929,7 @@ function Roadmap({
         </ol>
       )}
       <div className="mt-4">
-        <AddTopic goalId={goalId} onCreated={(id) => onFilter(id)} />
+        <AddTopic goalId={goalId} topicCount={s.topicsTotal} onCreated={(id) => onFilter(id, 'topic_created')} />
       </div>
       {timeline.length > 0 && (
         <p className="text-ink-4 mt-2 text-[11px]">
@@ -776,17 +1013,58 @@ function TaskCompose({
   const realTopics = topics.filter((t) => t.topicId !== null)
 
   const day = when === 'TODAY' ? todayKst() : when === 'DATE' ? date || null : null
-  const submit = () => {
-    if (!lines.length || saving || (when === 'DATE' && !date)) return
+  // '날짜'를 골랐는데 날짜가 비어 있으면 버튼이 비활성 (안내 문구 없음)
+  const blocked = when === 'DATE' && !date
+  const submit = (method: 'button' | 'enter') => {
+    if (!lines.length || saving) return
+    if (blocked) {
+      track('work_compose.task_blocked', {
+        goal_category_id: goalId,
+        validation_error: 'date_required',
+        line_count: lines.length,
+      })
+      return
+    }
+    const lineCount = lines.length
+    track('work_compose.task_submit', {
+      goal_category_id: goalId,
+      line_count: lineCount,
+      has_topic: topicId !== null,
+      when_option: when,
+      has_due_date: !!dueDate,
+      is_truncated: lines.some((l) => l.length > 100),
+      due_before_date: !!(dueDate && day && dueDate < day),
+      submit_method: method,
+    })
     const common = { topicId, date: day, dueDate: dueDate || null }
-    const done = () => setText('')
-    if (lines.length === 1) one.mutate({ taskName: lines[0].slice(0, 100), ...common }, { onSuccess: done })
-    else many.mutate({ text, ...common }, { onSuccess: done })
+    const req =
+      lineCount === 1
+        ? one.mutateAsync({ taskName: lines[0].slice(0, 100), ...common }).then(() => 1)
+        : many.mutateAsync({ text, ...common }).then((r) => r.length)
+    req.then(
+      (created) => {
+        setText('')
+        track('work_compose.task_result', {
+          goal_category_id: goalId,
+          line_count: lineCount,
+          created_count: created,
+          result: 'success',
+        })
+      },
+      (e: unknown) =>
+        track('work_compose.task_result', {
+          goal_category_id: goalId,
+          line_count: lineCount,
+          created_count: 0,
+          result: 'fail',
+          error_status: failStatus(e),
+        })
+    )
   }
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
-      submit()
+      submit('enter')
     }
   }
 
@@ -794,7 +1072,11 @@ function TaskCompose({
     <div>
       <select
         value={topicId ?? ''}
-        onChange={(e) => onTopic(e.target.value ? Number(e.target.value) : null)}
+        onChange={(e) => {
+          const id = e.target.value ? Number(e.target.value) : null
+          track('work_compose.topic_select', { goal_category_id: goalId, topic_id: id, has_topic: id !== null })
+          onTopic(id)
+        }}
         aria-label="주제"
         className="border-line-strong bg-surface h-9 w-full rounded-xl border px-2.5 text-[14px] font-semibold"
       >
@@ -832,7 +1114,10 @@ function TaskCompose({
               type="button"
               role="radio"
               aria-checked={when === v}
-              onClick={() => setWhen(v)}
+              onClick={() => {
+                if (v !== when) track('work_compose.when_select', { goal_category_id: goalId, when_option: v })
+                setWhen(v)
+              }}
               className={cn(
                 'h-7 rounded-md px-2.5 text-[12px] font-semibold',
                 when === v ? 'bg-surface text-ink shadow-sm' : 'text-ink-3'
@@ -861,15 +1146,12 @@ function TaskCompose({
           />
         </label>
       </div>
-      <Button
-        className="mt-3"
-        fullWidth
-        loading={saving}
-        disabled={!lines.length || (when === 'DATE' && !date)}
-        onClick={submit}
-      >
-        {lines.length > 1 ? `${lines.length}개 추가` : '할 일 추가'}
-      </Button>
+      {/* 비활성 버튼을 누른 것도 남기려고 감싼 요소에서 받아요 (비활성 버튼은 pointer-events 가 꺼져 있어요) */}
+      <div className="mt-3" onPointerDown={() => blocked && submit('button')}>
+        <Button fullWidth loading={saving} disabled={!lines.length || blocked} onClick={() => submit('button')}>
+          {lines.length > 1 ? `${lines.length}개 추가` : '할 일 추가'}
+        </Button>
+      </div>
       <p className="text-ink-4 mt-1.5 text-[11px] leading-relaxed">
         Enter 추가 · Shift+Enter 줄바꿈 · &lsquo;나중에&rsquo;는 캘린더에 안 올리고 로드맵 · 보드에만 담아요
       </p>
@@ -882,9 +1164,31 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
   const create = useCreateWorkRetro(goalId)
   const remove = useDeleteWorkRetro(goalId)
   const [text, setText] = useState('')
-  const submit = () => {
-    if (!text.trim() || create.isPending) return
-    create.mutate(text.trim(), { onSuccess: () => setText('') })
+  const retroResult = (action: 'create' | 'delete', req: Promise<unknown>) =>
+    req.then(
+      () => {
+        track('work_compose.retro_result', { goal_category_id: goalId, retro_action: action, result: 'success' })
+        return true
+      },
+      (e: unknown) => {
+        track('work_compose.retro_result', {
+          goal_category_id: goalId,
+          retro_action: action,
+          result: 'fail',
+          error_status: failStatus(e),
+        })
+        return false
+      }
+    )
+  const submit = (method: 'button' | 'enter') => {
+    const content = text.trim()
+    if (!content || create.isPending) return
+    track('work_compose.retro_submit', {
+      goal_category_id: goalId,
+      content_length: content.length,
+      submit_method: method,
+    })
+    retroResult('create', create.mutateAsync(content)).then((ok) => ok && setText(''))
   }
   return (
     <div>
@@ -894,7 +1198,7 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
             e.preventDefault()
-            submit()
+            submit('enter')
           }
         }}
         rows={4}
@@ -902,7 +1206,13 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
         placeholder="오늘 일하며 배운 점 · 막힌 점 · 다음에 바꿀 점"
         className={`${inlineInput} h-auto resize-none py-2.5 leading-relaxed`}
       />
-      <Button className="mt-3" fullWidth loading={create.isPending} disabled={!text.trim()} onClick={submit}>
+      <Button
+        className="mt-3"
+        fullWidth
+        loading={create.isPending}
+        disabled={!text.trim()}
+        onClick={() => submit('button')}
+      >
         회고 남기기
       </Button>
       {board.retrospectives.length > 0 && (
@@ -911,6 +1221,12 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
             <p className="text-ink-3 text-[12px] font-semibold">최근 회고</p>
             <Link
               href={`/goal/${goalId}?tab=reflections`}
+              onClick={() =>
+                track('work_compose.retro_all_click', {
+                  goal_category_id: goalId,
+                  item_count: board.retrospectives.length,
+                })
+              }
               className="text-brand ml-auto text-[12px] font-semibold hover:underline"
             >
               모두 보기
@@ -925,7 +1241,13 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
                 <p className="min-w-0 flex-1 text-[13px] leading-5 whitespace-pre-wrap">{r.content}</p>
                 <button
                   type="button"
-                  onClick={() => remove.mutate(r.retrospectiveId)}
+                  onClick={() => {
+                    track('work_compose.retro_delete_click', {
+                      goal_category_id: goalId,
+                      days_ago: daysAgo(r.reviewDate, board.today),
+                    })
+                    retroResult('delete', remove.mutateAsync(r.retrospectiveId))
+                  }}
                   aria-label="회고 지우기"
                   className="text-ink-4 hover:text-danger shrink-0 self-start p-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                 >
@@ -1021,7 +1343,7 @@ function TopicBar({
 }: {
   topics: WorkTopic[]
   filter: TopicFilter
-  onFilter: (f: TopicFilter) => void
+  onFilter: (f: TopicFilter, entry: FilterEntry) => void
 }) {
   const total = topics.reduce((n, t) => n + t.remaining, 0)
   const chip = (selected: boolean) =>
@@ -1036,7 +1358,7 @@ function TopicBar({
         type="button"
         role="tab"
         aria-selected={filter === 'ALL'}
-        onClick={() => onFilter('ALL')}
+        onClick={() => onFilter('ALL', 'topic_chip')}
         className={chip(filter === 'ALL')}
       >
         전체 <span className="tabular-nums opacity-60">{total}</span>
@@ -1049,7 +1371,7 @@ function TopicBar({
             type="button"
             role="tab"
             aria-selected={selected}
-            onClick={() => onFilter(t.topicId === null ? 'NONE' : t.topicId)}
+            onClick={() => onFilter(t.topicId === null ? 'NONE' : t.topicId, 'topic_chip')}
             className={chip(selected)}
           >
             {t.emoji ? `${t.emoji} ` : ''}
@@ -1075,12 +1397,16 @@ function BoardCard({
   showTopic,
   onOpen,
   onMove,
+  onDragStart,
+  onDragEnd,
 }: {
   task: WorkTask
   today: string
   showTopic: boolean
   onOpen: () => void
-  onMove: (to: WorkColumn) => void
+  onMove: (to: WorkColumn, method: MoveMethod) => void
+  onDragStart: () => void
+  onDragEnd: () => void
 }) {
   const next: WorkColumn | null =
     task.status === 'NOT_STARTED' ? 'IN_PROGRESS' : task.status === 'IN_PROGRESS' ? 'DONE' : null
@@ -1090,14 +1416,16 @@ function BoardCard({
       onDragStart={(e) => {
         e.dataTransfer.setData('text/plain', String(task.taskId))
         e.dataTransfer.effectAllowed = 'move'
+        onDragStart()
       }}
+      onDragEnd={onDragEnd}
       className={cn(
         'border-line bg-surface hover:border-line-strong group cursor-grab rounded-xl border p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)] active:cursor-grabbing',
         task.overdue && 'border-danger/40'
       )}
     >
       <div className="flex items-start gap-2">
-        <CheckButton task={task} onToggle={() => onMove(task.status === 'DONE' ? 'NOT_STARTED' : 'DONE')} />
+        <CheckButton task={task} onToggle={() => onMove(task.status === 'DONE' ? 'NOT_STARTED' : 'DONE', 'check')} />
         <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
           <span
             className={cn(
@@ -1117,7 +1445,7 @@ function BoardCard({
       {next && (
         <button
           type="button"
-          onClick={() => onMove(next)}
+          onClick={() => onMove(next, 'next_button')}
           className="text-ink-3 hover:text-brand mt-2 ml-8 text-[12px] font-semibold [@media(hover:hover)]:hidden [@media(hover:hover)]:group-hover:block"
         >
           {COLUMN_LABEL[next]}으로 →
@@ -1128,25 +1456,68 @@ function BoardCard({
 }
 
 function Kanban({
+  goalId,
   board,
   filter,
   onOpen,
   onMove,
 }: {
+  goalId: number
   board: WorkBoard
   filter: TopicFilter
   onOpen: (t: WorkTask) => void
-  onMove: (t: WorkTask, to: WorkColumn) => void
+  onMove: (t: WorkTask, to: WorkColumn, method: MoveMethod) => void
 }) {
   const [over, setOver] = useState<WorkColumn | null>(null)
   const all = useMemo(() => [...board.board.notStarted, ...board.board.inProgress, ...board.board.done], [board])
+  // 칸 위에 놓았는지 — 놓지 않고 끝난 끌기는 '칸 밖' 취소 (drop 이 dragend 보다 먼저 와요)
+  const dropped = useRef(false)
+
+  // 주제 필터 때문에 빈 칸 안내가 보일 때 — 필터를 바꿀 때마다 한 번
+  const emptySent = useRef<TopicFilter | null>(null)
+  useEffect(() => {
+    if (emptySent.current === filter) return
+    emptySent.current = filter
+    if (filter === 'ALL') return
+    for (const { key, list } of COLUMNS) {
+      if (board.board[list].some((t) => matchTopic(t, filter))) continue
+      track('work_board.empty_column_view', {
+        goal_category_id: goalId,
+        to_status: key,
+        topic_filter: filterKind(filter),
+        unfiltered_count: key === 'DONE' ? board.board.doneTotal : board.board[list].length,
+      })
+    }
+  }, [filter, board, goalId])
 
   const onDrop = (e: DragEvent, to: WorkColumn) => {
     e.preventDefault()
     setOver(null)
+    dropped.current = true
     const id = Number(e.dataTransfer.getData('text/plain'))
     const task = all.find((t) => t.taskId === id)
-    if (task && task.status !== to) onMove(task, to)
+    if (!task) return
+    if (task.status !== to) onMove(task, to, 'drag')
+    else
+      track('work_board.card_drag_cancel', {
+        goal_category_id: goalId,
+        task_id: task.taskId,
+        from_status: task.status,
+        drag_cancel_reason: 'same_column',
+      })
+  }
+  const dragStart = (t: WorkTask) => {
+    dropped.current = false
+    track('work_board.card_drag_start', { goal_category_id: goalId, task_id: t.taskId, from_status: t.status })
+  }
+  const dragEnd = (t: WorkTask) => {
+    if (dropped.current) return
+    track('work_board.card_drag_cancel', {
+      goal_category_id: goalId,
+      task_id: t.taskId,
+      from_status: t.status,
+      drag_cancel_reason: 'outside',
+    })
   }
 
   return (
@@ -1196,7 +1567,9 @@ function Kanban({
                     today={board.today}
                     showTopic={filter === 'ALL'}
                     onOpen={() => onOpen(t)}
-                    onMove={(to) => onMove(t, to)}
+                    onMove={(to, method) => onMove(t, to, method)}
+                    onDragStart={() => dragStart(t)}
+                    onDragEnd={() => dragEnd(t)}
                   />
                 ))}
               </ul>
@@ -1222,14 +1595,48 @@ function Kanban({
  */
 export function WorkBoardView({ goal }: { goal: GoalCategory }) {
   const goalId = goal.goalCategoryId
-  const { data: board, isPending, isError, error, refetch } = useWorkBoard(goalId)
+  const { data: board, isPending, isError, error, errorUpdatedAt, refetch } = useWorkBoard(goalId)
   const move = useMoveWorkTask(goalId)
   const [filter, setFilter] = useState<TopicFilter>('ALL')
   const [opened, setOpened] = useState<WorkTask | null>(null)
+  /** 자세히 창을 연 화면 — 창 안에서 칸을 바꾸면 work_task.status_change 의 surface 로 써요 */
+  const [openedFrom, setOpenedFrom] = useState<Surface>('board')
   const [sharing, setSharing] = useState(false)
   const [composeTab, setComposeTab] = useState<ComposeTab>('task')
   const [composeTopic, setComposeTopic] = useState<number | null>(null)
   const composeInput = useRef<HTMLTextAreaElement>(null)
+  const routineCount = routineCountOf(goal)
+
+  // 보드를 다 불러와 그렸을 때 한 번 (탭을 다시 열면 다시 마운트돼서 또 한 번)
+  const viewSent = useRef(false)
+  useEffect(() => {
+    if (!board || isError || viewSent.current) return
+    viewSent.current = true
+    const s = board.summary
+    track('work_board.view', {
+      goal_category_id: goalId,
+      topic_count: s.topicsTotal,
+      topic_done_count: s.topicsDone,
+      overdue_topic_count: board.timeline.filter((t) => t.status === 'OVERDUE').length,
+      work_total_count: s.total,
+      work_done_count: s.done,
+      open_task_count: s.remaining,
+      in_progress_count: s.inProgress,
+      overdue_count: s.overdue,
+      due_this_week_count: s.dueThisWeek,
+      has_next_due: !!s.nextTopic,
+      d_day: s.nextTopic?.dDay,
+      routine_count: routineCount,
+    })
+  }, [board, isError, goalId, routineCount])
+
+  // '보드를 불러오지 못했어요' — 실패할 때마다 한 번 (다시 시도 후 또 실패하면 다시)
+  const failSent = useRef(0)
+  useEffect(() => {
+    if (!isError || failSent.current === errorUpdatedAt) return
+    failSent.current = errorUpdatedAt
+    track('work_board.load_fail', { goal_category_id: goalId, error_status: failStatus(error) })
+  }, [isError, error, errorUpdatedAt, goalId])
 
   if (isPending) {
     return (
@@ -1243,28 +1650,76 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
       <Card className="p-8 text-center">
         <p className="font-bold">보드를 불러오지 못했어요</p>
         <p className="text-ink-3 mt-1 text-sm">{error?.message}</p>
-        <Button className="mt-4" onClick={() => refetch()}>
+        <Button
+          className="mt-4"
+          onClick={() => {
+            track('work_board.retry_click', { goal_category_id: goalId, error_status: failStatus(error) })
+            refetch()
+          }}
+        >
           다시 시도
         </Button>
       </Card>
     )
   }
 
+  // Task 자세히 창 열기 (로드맵 이름 · 보드 카드 · 루틴 체크)
+  const openTask = (t: WorkTask, surface: Surface) => {
+    track('work_task.open', {
+      surface,
+      goal_category_id: goalId,
+      task_id: t.taskId,
+      task_status: t.status === 'DONE' ? 'COMPLETED' : 'TODO',
+      is_routine: t.routine,
+      is_overdue: t.overdue,
+    })
+    setOpenedFrom(surface)
+    setOpened(t)
+  }
+  // 칸 옮기기 — 화면은 먼저 바뀌고 실패하면 되돌려요 (useMoveWorkTask)
+  const moveTask = (t: WorkTask, to: WorkColumn, surface: Surface, method: MoveMethod) => {
+    const common = { surface, task_id: t.taskId, to_status: to, move_method: method }
+    track('work_task.status_change', {
+      ...common,
+      goal_category_id: goalId,
+      topic_id: t.topicId,
+      from_status: t.status,
+      is_overdue: t.overdue,
+    })
+    move.mutateAsync({ task: t, to }).then(
+      () => track('work_task.move_result', { ...common, result: 'success' }),
+      (e: unknown) => track('work_task.move_result', { ...common, result: 'fail', error_status: failStatus(e) })
+    )
+  }
   const toggle = (t: WorkTask) => {
     if (t.routine) {
       // 루틴 Task 는 보드 칸이 없어서 상세 창에서 처리
-      setOpened(t)
+      openTask(t, 'roadmap')
       return
     }
-    move.mutate({ task: t, to: t.status === 'DONE' ? 'NOT_STARTED' : 'DONE' })
+    moveTask(t, t.status === 'DONE' ? 'NOT_STARTED' : 'DONE', 'roadmap', 'check')
+  }
+  const changeFilter = (f: TopicFilter, entry: FilterEntry) => {
+    if (f !== filter) {
+      const visible = [...board.board.notStarted, ...board.board.inProgress, ...board.board.done]
+      track('work_board.topic_filter_change', {
+        goal_category_id: goalId,
+        topic_filter: filterKind(f),
+        topic_id: typeof f === 'number' ? f : undefined,
+        entry_point: entry,
+        result_count: visible.filter((t) => matchTopic(t, f)).length,
+      })
+    }
+    setFilter(f)
   }
   // 로드맵에서 주제를 고르면 보드가 그 주제만 보여주고, 보드로 내려가요
-  const pickTopic = (f: TopicFilter) => {
-    setFilter(f)
+  const pickTopic = (f: TopicFilter, entry: FilterEntry) => {
+    changeFilter(f, entry)
     if (f !== 'ALL') document.getElementById('work-board')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
   // 로드맵 "+ 할 일" → 적기 패널을 그 주제로 맞추고 입력창에 커서
   const composeFor = (topicId: number | null) => {
+    track('work_roadmap.add_task_click', { goal_category_id: goalId, topic_id: topicId, compose_tab: composeTab })
     setComposeTab('task')
     setComposeTopic(topicId)
     requestAnimationFrame(() => {
@@ -1280,7 +1735,14 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
 
   return (
     <div className="space-y-5">
-      <SummaryHero board={board} onShare={() => setSharing(true)} />
+      <SummaryHero
+        board={board}
+        onShare={() => {
+          track('work_board.share_click', { goal_category_id: goalId, open_task_count: board.summary.remaining })
+          setSharing(true)
+        }}
+        onPill={(kind) => track('work_board.pill_dead_click', { goal_category_id: goalId, pill_kind: kind })}
+      />
 
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         {/* 적기 + 루틴 — 좁은 화면에선 맨 위, 넓은 화면에선 오른쪽에 붙어서 따라와요 (길면 패널 안에서 스크롤) */}
@@ -1289,7 +1751,11 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
             goal={goal}
             board={board}
             tab={composeTab}
-            onTab={setComposeTab}
+            onTab={(t) => {
+              if (t !== composeTab)
+                track('work_compose.tab_click', { goal_category_id: goalId, compose_tab: t, from_tab: composeTab })
+              setComposeTab(t)
+            }}
             topicId={composeTopic}
             onTopic={setComposeTopic}
             inputRef={composeInput}
@@ -1304,7 +1770,7 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
             board={board}
             filter={filter}
             onFilter={pickTopic}
-            onOpen={setOpened}
+            onOpen={(t) => openTask(t, 'roadmap')}
             onToggle={toggle}
             onAdd={composeFor}
           />
@@ -1314,13 +1780,14 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
               <h2 className="text-[17px] font-bold">보드</h2>
               <span className="text-ink-3 text-[12px]">카드를 끌어서 칸을 옮기거나, 눌러서 자세히 고쳐요</span>
             </div>
-            <TopicBar topics={board.topics} filter={filter} onFilter={setFilter} />
+            <TopicBar topics={board.topics} filter={filter} onFilter={changeFilter} />
             <div className="mt-4">
               <Kanban
+                goalId={goalId}
                 board={board}
                 filter={filter}
-                onOpen={setOpened}
-                onMove={(task, to) => move.mutate({ task, to })}
+                onOpen={(t) => openTask(t, 'board')}
+                onMove={(t, to, method) => moveTask(t, to, 'board', method)}
               />
             </div>
           </Card>
@@ -1337,6 +1804,7 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
           goalId={goalId}
           task={opened}
           topics={board.topics}
+          surface={openedFrom}
           onClose={() => setOpened(null)}
         />
       )}

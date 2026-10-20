@@ -33,5 +33,9 @@ export function goalDDay(dDay: number | null) {
   return dDay > 0 ? `D-${dDay}` : `D+${-dDay}`
 }
 
+/** 오늘부터 며칠 전 날짜인지 (오늘 0) — 분석용 days_ago */
+export const daysAgo = (ymd: string, today: string) =>
+  Math.round((Date.parse(`${today.slice(0, 10)}T00:00:00Z`) - Date.parse(`${ymd.slice(0, 10)}T00:00:00Z`)) / 86_400_000)
+
 /** "2026.11.14 (금)" */
 export const fullDate = (ymd: string) => `${ymd.replaceAll('-', '.')} (${WEEKDAY_LABEL[weekdayIndex(ymd)]})`
