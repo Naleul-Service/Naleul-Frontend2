@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, isApiError } from '@/lib/client/api'
 import { toast } from '@/stores/toastStore'
 import { goalKeys, type GoalMode, type ReflectionMood } from '@/features/goal/api'
@@ -198,8 +198,9 @@ export interface ReflectionFeedPage {
 export type ReflectionPeriod = 'DAY' | 'WEEK' | 'MONTH'
 
 /** [from, to] 기간의 회고 (양 끝 포함, 최대 92일) */
-export function useReflectionRange(from: string, to: string, goalCategoryId?: number) {
+export function useReflectionRange(from: string, to: string, goalCategoryId?: number, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: [...homeKeys.reflections(goalCategoryId), from, to] as const,
     queryFn: () => {
       const days = Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1
@@ -209,5 +210,21 @@ export function useReflectionRange(from: string, to: string, goalCategoryId?: nu
       return api.get<ReflectionFeedPage>(`/v1/home/reflections?${q}`)
     },
     placeholderData: (prev) => prev,
+  })
+}
+
+/** "전체" — 기간 없이 최근 회고부터, 30일씩 "더 보기"로 그 전 (같은 GET /home/reflections · before 커서) */
+export function useReflectionFeed(goalCategoryId?: number, enabled = true) {
+  return useInfiniteQuery({
+    enabled,
+    queryKey: [...homeKeys.reflections(goalCategoryId), 'feed'] as const,
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => {
+      const q = new URLSearchParams({ days: '30' })
+      if (pageParam) q.set('before', pageParam)
+      if (goalCategoryId) q.set('goalCategoryId', String(goalCategoryId))
+      return api.get<ReflectionFeedPage>(`/v1/home/reflections?${q}`)
+    },
+    getNextPageParam: (last) => (last.hasMore ? last.from : null),
   })
 }

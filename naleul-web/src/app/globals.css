@@ -96,6 +96,9 @@
   --color-progress-track: #e3f1f4;
   /* 히트맵 빈 칸 · 안 한 날 */
   --color-heat-empty: #f1f4f8;
+  /* 회고 배지 바탕 · 줄 사이 구분선 */
+  --color-badge-bg: #eaeef3;
+  --color-divider: #e1e6ed;
   --color-progress-fill: #00cba8;
   --color-calendar-today-bg: #0f7a9c;
   --color-calendar-today-fg: #ffffff;
@@ -412,6 +415,8 @@
   --color-accent-on-mint: #121820;
   --color-progress-track: #22343d;
   --color-heat-empty: #252d38;
+  --color-badge-bg: #2f3845;
+  --color-divider: #2f3845;
   --color-progress-fill: #00cba8;
   --color-calendar-today-bg: #167a9c;
   --color-calendar-today-fg: #ffffff;

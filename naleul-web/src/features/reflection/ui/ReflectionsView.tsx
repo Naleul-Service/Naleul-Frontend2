@@ -3,20 +3,26 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Library, PencilLine } from 'lucide-react'
-import { ChevronLeft, ChevronRight, NotebookPen } from '@/components/icons'
+import { Library } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from '@/components/icons'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
+import { iconButtonClass } from '@/components/ui/IconButton'
 import { track } from '@/lib/client/analytics'
 import { referrerType } from '@/lib/client/commonEvents'
 import { errorStatusOf } from '@/features/home/analytics'
 import { useGoalCategories, type GoalCategory } from '@/features/goal/api'
 import { MOODS, moodOf } from '@/features/goal/ui/progress/DailyCheckInCard'
-import { useReflectionRange, type ReflectionEntry, type ReflectionPeriod } from '@/features/home/api'
+import {
+  useReflectionFeed,
+  useReflectionRange,
+  type ReflectionEntry,
+  type ReflectionPeriod,
+} from '@/features/home/api'
 import { goalAccent } from '@/lib/goalTone'
 import {
   addDays,
@@ -159,7 +165,14 @@ export function ReflectionsView() {
   )
 }
 
-const PERIODS: { value: ReflectionPeriod; label: string }[] = [
+/** 전체(기간 없이 최근부터) + 일간 · 주간 · 월간 */
+type TimelinePeriod = 'ALL' | ReflectionPeriod
+
+/** Amplitude period 값 — ALL · DAY · WEEK · MONTH (iOS · Android 와 같은 대문자) */
+const periodProp = (p: TimelinePeriod) => p
+
+const PERIODS: { value: TimelinePeriod; label: string }[] = [
+  { value: 'ALL', label: '전체' },
   { value: 'DAY', label: '일간' },
   { value: 'WEEK', label: '주간' },
   { value: 'MONTH', label: '월간' },
@@ -226,11 +239,16 @@ export function ReflectionTimeline({
   surface: ReflectionTimelineSurface
 }) {
   const today = todayKst()
-  const [period, setPeriod] = useState<ReflectionPeriod>('WEEK')
+  const [period, setPeriod] = useState<TimelinePeriod>('ALL')
   const [anchor, setAnchor] = useState(today)
-  const { from, to } = periodRange(period, anchor)
-  const feed = useReflectionRange(from, to, goalId)
-  const entries = feed.data?.entries ?? []
+  const all = period === 'ALL'
+  // 전체는 기간이 없어요 — 아래 계산은 주간 기준 값을 써도 화면에 안 쓰여요
+  const ranged: ReflectionPeriod = all ? 'WEEK' : period
+  const { from, to } = periodRange(ranged, anchor)
+  const range = useReflectionRange(from, to, goalId, !all)
+  const recent = useReflectionFeed(goalId, all)
+  const feed = all ? recent : range
+  const entries = all ? (recent.data?.pages.flatMap((p) => p.entries) ?? []) : (range.data?.entries ?? [])
   const groups = byDate(entries)
   const atLatest = to >= today
 
@@ -243,12 +261,12 @@ export function ReflectionTimeline({
   )
 
   // ── Amplitude ──
-  const offset = periodOffset(period, from, today)
-  const viewKey = `${period}:${from}:${goalId ?? ''}`
+  const offset = all ? 0 : periodOffset(ranged, from, today)
+  const viewKey = `${period}:${all ? '' : from}:${goalId ?? ''}`
   const entryCount = entries.length
   const checkInCount = checkIns.length
   const retroCount = entries.filter((e) => e.kind === 'RETRO').length
-  const truncated = feed.data?.hasMore ?? false
+  const truncated = all ? recent.hasNextPage : (range.data?.hasMore ?? false)
   // 지금 기간의 데이터를 그렸는지 (이전 기간 자리 표시 데이터는 빼요)
   const shown = feed.isSuccess && !feed.isPlaceholderData
 
@@ -260,17 +278,22 @@ export function ReflectionTimeline({
     track('reflection_timeline.view', {
       surface,
       goal_category_id: goalId,
-      period,
+      period: periodProp(period),
       period_offset: offset,
       entry_count: entryCount,
       check_in_count: checkInCount,
       retro_count: retroCount,
       day_count: days,
-      elapsed_day_count: totalDays,
+      elapsed_day_count: all ? undefined : totalDays,
       is_truncated: truncated,
     })
     if (entryCount === 0) {
-      track('reflection_timeline.empty_view', { surface, goal_category_id: goalId, period, period_offset: offset })
+      track('reflection_timeline.empty_view', {
+        surface,
+        goal_category_id: goalId,
+        period: periodProp(period),
+        period_offset: offset,
+      })
     }
   }, [
     shown,
@@ -285,6 +308,7 @@ export function ReflectionTimeline({
     days,
     totalDays,
     truncated,
+    all,
   ])
 
   // 불러오기 실패 카드 (실패할 때마다 한 번)
@@ -297,7 +321,7 @@ export function ReflectionTimeline({
     lastFailAt.current = failedAt
     track('reflection_timeline.load_fail', {
       surface,
-      period,
+      period: periodProp(period),
       period_offset: offset,
       error_status: errorStatusOf(feedError),
     })
@@ -318,7 +342,12 @@ export function ReflectionTimeline({
         const key = `${viewKey}:${mark}`
         if (pct >= mark - 1 && !scrollSent.current.has(key)) {
           scrollSent.current.add(key)
-          track('reflection_timeline.scroll_depth', { surface, period, scroll_percent: mark, entry_count: entryCount })
+          track('reflection_timeline.scroll_depth', {
+            surface,
+            period: periodProp(period),
+            scroll_percent: mark,
+            entry_count: entryCount,
+          })
         }
       }
     }
@@ -326,13 +355,13 @@ export function ReflectionTimeline({
     return () => window.removeEventListener('scroll', onScroll)
   }, [shown, viewKey, surface, period, entryCount])
 
-  const changePeriod = (p: ReflectionPeriod) => {
+  const changePeriod = (p: TimelinePeriod) => {
     if (p === period) return
     track('reflection_timeline.period_change', {
       surface,
-      period: p,
-      from_period: period,
-      period_offset: periodOffset(p, periodRange(p, anchor).from, today),
+      period: periodProp(p),
+      from_period: periodProp(period),
+      period_offset: p === 'ALL' ? 0 : periodOffset(p, periodRange(p, anchor).from, today),
     })
     setPeriod(p)
   }
@@ -340,49 +369,51 @@ export function ReflectionTimeline({
   const move = (action: 'prev' | 'next' | 'today', next: string) => {
     track('reflection_timeline.nav_click', {
       surface,
-      period,
+      period: periodProp(period),
       date_action: action,
-      period_offset: periodOffset(period, periodRange(period, next).from, today),
+      period_offset: periodOffset(ranged, periodRange(ranged, next).from, today),
     })
     setAnchor(next)
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* 기간 고르기 + 이동 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className={segmentedClass()} role="tablist" aria-label="기간">
-          {PERIODS.map((p) => (
-            <button
-              key={p.value}
-              type="button"
-              role="tab"
-              aria-selected={period === p.value}
-              onClick={() => changePeriod(p.value)}
-              className={segmentClass(period === p.value)}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
+      {/* 기간 고르기 (전체 · 일간 · 주간 · 월간) */}
+      <div className={segmentedClass('self-start')} role="tablist" aria-label="기간">
+        {PERIODS.map((p) => (
+          <button
+            key={p.value}
+            type="button"
+            role="tab"
+            aria-selected={period === p.value}
+            onClick={() => changePeriod(p.value)}
+            className={segmentClass(period === p.value)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 기간 이동 — 왼쪽에 붙은 작은 묶음: ‹ 기간 › + 오늘/이번 주/이번 달 */}
+      {!all && (
+        <div className="-ml-1 flex w-fit items-center gap-1">
           <button
             type="button"
-            onClick={() => move('prev', shift(period, anchor, -1))}
+            onClick={() => move('prev', shift(ranged, anchor, -1))}
             aria-label="이전 기간"
-            className="text-ink-2 hover:bg-subtle grid size-8 place-items-center rounded-lg"
+            className={iconButtonClass('sm')}
           >
             <ChevronLeft className="size-4" />
           </button>
-          <p className="min-w-[140px] text-center text-[14px] font-bold tabular-nums">
-            {periodTitle(period, from, to, today)}
+          <p className="text-body-md text-text-primary font-medium whitespace-nowrap tabular-nums">
+            {periodTitle(ranged, from, to, today)}
           </p>
           <button
             type="button"
-            onClick={() => move('next', shift(period, anchor, 1))}
+            onClick={() => move('next', shift(ranged, anchor, 1))}
             disabled={atLatest}
             aria-label="다음 기간"
-            className="text-ink-2 hover:bg-subtle grid size-8 place-items-center rounded-lg disabled:opacity-30"
+            className={iconButtonClass('sm')}
           >
             <ChevronRight className="size-4" />
           </button>
@@ -390,13 +421,13 @@ export function ReflectionTimeline({
             <button
               type="button"
               onClick={() => move('today', today)}
-              className="text-text-brand hover:bg-brand-soft h-8 rounded-lg px-2 text-[12px] font-semibold"
+              className="text-label-md text-text-brand hover:bg-action-ghost-hover h-7 rounded-[6px] px-2 whitespace-nowrap"
             >
               {period === 'DAY' ? '오늘' : period === 'WEEK' ? '이번 주' : '이번 달'}
             </button>
           )}
         </div>
-      </div>
+      )}
 
       {feed.isPending ? (
         <div className="grid min-h-[240px] place-items-center">
@@ -410,7 +441,11 @@ export function ReflectionTimeline({
             variant="secondary"
             className="mt-3"
             onClick={() => {
-              track('reflection_timeline.retry_click', { surface, period, error_status: errorStatusOf(feed.error) })
+              track('reflection_timeline.retry_click', {
+                surface,
+                period: periodProp(period),
+                error_status: errorStatusOf(feed.error),
+              })
               feed.refetch()
             }}
           >
@@ -420,23 +455,29 @@ export function ReflectionTimeline({
       ) : (
         <div className={cn('flex flex-col gap-4 transition-opacity', feed.isPlaceholderData && 'opacity-60')}>
           {/* 이 기간 요약 (주간 · 월간) */}
+          {/* 이 기간 요약 (전체 · 주간 · 월간 — 전체는 불러온 회고 기준, 분모 없이) — surface · border/subtle · 모서리 16 · p-4 */}
           {period !== 'DAY' && entries.length > 0 && (
-            <Card className="flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3">
-              <p className="text-[13px]">
-                <b className="tabular-nums">{days}일</b>
-                <span className="text-ink-3"> 기록 / {totalDays}일</span>
-              </p>
-              {checkIns.some((e) => e.mood) && (
-                <ul className="flex items-center gap-3 text-[13px]" aria-label="기분별 날 수">
-                  {moodCounts.map((m) => (
-                    <li key={m.value} className="flex items-center gap-1" title={m.label}>
-                      <span aria-hidden>{m.emoji}</span>
-                      <span className="text-ink-3">{m.label}</span>
-                      <b className="tabular-nums">{m.count}</b>
-                    </li>
-                  ))}
-                </ul>
-              )}
+            <Card className="flex flex-col gap-3 p-4 shadow-none">
+              <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+                <div>
+                  <p className="text-caption-md text-text-secondary">기록한 날</p>
+                  <p className="text-h3 text-text-primary mt-0.5 font-semibold tabular-nums">
+                    {days}일{!all && <span className="text-text-tertiary"> / {totalDays}일</span>}
+                  </p>
+                </div>
+                {checkIns.some((e) => e.mood) && (
+                  <ul className="flex items-center gap-3" aria-label="기분별 날 수">
+                    {moodCounts.map((m) => (
+                      <li key={m.value} className="flex items-center gap-1" title={m.label} aria-label={`${m.label} ${m.count}`}>
+                        <span aria-hidden className="text-[20px] leading-none">
+                          {m.emoji}
+                        </span>
+                        <span className="text-label-lg text-text-primary tabular-nums">{m.count}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               {showGoal && <TopGoal entries={entries} />}
             </Card>
           )}
@@ -447,7 +488,7 @@ export function ReflectionTimeline({
                 <Library className="size-5" />
               </span>
               <p className="text-[15px] font-bold">
-                {period === 'DAY' ? '이날' : period === 'WEEK' ? '이번 주' : '이 달'}에 남긴 회고가 없어요
+                {all ? '아직' : period === 'DAY' ? '이날' : period === 'WEEK' ? '이번 주' : '이 달'} 남긴 회고가 없어요
               </p>
               <p className="text-ink-3 text-[13px]">
                 {emptyHint ??
@@ -464,20 +505,36 @@ export function ReflectionTimeline({
                       <span className="text-ink-3 text-[12px]">{relLabel(g.date, today)}</span>
                     </h3>
                   )}
-                  <Card className="divide-line divide-y">
-                    {g.items.map((e) => (
-                      <EntryRow
-                        key={`${e.kind}-${e.goalCategoryId}-${e.retrospectiveId ?? e.date}`}
-                        entry={e}
-                        showGoal={showGoal}
-                        surface={surface}
-                        today={today}
-                      />
+                  <Card>
+                    {g.items.map((e, i) => (
+                      <div key={`${e.kind}-${e.goalCategoryId}-${e.retrospectiveId ?? e.date}`}>
+                        {/* 줄 사이 구분선 — 양옆 16 안쪽 */}
+                        {i > 0 && <div className="bg-divider mx-4 h-px" aria-hidden />}
+                        <EntryRow
+                          entry={e}
+                          showGoal={showGoal && (!goalId || new Set(g.items.map((x) => x.goalCategoryId)).size > 1)}
+                          surface={surface}
+                          today={today}
+                        />
+                      </div>
                     ))}
                   </Card>
                 </li>
               ))}
             </ol>
+          )}
+
+          {/* 전체: 그 전 회고 더 보기 (30일씩) */}
+          {all && recent.hasNextPage && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="self-center"
+              loading={recent.isFetchingNextPage}
+              onClick={() => void recent.fetchNextPage()}
+            >
+              이전 회고 더 보기
+            </Button>
           )}
         </div>
       )}
@@ -487,23 +544,29 @@ export function ReflectionTimeline({
 
 /** 이 기간에 기록을 가장 많이 남긴 목표 (전체 보기에서만) */
 function TopGoal({ entries }: { entries: ReflectionEntry[] }) {
-  const byGoal = new Map<number, { name: string; emoji: string | null; days: Set<string> }>()
+  const byGoal = new Map<number, { name: string; emoji: string | null; color: string | null; days: Set<string> }>()
   for (const e of entries) {
-    const g = byGoal.get(e.goalCategoryId) ?? { name: e.goalName, emoji: e.goalEmoji, days: new Set<string>() }
+    const g = byGoal.get(e.goalCategoryId) ?? {
+      name: e.goalName,
+      emoji: e.goalEmoji,
+      color: e.colorCode,
+      days: new Set<string>(),
+    }
     g.days.add(e.date)
     byGoal.set(e.goalCategoryId, g)
   }
   const top = [...byGoal.values()].sort((a, b) => b.days.size - a.days.size)[0]
   if (!top || byGoal.size < 2) return null
   return (
-    <p className="text-[13px]">
-      <span className="text-ink-3">가장 많이 돌아본 목표 </span>
-      <b>
+    <div className="border-border-soft flex min-w-0 items-center gap-2 border-t pt-3">
+      <span className="text-caption-md text-text-secondary shrink-0">가장 많이 돌아본 목표</span>
+      <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(top.color) }} aria-hidden />
+      <span className="text-body-md text-text-primary min-w-0 truncate font-medium">
         {top.emoji ? `${top.emoji} ` : ''}
         {top.name}
-      </b>
-      <span className="text-ink-3"> · {top.days.size}일</span>
-    </p>
+      </span>
+      <span className="text-caption-md text-text-tertiary shrink-0">· {top.days.size}일</span>
+    </div>
   )
 }
 
@@ -557,69 +620,57 @@ function EntryRow({
     })
   }
   return (
-    <div className="flex gap-3 px-4 py-3" onClick={onDeadClick}>
-      <span
-        className={cn(
-          'mt-0.5 grid size-7 shrink-0 place-items-center rounded-full',
-          isRetro ? 'bg-subtle text-ink-2' : 'bg-brand-soft text-text-brand'
-        )}
-        title={isRetro ? '회고 글' : '오늘 기록'}
-      >
-        {isRetro ? <PencilLine className="size-3.5" /> : <NotebookPen className="size-3.5" />}
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {showGoal && (
-            <Link
-              href={`/goal/${e.goalCategoryId}`}
-              onClick={() =>
-                track('reflection_timeline.goal_link_click', {
-                  surface,
-                  goal_category_id: e.goalCategoryId,
-                  goal_mode: e.goalMode ?? undefined,
-                  entry_kind: e.kind,
-                  days_ago: ago,
-                })
-              }
-              className="flex min-w-0 items-center gap-1.5 text-[13px] font-bold hover:underline"
-            >
-              <span
-                className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: goalAccent(e.colorCode) }}
-                aria-hidden
-              />
-              <span className="truncate">
-                {e.goalEmoji ? `${e.goalEmoji} ` : ''}
-                {e.goalName}
-              </span>
-            </Link>
-          )}
+    // 회고 카드 줄 — 목표 줄 → 배지 줄(한 줄) → 내용
+    <div className="px-4 py-3" onClick={onDeadClick}>
+      {showGoal && (
+        <Link
+          href={`/goal/${e.goalCategoryId}`}
+          onClick={() =>
+            track('reflection_timeline.goal_link_click', {
+              surface,
+              goal_category_id: e.goalCategoryId,
+              goal_mode: e.goalMode ?? undefined,
+              entry_kind: e.kind,
+              days_ago: ago,
+            })
+          }
+          className="text-label-sm text-text-secondary mb-1.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 hover:underline"
+        >
+          <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(e.colorCode) }} aria-hidden />
+          <span className="truncate">
+            {e.goalEmoji ? `${e.goalEmoji} ` : ''}
+            {e.goalName}
+          </span>
+        </Link>
+      )}
+      {(e.value != null || mood || (isRetro && e.reviewType && e.reviewType !== 'DAILY')) && (
+        <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
           {e.value != null && (
-            <span className="bg-subtle rounded-full px-2 py-0.5 text-[12px]">
-              <span className="text-ink-3">{e.metricName ?? '수치'} </span>
-              <b>
+            <span className="bg-badge-bg flex min-w-0 shrink items-center gap-1 rounded-full px-2 py-1 text-[13px] whitespace-nowrap">
+              <span className="text-text-secondary truncate font-medium">{e.metricName ?? '수치'}</span>
+              <span className="text-text-primary shrink-0 font-semibold">
                 {fmt(e.value)}
                 {e.unit ?? ''}
-              </b>
+              </span>
             </span>
           )}
           {mood && (
-            <span className="bg-subtle rounded-full px-2 py-0.5 text-[12px] font-semibold">
+            <span className="bg-badge-bg min-w-0 shrink truncate rounded-full px-2 py-1 text-[12px] font-semibold whitespace-nowrap">
               {mood.emoji} {mood.label}
             </span>
           )}
           {isRetro && e.reviewType && e.reviewType !== 'DAILY' && (
-            <span className="text-ink-3 text-[11px] font-semibold">
+            <span className="text-text-secondary shrink-0 text-[11px] font-semibold whitespace-nowrap">
               {e.reviewType === 'WEEKLY' ? '주간 회고' : '월간 회고'}
             </span>
           )}
         </div>
-        {e.note ? (
-          <p className="text-ink-2 mt-1 text-[14px] leading-relaxed whitespace-pre-wrap">{e.note}</p>
-        ) : (
-          !isRetro && <p className="text-ink-4 mt-1 text-[12px]">수치만 남겼어요</p>
-        )}
-      </div>
+      )}
+      {e.note ? (
+        <p className="text-ink-2 mt-1.5 text-[14px] leading-relaxed whitespace-pre-wrap">{e.note}</p>
+      ) : (
+        !isRetro && <p className="text-ink-4 mt-1.5 text-[12px]">수치만 남겼어요</p>
+      )}
     </div>
   )
 }
