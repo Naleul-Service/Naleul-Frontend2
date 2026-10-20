@@ -5,11 +5,13 @@
  * 2. code 를 백엔드에 넘겨 우리 서비스 JWT 를 받아요.
  * 3. 쿠키를 "리다이렉트 응답 자체"에 담아서 보내요. → 브라우저에 확실히 저장돼요.
  * 4. state 에 담아둔 원래 가려던 페이지로 이동해요.
+ *    실패해도 원래 페이지로 돌려보내고 ?loginError=... 를 붙여요 → 그 화면에서 로그인 모달이 에러와 함께 다시 떠요.
  */
 import { NextResponse, type NextRequest } from 'next/server'
 import { kakaoLogin } from '@/lib/server/authApi'
 import { clearSessionCookies, setTokenCookies, setUserCookies } from '@/lib/server/session'
 import { safeRedirectPath } from '@/lib/redirectPath'
+import { LOGIN_ERROR_PARAM } from '@/components/auth/kakaoAuth'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
@@ -17,7 +19,12 @@ export async function GET(request: NextRequest) {
   const kakaoError = searchParams.get('error')
   const next = safeRedirectPath(searchParams.get('state'))
 
-  const toLogin = (error: string) => NextResponse.redirect(new URL(`/login?error=${error}`, origin))
+  // 로그인 페이지 대신 원래 보던 화면으로 돌려보내요 (LoginRequiredDialog 가 loginError 를 보고 모달을 열어요)
+  const toLogin = (error: string) => {
+    const url = new URL(next, origin)
+    url.searchParams.set(LOGIN_ERROR_PARAM, error)
+    return NextResponse.redirect(url)
+  }
 
   if (kakaoError) return toLogin('cancelled')
   if (!code) return toLogin('no_code')

@@ -6,6 +6,7 @@ import { useState, type ReactNode } from 'react'
 import { isApiError } from '@/lib/client/api'
 import { Toaster } from '@/components/ui/Toaster'
 import { ThemeSync } from '@/features/theme/theme'
+import { LoginRequiredDialog } from '@/components/auth/LoginRequiredDialog'
 
 function makeQueryClient() {
   return new QueryClient({
@@ -32,6 +33,8 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryClientProvider client={client}>
       {children}
       <Toaster />
+      {/* 로그인 모달은 여기 하나만 — 사이드바가 없는 목표 만들기 화면에서도 떠야 해요 */}
+      <LoginRequiredDialog />
       <ThemeSync />
       <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
     </QueryClientProvider>

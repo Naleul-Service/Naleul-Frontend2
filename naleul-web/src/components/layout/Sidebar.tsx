@@ -20,6 +20,7 @@ import { Logo } from '@/components/brand/Logo'
 import { buttonClass } from '@/components/ui/Button'
 import { GoalNavList } from '@/features/goal/ui/GoalNavList'
 import { AdSlot } from '@/components/ads/AdSlot'
+import { openLoginDialog } from '@/components/auth/loginHref'
 import { isGuestUser, type SessionUserView } from './types'
 
 interface NavItem {
@@ -113,10 +114,17 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
       {isGuestUser(user) ? (
         <div className="border-line border-t px-1 pt-4">
           <p className="text-ink-3 px-1 text-[13px]">둘러보는 중이에요. 로그인하면 만든 목표와 Task가 저장돼요.</p>
-          <a href="/login" className={cn(buttonClass('primary', 'md', true), 'mt-3')}>
+          <button
+            type="button"
+            onClick={() => {
+              onNavigate?.() // 모바일 서랍은 닫고 모달을 띄워요
+              openLoginDialog({ reason: 'login' })
+            }}
+            className={cn(buttonClass('primary', 'md', true), 'mt-3')}
+          >
             <LogIn className="size-4" />
             로그인하고 시작하기
-          </a>
+          </button>
         </div>
       ) : (
         <div className="border-line flex items-center gap-3 border-t px-2 pt-4">

@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { Menu } from 'lucide-react'
 import { Logo } from '@/components/brand/Logo'
-import { GuestBanner, LoginRequiredDialog } from '@/components/auth/LoginRequiredDialog'
+import { GuestBanner } from '@/components/auth/LoginRequiredDialog'
 import { Sidebar } from './Sidebar'
 import { isGuestUser, type SessionUserView } from './types'
 
@@ -47,7 +47,6 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
         {isGuestUser(user) && <GuestBanner />}
         <div className="mx-auto w-full max-w-[1440px] px-4 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</div>
       </main>
-      <LoginRequiredDialog />
     </div>
   )
 }
