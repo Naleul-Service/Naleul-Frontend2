@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, type MouseEvent } from 'react'
 import Link from 'next/link'
-import { CalendarDays, Plus } from 'lucide-react'
+import { CalendarDays, Plus } from '@/components/icons'
 import { rectOf } from '@/components/ui/Popover'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'

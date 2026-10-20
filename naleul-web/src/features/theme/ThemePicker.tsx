@@ -1,11 +1,12 @@
 'use client'
 
-import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
+import { Monitor, Moon, Sun } from 'lucide-react'
+import { type IconComponent } from '@/components/icons'
 import { track } from '@/lib/client/analytics'
 import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { useThemePref, type ThemePref } from './theme'
 
-const OPTIONS: { value: ThemePref; label: string; icon: LucideIcon }[] = [
+const OPTIONS: { value: ThemePref; label: string; icon: IconComponent }[] = [
   { value: 'system', label: '시스템', icon: Monitor },
   { value: 'light', label: '라이트', icon: Sun },
   { value: 'dark', label: '다크', icon: Moon },

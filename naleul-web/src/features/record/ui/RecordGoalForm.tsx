@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import { errorStatusOf } from '@/features/home/analytics'
@@ -160,7 +160,7 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
                   onClick={() => setEmoji(e)}
                   className={cn(
                     'grid size-9 place-items-center rounded-xl border text-lg',
-                    emoji === e ? 'border-ink bg-subtle' : 'border-line hover:border-line-strong'
+                    emoji === e ? 'border-action-outline-border bg-action-secondary-bg' : 'border-line hover:border-line-strong'
                   )}
                 >
                   {e}

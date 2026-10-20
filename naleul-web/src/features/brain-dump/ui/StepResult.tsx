@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, CalendarClock, CalendarX2, RotateCcw, Sparkles } from 'lucide-react'
+import { CalendarX2, RotateCcw } from 'lucide-react'
+import { ArrowRight, CalendarClock, Sparkles } from '@/components/icons'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'

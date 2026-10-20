@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from '@/components/icons'
 import { rectOf } from '@/components/ui/Popover'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -144,6 +144,7 @@ export function CalendarView() {
           <div className="flex items-center gap-2">
             {!add && (
               <Button
+                variant="primary"
                 size="sm"
                 onClick={() => {
                   track('calendar.task_add_click', { view_mode: view, view_date: date })

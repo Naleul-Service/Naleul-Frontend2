@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Bell, BellOff, CalendarClock, X } from 'lucide-react'
+import { BellOff } from 'lucide-react'
+import { Bell, CalendarClock, X } from '@/components/icons'
 import { DaysPicker, Field, InlineForm, inlineInput, type InlineSubmitMethod } from '@/features/goal/edit/inline'
 import { track } from '@/lib/client/analytics'
 import { JAVA_DAYS } from '@/features/goal/format'

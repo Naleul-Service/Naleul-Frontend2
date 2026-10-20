@@ -1,7 +1,8 @@
 'use client'
 
 import type { CSSProperties, MouseEvent, PointerEvent } from 'react'
-import { Check, Clock, GripHorizontal, Pin, Sparkles, X } from 'lucide-react'
+import { GripHorizontal } from 'lucide-react'
+import { Check, Clock, Pin, Sparkles, X } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { goalAccent, goalVars } from '@/lib/goalTone'
 import { shownTime, type Placed, type PlacedSleep } from '../layout'
@@ -169,15 +170,15 @@ export function TaskBlock({
       <span className="flex min-w-0 items-center gap-1">
         {done && (
           <span className="grid size-3.5 shrink-0 place-items-center rounded-full bg-(--goal-accent) text-white">
-            <Check className="size-2.5" strokeWidth={3.5} />
+            <Check className="size-2.5" />
           </span>
         )}
         {t.missed && (
           <span className="bg-action-danger-bg text-action-danger-fg grid size-3.5 shrink-0 place-items-center rounded-full">
-            <X className="size-2.5" strokeWidth={3.5} />
+            <X className="size-2.5" />
           </span>
         )}
-        {proposed && t.proposed && <Sparkles className="size-3.5 shrink-0 text-(--goal-accent)" strokeWidth={1.5} />}
+        {proposed && t.proposed && <Sparkles className="size-3.5 shrink-0 text-(--goal-accent)" />}
         <span className="min-w-0 flex-1 truncate">
           {t.emoji ? `${t.emoji} ` : ''}
           {t.taskName}
@@ -254,7 +255,7 @@ export function FixedBlockView({
       )}
     >
       <span className="flex min-w-0 items-center gap-1 truncate">
-        <Clock className="size-3.5 shrink-0" strokeWidth={1.25} aria-hidden />
+        <Clock className="size-3.5 shrink-0" aria-hidden />
         {b.emoji ? `${b.emoji} ` : ''}
         {b.title}
         {/* 기본 시간과 다르게 바꾼 날 (이날만·이번 주로 바꾼 경우). 지난 날짜는 "앞으로" 변경 때 예전 시간으로 고정해 둔 것이라 표시하지 않아요 */}

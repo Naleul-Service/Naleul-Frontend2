@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, CalendarClock, Clock, Pencil } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
+import { CalendarClock, Clock, Pencil } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Chip'

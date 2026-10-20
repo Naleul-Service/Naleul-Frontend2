@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Info, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Info, X } from '@/components/icons'
 import { AIBadge } from '@/components/ui/AIBadge'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Chip'
@@ -115,13 +115,13 @@ export function CarryProposalBar({
   const pager = tasks.length > 1 && (
     <div className="flex shrink-0 items-center gap-0.5">
       <IconButton label="이전 제안" disabled={idx === 0} onClick={() => setPage(idx - 1)}>
-        <ChevronLeft strokeWidth={1.5} />
+        <ChevronLeft />
       </IconButton>
       <span className="text-body-sm text-text-secondary min-w-9 text-center font-medium tabular-nums">
         {idx + 1} / {tasks.length}
       </span>
       <IconButton label="다음 제안" disabled={idx >= tasks.length - 1} onClick={() => setPage(idx + 1)}>
-        <ChevronRight strokeWidth={1.5} />
+        <ChevronRight />
       </IconButton>
     </div>
   )
@@ -130,7 +130,7 @@ export function CarryProposalBar({
       variant="secondary"
       disabled={busy}
       loading={decline.isPending}
-      leftIcon={<X className="size-4" strokeWidth={1.5} />}
+      leftIcon={<X className="size-4" />}
       onClick={() => {
         track('carry_proposal.decline_click', { surface: surf, task_id: t.taskId, item_count: tasks.length })
         decline.mutate(t.taskId, result('decline'))
@@ -144,7 +144,7 @@ export function CarryProposalBar({
       variant="primary"
       disabled={busy}
       loading={accept.isPending}
-      leftIcon={<Check className="size-4" strokeWidth={1.5} />}
+      leftIcon={<Check className="size-4" />}
       onClick={() => {
         track('carry_proposal.accept_click', { surface: surf, task_id: t.taskId, item_count: tasks.length })
         accept.mutate(t.taskId, result('accept'))
@@ -156,7 +156,7 @@ export function CarryProposalBar({
   const divider = <span aria-hidden className="bg-border-subtle h-7 w-px shrink-0" />
   const info = (
     <span title={`${sentence} ${hint}`} className="text-text-tertiary shrink-0">
-      <Info className="size-4" strokeWidth={1.25} />
+      <Info className="size-4" />
     </span>
   )
   const title = (

@@ -1,7 +1,7 @@
 'use client'
 
 import { type MouseEvent } from 'react'
-import { Check, Repeat } from 'lucide-react'
+import { Check, Repeat } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import { dateRelationOf } from '@/features/home/analytics'
@@ -137,7 +137,7 @@ function Row({
           done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-success'
         )}
       >
-        {done && <Check className="size-3" strokeWidth={3.5} />}
+        {done && <Check className="size-3" />}
       </button>
       <button
         type="button"

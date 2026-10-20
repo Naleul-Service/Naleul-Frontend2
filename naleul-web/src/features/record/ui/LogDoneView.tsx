@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Check, Clock, Sparkles, Timer, X } from 'lucide-react'
+import { Timer } from 'lucide-react'
+import { ArrowLeft, Check, Clock, Sparkles, X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
@@ -170,7 +171,7 @@ export function LogDoneView({ goals, surface = 'page' }: { goals: GoalCategory[]
       <Card className="p-5 sm:p-6">
         <p className="flex items-center gap-2 text-[17px] font-bold">
           <span className="bg-success grid size-6 place-items-center rounded-full text-white">
-            <Check className="size-3.5" strokeWidth={3} />
+            <Check className="size-3.5" />
           </span>
           {done.activities.length}개를 기록했어요
         </p>

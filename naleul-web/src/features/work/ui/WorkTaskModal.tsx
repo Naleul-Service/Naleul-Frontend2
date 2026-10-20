@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2 } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { track } from '@/lib/client/analytics'

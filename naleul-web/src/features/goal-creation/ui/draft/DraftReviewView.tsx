@@ -4,15 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  AlertTriangle,
-  ChevronDown,
-  CornerDownLeft,
-  MessageSquareText,
-  RefreshCw,
-  Sparkles,
-  UserCheck,
-} from 'lucide-react'
+import { AlertTriangle, CornerDownLeft, MessageSquareText, RefreshCw, UserCheck } from 'lucide-react'
+import { ChevronDown, Sparkles } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
@@ -705,14 +698,14 @@ export function DraftReviewView({ session, draft }: Props) {
 
       {/* 하단 고정 바 */}
       <div className="bg-canvas px-4 pb-[max(12px,env(safe-area-inset-bottom))] sm:px-6 lg:px-8">
-        <div className="bg-inverse mx-auto flex max-w-[1280px] flex-col gap-3 rounded-card px-5 py-4 text-on-ink sm:flex-row sm:items-center sm:px-6">
+        <div className="bg-glass-bg border-glass-border shadow-pop text-text-primary rounded-card mx-auto flex max-w-[1280px] flex-col gap-3 border px-5 py-4 backdrop-blur-[16px] sm:flex-row sm:items-center sm:px-6">
           <div className="flex-1">
-            <p className="text-[14px] text-on-ink/85">
-              이 목표로 시작하면 <b className="text-on-inverse-accent">Task {oneTimes}개</b>와{' '}
-              <b className="text-on-inverse-accent">루틴 {routines.length}개</b>가 내일부터 TimeBlock에 자동 배치돼요.
+            <p className="text-text-secondary text-[14px]">
+              이 목표로 시작하면 <b className="text-text-brand">Task {oneTimes}개</b>와{' '}
+              <b className="text-text-brand">루틴 {routines.length}개</b>가 내일부터 TimeBlock에 자동 배치돼요.
             </p>
             {/* 다시 생성은 한 대화 최대 횟수 + 하루 횟수가 있어요 — 누르기 전에 남은 횟수를 보여줘요 */}
-            <UsageLine tone="onDark" className="mt-1" items={[regenLeft, draftLeft]} />
+            <UsageLine className="mt-1" items={[regenLeft, draftLeft]} />
           </div>
           <div className="flex gap-2">
             {/* 한도를 다 써서 막힌 '다시 생성'을 누를 때 (disabled 라 감싼 요소의 pointerdown 으로) */}
@@ -741,7 +734,7 @@ export function DraftReviewView({ session, draft }: Props) {
               >
                 <RefreshCw className="size-4" />
                 다시 생성
-                {regenRemaining != null && <span className="text-white/70">({regenRemaining}회 남음)</span>}
+                {regenRemaining != null && <span className="opacity-75">({regenRemaining}회 남음)</span>}
               </Button>
             </span>
             <Button

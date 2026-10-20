@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowRight, MessageCircle, NotebookPen, Sparkles } from 'lucide-react'
+import { MessageCircle } from 'lucide-react'
+import { ArrowRight, NotebookPen, Sparkles } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Badge, Chip } from '@/components/ui/Chip'
 import { isApiError } from '@/lib/client/api'
@@ -159,7 +160,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             onClick={() => track('goal_new.record_mode_click', { has_input: hasInput })}
             className="border-line bg-surface hover:border-line-strong group mt-6 flex items-center gap-3 rounded-2xl border px-4 py-3"
           >
-            <span className="bg-ink text-on-ink grid size-9 shrink-0 place-items-center rounded-xl">
+            <span className="bg-action-secondary-bg text-text-brand grid size-9 shrink-0 place-items-center rounded-xl">
               <NotebookPen className="size-4" />
             </span>
             <span className="min-w-0 flex-1">

@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
-import { CalendarCheck, Check, NotebookPen, PenLine, RotateCcw, Sparkles } from 'lucide-react'
+import { CalendarCheck, PenLine, RotateCcw } from 'lucide-react'
+import { Check, NotebookPen, Sparkles } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { cn } from '@/lib/cn'
@@ -407,7 +408,7 @@ export function TaskAddView({
                       i < step ? 'bg-success text-on-ink' : i === step ? 'bg-action-primary-bg text-action-primary-fg' : 'bg-subtle text-ink-3'
                     )}
                   >
-                    {i < step ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+                    {i < step ? <Check className="size-3.5" /> : i + 1}
                   </span>
                   <span className={cn(panel ? 'text-[12px]' : 'text-sm', i === step ? 'font-bold' : 'text-ink-3')}>
                     {panel && i === 2 ? '확인' : label}

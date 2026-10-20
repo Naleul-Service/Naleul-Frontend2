@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Flame } from 'lucide-react'
+import { Flame } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from '@/components/icons'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'

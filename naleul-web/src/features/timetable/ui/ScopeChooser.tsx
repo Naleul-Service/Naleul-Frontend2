@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarDays, CalendarRange, Infinity as InfinityIcon, Repeat, X } from 'lucide-react'
+import { CalendarRange, Infinity as InfinityIcon } from 'lucide-react'
+import { CalendarDays, Repeat, X } from '@/components/icons'
 import { Chip } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'

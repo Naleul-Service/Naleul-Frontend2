@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CalendarMinus, CalendarPlus, Flag, X } from 'lucide-react'
+import { CalendarMinus, CalendarPlus, Flag } from 'lucide-react'
+import { X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { track } from '@/lib/client/analytics'

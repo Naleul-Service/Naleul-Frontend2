@@ -2,9 +2,11 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ChevronDown, Flame, Plus, Repeat } from 'lucide-react'
+import { Flame } from 'lucide-react'
+import { ChevronDown, Plus, Repeat } from '@/components/icons'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
+import { buttonClass } from '@/components/ui/Button'
 import type { Habit, HabitHome } from '@/features/habit/api'
 import { goalAccent } from '@/lib/goalTone'
 import { addDays, dDay, hm } from '@/features/timetable/time'
@@ -45,7 +47,7 @@ export function TodayTasks({
         <Link
           onClick={() => addClick('header')}
           href="/tasks/new"
-          className="text-ink-3 hover:text-ink flex items-center gap-0.5 text-[13px] font-semibold"
+          className={buttonClass('ghost', 'sm')}
           aria-label="Task 추가"
         >
           <Plus className="size-4" />

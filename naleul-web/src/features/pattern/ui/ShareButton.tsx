@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type RefObject } from 'react'
-import { Download } from 'lucide-react'
+import { Download } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/stores/toastStore'
 import { track } from '@/lib/client/analytics'

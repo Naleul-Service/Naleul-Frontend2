@@ -1,7 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
 const MAX_LENGTH = 500
@@ -81,7 +81,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, placeholder,
         aria-label="보내기"
         className="bg-action-primary-bg text-action-primary-fg hover:bg-action-primary-bg-hover disabled:bg-border-subtle disabled:text-text-tertiary grid size-10 shrink-0 place-items-center rounded-full transition-colors"
       >
-        <ArrowUp className="size-5" strokeWidth={2} />
+        <ArrowUp className="size-5" />
       </button>
     </form>
   )

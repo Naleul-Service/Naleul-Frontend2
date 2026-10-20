@@ -1,6 +1,6 @@
 'use client'
 
-import { Sparkles } from 'lucide-react'
+import { Sparkles } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'

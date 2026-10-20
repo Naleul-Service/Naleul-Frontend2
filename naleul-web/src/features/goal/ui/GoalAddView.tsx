@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, BriefcaseBusiness, ListChecks, MessageCircle, PenLine, Target } from 'lucide-react'
+import { BriefcaseBusiness, MessageCircle, PenLine } from 'lucide-react'
+import { ArrowRight, ListChecks, Target } from '@/components/icons'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
@@ -347,8 +348,8 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
         </section>
 
         {/* 업무형 */}
-        <section className={cn(card, open === 'record' && 'border-ink ring-ink ring-1')} aria-labelledby="work-title">
-          <span className="bg-ink text-on-ink grid size-11 place-items-center rounded-2xl">
+        <section className={cn(card, open === 'record' && 'border-action-outline-border ring-action-outline-border ring-1')} aria-labelledby="work-title">
+          <span className="bg-action-secondary-bg text-text-brand grid size-11 place-items-center rounded-[12px]">
             <BriefcaseBusiness className="size-5" />
           </span>
           <p id="work-title" className="mt-4 flex flex-wrap items-center gap-2 text-[18px] font-bold">
@@ -378,7 +379,7 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
         </section>
 
         {/* 목표형 */}
-        <section className={cn(card, open === 'manual' && 'border-ink ring-ink ring-1')} aria-labelledby="goal-title">
+        <section className={cn(card, open === 'manual' && 'border-action-outline-border ring-action-outline-border ring-1')} aria-labelledby="goal-title">
           <span className="bg-brand-soft text-text-brand grid size-11 place-items-center rounded-2xl">
             <Target className="size-5" />
           </span>

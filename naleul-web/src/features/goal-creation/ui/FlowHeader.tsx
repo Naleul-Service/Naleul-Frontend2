@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { X } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
 /** 목표 만들기 플로우 공통 상단 바: 닫기 · 제목(+진행 표시) · 오른쪽 액션 */

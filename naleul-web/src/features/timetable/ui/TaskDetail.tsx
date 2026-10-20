@@ -2,22 +2,8 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import {
-  CalendarClock,
-  Check,
-  Clock,
-  Ellipsis,
-  Flag,
-  Layers,
-  Link2,
-  Pin,
-  PinOff,
-  Pencil,
-  Repeat,
-  Trash,
-  Undo2,
-  X,
-} from 'lucide-react'
+import { Ellipsis, Flag, Layers, Link2, PinOff, Undo2 } from 'lucide-react'
+import { CalendarClock, Check, Clock, Pin, Pencil, Repeat, Trash, X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
@@ -734,7 +720,7 @@ export function TaskDetail({
               runAction(done ? 'uncomplete' : 'complete', () => actions.onToggleComplete(t))
             }}
           >
-            {!done && <Check className="size-4" strokeWidth={2.6} />}
+            {!done && <Check className="size-4" />}
             {done ? '완료 취소' : '완료'}
           </Button>
           {(perm.unlock || perm.unschedule || perm.delete || chain > 1) && (

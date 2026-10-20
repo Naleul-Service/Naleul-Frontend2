@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { X } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
 export interface AnchorRect {
@@ -117,7 +117,7 @@ export function Popover({ anchor, onClose, children, width = 320, label, classNa
           aria-label="닫기"
           className="rounded-icon-btn text-text-secondary hover:bg-bg-subtle hover:text-text-primary absolute top-3 right-3 grid size-7 place-items-center"
         >
-          <X className="size-4" strokeWidth={1.25} />
+          <X className="size-4" />
         </button>
         {children}
       </div>

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import { goalCreationApi, goalCreationKeys } from '../api'

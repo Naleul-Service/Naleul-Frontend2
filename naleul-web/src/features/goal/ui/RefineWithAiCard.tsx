@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { ArrowRight, NotebookPen, Sparkles } from 'lucide-react'
+import { ArrowRight, NotebookPen, Sparkles } from '@/components/icons'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'

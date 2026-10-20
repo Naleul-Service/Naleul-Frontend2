@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, CalendarDays, Check, Smartphone } from 'lucide-react'
+import { Smartphone } from 'lucide-react'
+import { ArrowRight, CalendarDays, Check } from '@/components/icons'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
@@ -308,7 +309,7 @@ function GoogleImport() {
                       }}
                       className={cn(
                         'flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors',
-                        on ? 'border-ink bg-subtle text-ink' : 'border-line-strong text-ink-3 hover:text-ink'
+                        on ? 'border-text-brand bg-ai-tint-soft text-text-brand' : 'border-line-strong text-ink-3 hover:text-ink'
                       )}
                     >
                       <span className="size-2.5 rounded-full" style={{ backgroundColor: c.color }} />

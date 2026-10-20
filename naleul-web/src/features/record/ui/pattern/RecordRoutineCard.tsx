@@ -1,4 +1,4 @@
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp } from '@/components/icons'
 import { Section } from '@/features/pattern/ui/Section'
 import { formatDuration } from '@/features/timetable/time'
 import type { RecordPattern } from '../../api'

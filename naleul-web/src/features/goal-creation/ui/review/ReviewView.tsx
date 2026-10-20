@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronRight, Sparkles } from 'lucide-react'
+import { ChevronRight, Sparkles } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { Badge } from '@/components/ui/Chip'

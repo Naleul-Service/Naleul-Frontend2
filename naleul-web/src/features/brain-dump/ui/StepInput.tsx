@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
-import { Clock, CornerDownLeft, Lock, Timer, X, Sparkles } from 'lucide-react'
+import { CornerDownLeft, Timer } from 'lucide-react'
+import { Clock, Lock, X, Sparkles } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'

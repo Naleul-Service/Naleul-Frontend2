@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { Check } from '@/components/icons'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
 import { addDays, todayKst } from '@/features/timetable/time'
@@ -232,7 +232,7 @@ function MilestoneItem({
               : 'border-line-strong bg-surface hover:border-success'
         )}
       >
-        {done && <Check className="size-2.5" strokeWidth={4} />}
+        {done && <Check className="size-2.5" />}
       </button>
       <div className="flex items-start gap-2">
         <button type="button" onClick={edit.open} className="min-w-0 flex-1 text-left">

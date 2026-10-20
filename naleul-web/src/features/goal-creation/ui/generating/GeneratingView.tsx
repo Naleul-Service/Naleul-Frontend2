@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, Check, Sparkles } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
+import { Check, Sparkles } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
@@ -230,7 +231,7 @@ export function GeneratingView({
                       state === 'todo' && 'bg-subtle'
                     )}
                   >
-                    {state === 'done' && <Check className="size-3.5" strokeWidth={3} />}
+                    {state === 'done' && <Check className="size-3.5" />}
                     {state === 'current' && <Spinner className="size-3" />}
                   </span>
                   <span

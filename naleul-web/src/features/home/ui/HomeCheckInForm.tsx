@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { ArrowRight } from 'lucide-react'
+import { ArrowRight } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import type { ReflectionMood } from '@/features/goal/api'

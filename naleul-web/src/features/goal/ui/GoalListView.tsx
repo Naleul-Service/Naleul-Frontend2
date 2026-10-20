@@ -3,7 +3,7 @@
 import { useEffect, useRef, type MouseEvent } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Plus, Sparkles } from 'lucide-react'
+import { ArrowRight, Plus, Sparkles } from '@/components/icons'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -306,7 +306,7 @@ export function GoalListView() {
             onClick={() => track('goal_list.add_click', { goal_count: temps.length + ongoing.length })}
             className={buttonClass('primary')}
           >
-            <Plus className="size-4" strokeWidth={2.6} />
+            <Plus className="size-4" />
             목표 추가
           </Link>
         }

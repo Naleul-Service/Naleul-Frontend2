@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react'
-import { X } from 'lucide-react'
+import { X } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { goalVars } from '@/lib/goalTone'
 
@@ -112,7 +112,7 @@ export function GoalChip({
           }}
           className="-mr-0.5 grid place-items-center rounded opacity-70 hover:opacity-100"
         >
-          <X className={md ? 'size-3.5' : 'size-3'} strokeWidth={1.5} />
+          <X className={md ? 'size-3.5' : 'size-3'} />
         </span>
       )}
     </Tag>

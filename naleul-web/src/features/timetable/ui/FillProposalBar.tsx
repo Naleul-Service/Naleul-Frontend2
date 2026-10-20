@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, X } from 'lucide-react'
+import { Check, X } from '@/components/icons'
 import { AIBadge } from '@/components/ui/AIBadge'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
@@ -72,7 +72,7 @@ export function FillProposalBar({
             <Button
               variant="secondary"
               disabled={loading}
-              leftIcon={<X className="size-4" strokeWidth={1.5} />}
+              leftIcon={<X className="size-4" />}
               onClick={() => onCancel('cancel_button')}
             >
               {count === 0 ? '닫기' : isNew ? '아니요 (시간 미정으로 두기)' : '취소 (반영 안 함)'}
@@ -81,7 +81,7 @@ export function FillProposalBar({
               <Button
                 variant="primary"
                 loading={loading}
-                leftIcon={<Check className="size-4" strokeWidth={1.5} />}
+                leftIcon={<Check className="size-4" />}
                 onClick={onApply}
               >
                 이대로 진행

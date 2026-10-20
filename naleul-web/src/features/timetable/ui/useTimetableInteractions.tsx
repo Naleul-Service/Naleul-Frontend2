@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { Link2, X } from 'lucide-react'
+import { Link2 } from 'lucide-react'
+import { X } from '@/components/icons'
 import { Popover, rectOf, type AnchorRect } from '@/components/ui/Popover'
 import { dateRelationOf, errorStatusOf } from '@/features/home/analytics'
 import { track, type EventProps } from '@/lib/client/analytics'

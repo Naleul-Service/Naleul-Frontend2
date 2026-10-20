@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Check } from 'lucide-react'
+import { Check } from '@/components/icons'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -178,7 +178,7 @@ export function WithdrawView() {
             )}
             aria-hidden
           >
-            {agreed && <Check className="size-3.5" strokeWidth={3} />}
+            {agreed && <Check className="size-3.5" />}
           </span>
           <span className="text-ink-2 text-[14px]">회원 탈퇴 유의 사항을 확인했으며 동의합니다.</span>
         </label>

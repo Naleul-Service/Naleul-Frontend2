@@ -2,18 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  BarChart3,
-  CalendarDays,
-  Home,
-  Library,
-  LogIn,
-  LogOut,
-  Plus,
-  Settings,
-  Target,
-  type LucideIcon,
-} from 'lucide-react'
+import { Library, LogIn } from 'lucide-react'
+import { BarChart3, CalendarDays, Home, LogOut, Plus, Settings, Target, type IconComponent } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { logout } from '@/lib/client/api'
 import { COMMON_EVENTS as CE, EVENTS, track } from '@/lib/client/analytics'
@@ -30,7 +20,7 @@ import { isGuestUser, type SessionUserView } from './types'
 interface NavItem {
   href: string
   label: string
-  icon: LucideIcon
+  icon: IconComponent
   /** Amplitude nav_item */
   key: string
 }
@@ -123,7 +113,7 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
         }}
         className={buttonClass('primary', 'md', true)}
       >
-        <Plus className="size-[18px]" strokeWidth={1.5} />
+        <Plus className="size-[18px]" />
         Task 추가
       </Link>
 
@@ -151,7 +141,7 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
             aria-label="목표 추가"
             className={iconButtonClass('sm')}
           >
-            <Plus className="size-3.5" strokeWidth={1.25} />
+            <Plus className="size-3.5" />
           </Link>
         </div>
         <GoalNavList onNavigate={onNavigate} surface={surface} />
@@ -217,7 +207,7 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
             title="로그아웃"
             className={iconButtonClass('md')}
           >
-            <LogOut className="size-[18px]" strokeWidth={1.5} />
+            <LogOut className="size-[18px]" />
           </button>
         </div>
       )}

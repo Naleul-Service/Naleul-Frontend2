@@ -1,7 +1,7 @@
 'use client'
 
 import { useContext, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { todayKst } from '@/features/timetable/time'
 import type { GoalCategory } from '../api'

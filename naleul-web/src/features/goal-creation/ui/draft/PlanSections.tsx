@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { ArrowRight, Pencil, Plus } from 'lucide-react'
+import { ArrowRight, Pencil, Plus } from '@/components/icons'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
 import type { UserColor } from '@/features/color/api'
@@ -353,12 +353,12 @@ function PlanCurve({ plan }: { plan: GoalPlan }) {
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="mt-2 w-full" role="img" aria-label="계획 곡선">
-      <path d={path} fill="none" stroke="white" strokeOpacity="0.85" strokeWidth="2" strokeDasharray="5 4" />
+      <path d={path} fill="none" className="stroke-text-brand" strokeWidth="2" strokeDasharray="5 4" />
       {points.map((p, i) => (
         <g key={`${p.date}-${i}`}>
-          <circle cx={x(p.date)} cy={y(p.value)} r={i === points.length - 1 ? 5 : 4} fill="white" />
+          <circle cx={x(p.date)} cy={y(p.value)} r={i === points.length - 1 ? 5 : 4} className="fill-text-brand" />
           {i > 0 && (
-            <text x={x(p.date)} y={y(p.value) - 9} textAnchor="middle" fontSize="11" fontWeight="700" fill="white">
+            <text x={x(p.date)} y={y(p.value) - 9} textAnchor="middle" fontSize="11" fontWeight="700" className="fill-text-primary">
               {p.value}
             </text>
           )}
@@ -389,10 +389,11 @@ export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: 
   ] as const
 
   return (
-    <section className="bg-brand rounded-card p-6 text-white sm:p-7">
+    // AI 가 설계한 계획 요약 — 밝은 AI 카드 (ai-tint-soft + 그라데이션 테두리)
+    <section className="ai-border ai-card text-text-primary rounded-card p-6 sm:p-7">
       {goal.metric ? (
         <>
-          <div className="flex items-end justify-between text-[13px] text-white/70">
+          <div className="text-text-secondary flex items-end justify-between text-[13px]">
             <span>현재</span>
             <span>목표</span>
           </div>
@@ -401,7 +402,7 @@ export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: 
               {goal.metric.startValue}
               <span className="text-xl">{goal.metric.unit}</span>
             </span>
-            <ArrowRight className="size-6 text-white/70" />
+            <ArrowRight className="text-text-tertiary size-6" />
             <span className="text-[32px] font-bold tracking-tight">
               {goal.metric.targetValue}
               <span className="text-xl">{goal.metric.unit}</span>
@@ -410,24 +411,24 @@ export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: 
         </>
       ) : (
         <>
-          <p className="text-[13px] text-white/70">기간</p>
+          <p className="text-text-secondary text-[13px]">기간</p>
           <p className="mt-1 text-2xl font-bold">
             {formatMd(goal.startDate, false)} → {formatMd(goal.endDate, false)}
           </p>
         </>
       )}
 
-      <div className="mt-4 h-1.5 rounded-full bg-white/25">
-        <div className="h-full w-[3%] rounded-full bg-white" />
+      <div className="bg-bg-surface/70 mt-4 h-1.5 rounded-full">
+        <div className="bg-ai-gradient h-full w-[3%] rounded-full" />
       </div>
-      <div className="mt-2 flex justify-between text-[13px] text-white/80">
+      <div className="text-text-secondary mt-2 flex justify-between text-[13px]">
         <span>시작 {formatMd(goal.startDate, false)}</span>
         <span>{remain >= 0 ? `D-${remain}` : '종료'}</span>
       </div>
 
       {goal.metric && (
         <>
-          <p className="mt-5 text-[13px] text-white/80">계획 {goal.metric.name} 곡선</p>
+          <p className="text-text-secondary mt-5 text-[13px]">계획 {goal.metric.name} 곡선</p>
           <PlanCurve plan={plan} />
         </>
       )}
@@ -435,7 +436,7 @@ export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: 
         <button
           type="button"
           onClick={onEditGoal}
-          className="mt-3 inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1.5 text-[13px] font-semibold hover:bg-white/25"
+          className="bg-bg-surface/70 text-text-secondary hover:bg-bg-surface mt-3 inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[13px] font-semibold"
         >
           <Pencil className="size-3.5" />
           {goal.metric ? '시작값·목표값·종료일 고치기' : '종료일 고치기'}
@@ -444,8 +445,8 @@ export function MetricCard({ plan, onEditGoal }: { plan: GoalPlan; onEditGoal?: 
 
       <dl className="mt-5 grid grid-cols-2 gap-2.5">
         {stats.map(([label, value]) => (
-          <div key={label} className="rounded-2xl bg-white/15 px-4 py-3">
-            <dt className="text-xs text-white/75">{label}</dt>
+          <div key={label} className="bg-bg-surface rounded-xl px-4 py-3">
+            <dt className="text-caption-md text-text-secondary">{label}</dt>
             <dd className="mt-0.5 text-xl font-bold">{value}</dd>
           </div>
         ))}

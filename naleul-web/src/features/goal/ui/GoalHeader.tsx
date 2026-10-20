@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from '@/components/icons'
 import { Badge } from '@/components/ui/Chip'
 import { Card } from '@/components/ui/Card'
 import { track } from '@/lib/client/analytics'

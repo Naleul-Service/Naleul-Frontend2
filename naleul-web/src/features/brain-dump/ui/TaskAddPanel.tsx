@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { X } from 'lucide-react'
+import { X } from '@/components/icons'
 import { track } from '@/lib/client/analytics'
 import { TaskAddView, type TaskAddedInfo, type TaskAddViewHandle } from './TaskAddView'
 

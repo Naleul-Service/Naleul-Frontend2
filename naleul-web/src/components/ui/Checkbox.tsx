@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react'
+import { Check } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
 /** 디자인 시스템 Checkbox 모양 (20×20 · 모서리 6) — 버튼 · 라벨 안에 넣어 쓰는 장식이에요 */
@@ -14,7 +14,7 @@ export function CheckboxMark({ checked, className }: { checked: boolean; classNa
         className
       )}
     >
-      {checked && <Check className="size-3.5" strokeWidth={2.5} />}
+      {checked && <Check className="size-3.5" />}
     </span>
   )
 }

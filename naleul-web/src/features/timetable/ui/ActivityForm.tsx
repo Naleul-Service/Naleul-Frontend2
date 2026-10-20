@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { Link2, Trash2, X } from 'lucide-react'
+import { Link2 } from 'lucide-react'
+import { Trash2, X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { useGoalCategories } from '@/features/goal/api'

@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, Copy, PenLine, Repeat, Trash2 } from 'lucide-react'
+import { CheckCircle2, Copy, PenLine } from 'lucide-react'
+import { Repeat, Trash2 } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'

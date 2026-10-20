@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type KeyboardEvent, type Ref } from 'react'
-import { Check, Plus, X } from 'lucide-react'
+import { Check, Plus, X } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 
@@ -115,7 +115,7 @@ export function MustDoPicker({
                 on ? 'border-brand bg-brand-soft text-text-brand' : 'border-line-strong text-ink-2 hover:border-ink-4'
               )}
             >
-              {on && <Check className="size-3.5" strokeWidth={3} />}
+              {on && <Check className="size-3.5" />}
               {s}
             </button>
           )

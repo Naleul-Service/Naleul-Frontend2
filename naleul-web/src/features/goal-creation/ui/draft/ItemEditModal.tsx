@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2 } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'

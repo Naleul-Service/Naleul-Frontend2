@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { X } from 'lucide-react'
+import { X } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
 /** 모달을 닫은 방법 (Amplitude close_method) */
@@ -98,7 +98,7 @@ export function Modal({
                 aria-label="닫기"
                 className="rounded-icon-btn text-text-secondary hover:bg-bg-subtle hover:text-text-primary -mt-1 -mr-1.5 grid size-8 shrink-0 place-items-center"
               >
-                <X className="size-[18px]" strokeWidth={1.5} />
+                <X className="size-[18px]" />
               </button>
             )}
           </div>

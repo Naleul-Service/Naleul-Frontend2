@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, type MouseEvent } from 'react'
-import { CalendarDays, Check, Flag } from 'lucide-react'
+import { Flag } from 'lucide-react'
+import { CalendarDays, Check } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -448,7 +449,7 @@ function TaskRow({
           done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-ink-4 bg-surface'
         )}
       >
-        {done && <Check className="size-3" strokeWidth={3.5} />}
+        {done && <Check className="size-3" />}
       </button>
       <button
         type="button"

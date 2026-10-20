@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
-import { LineChart, Pencil, Trash2, X } from 'lucide-react'
+import { LineChart } from 'lucide-react'
+import { Pencil, Trash2, X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'

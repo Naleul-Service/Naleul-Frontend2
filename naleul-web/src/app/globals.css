@@ -32,8 +32,6 @@
   --color-danger-soft: #fbf0f0;
   --color-on-ink: #ffffff;
   --color-inverse: #121820;
-  /* inverse 면 위 강조 글자 (라이트: 민트 · 다크: inverse 가 밝아지니 진한 청록) */
-  --color-on-inverse-accent: #00cba8;
   --color-warning-ink: #805a12;
   --color-warning-ink-strong: #6b4a0e;
   --color-hatch: #f2f5f9;
@@ -123,6 +121,7 @@
   --color-glass-shadow: #1218201f;
   --color-glass-shadow-soft: #1218200f;
   --color-brand-logo: #0b4f65;
+  --color-brand-logo-base: #0b4f65;
   --color-brand-logo-accent: #4a90e2;
   --color-neutral-400: #a3aebd;
 
@@ -348,7 +347,6 @@
   --color-danger-soft: #443740;
   --color-on-ink: #121820;
   --color-inverse: #f2f5f9;
-  --color-on-inverse-accent: #0f7a9c;
   --color-warning-ink: #e8c878;
   --color-warning-ink-strong: #f0d89a;
   --color-hatch: #1a2129;
@@ -438,6 +436,7 @@
   --color-glass-shadow: #00000080;
   --color-glass-shadow-soft: #0000004d;
   --color-brand-logo: #7fcbe6;
+  --color-brand-logo-base: #7fcbe6;
   --color-brand-logo-accent: #5f9cf5;
   --color-neutral-400: #566273;
 
@@ -530,6 +529,20 @@
   --tw-shadow-color: rgb(0 0 0 / 0.35);
 }
 
+/*
+ * Figma 에 없어 lucide-react 로 남은 아이콘도 같은 선 굵기 규칙으로 (명세 3: 14·16px = 1.25 · 18px 이상 = 1.5, 화면 px)
+ * — non-scaling-stroke 로 viewBox 와 상관없이 화면 px 로 그려요. Figma 아이콘(components/icons)은 Icon 이 직접 계산해요.
+ */
+svg.lucide {
+  stroke-width: 1.5px;
+}
+svg.lucide :is(path, line, circle, rect, polyline, polygon, ellipse) {
+  vector-effect: non-scaling-stroke;
+}
+svg.lucide:is(.size-3, .size-3\.5, .size-4, .size-2\.5) {
+  stroke-width: 1.25px;
+}
+
 /* Tailwind dark: 변형 (dark:bg-…) 도 같은 기준으로 */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
@@ -563,6 +576,10 @@
   box-shadow:
     0 12px 36px rgb(0 0 0 / 0.08),
     0 2px 8px rgb(0 0 0 / 0.04);
+}
+/* AI 분석 카드 — ai/tint-soft 바탕(= ai/tint 60% 를 surface 위에, 불투명) + 그라데이션 테두리. ai-border · ai-border-flat 와 같이 써요 */
+@utility ai-card {
+  --ai-border-fill: color-mix(in srgb, var(--color-ai-tint) 60%, var(--color-bg-surface));
 }
 /* 그림자 없는 AI 테두리 (카드 안 · 목록 안처럼 떠 있지 않은 곳) */
 @utility ai-border-flat {

@@ -10,28 +10,15 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from 'react'
-import {
-  AlertTriangle,
-  Check,
-  ChevronDown,
-  CircleDashed,
-  Flag,
-  ListTodo,
-  Loader,
-  MessageSquareText,
-  Pencil,
-  PencilLine,
-  PenLine,
-  Plus,
-  Share2,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { AlertTriangle, CircleDashed, Flag, ListTodo, Loader, MessageSquareText, PencilLine, PenLine, Share2 } from 'lucide-react'
+import { Check, ChevronDown, Pencil, Plus, Trash2, X } from '@/components/icons'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { goalVars } from '@/lib/goalTone'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { track } from '@/lib/client/analytics'
 import { errorStatusOf } from '@/features/home/analytics'
@@ -114,13 +101,16 @@ function Meter({ label, value, right }: { label: string; value: number | null; r
   if (value === null) return null
   return (
     <div>
-      <div className="mb-1 flex justify-between text-[12px] text-on-ink/75">
+      <div className="text-caption-md text-text-secondary mb-1 flex justify-between">
         <span>{label}</span>
-        <span className="font-semibold text-on-ink tabular-nums">{right ?? `${value}%`}</span>
+        <span className="text-text-primary font-semibold tabular-nums">{right ?? `${value}%`}</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-on-ink/15">
-        <div className="h-full rounded-full bg-on-ink" style={{ width: `${Math.min(Math.max(value, 0), 100)}%` }} />
-      </div>
+      {/* 트랙 = surface 70% · 채움 = 목표 accent (NowCard) */}
+      <ProgressBar
+        value={Math.min(Math.max(value, 0), 100) / 100}
+        className="bg-bg-surface/70"
+        fillClassName="bg-(--goal-accent)"
+      />
     </div>
   )
 }
@@ -144,10 +134,13 @@ const shortDate = (ymd: string) =>
 
 function SummaryHero({
   board,
+  colorCode,
   onShare,
   onPill,
 }: {
   board: WorkBoard
+  /** 목표 색 — 카드 바탕을 목표 톤으로 (Figma NowCard) */
+  colorCode?: string | null
   onShare: () => void
   /** 알약은 눌러도 아무 일이 없어요 — 눌러 보는지만 남겨요 */
   onPill: (kind: PillKind) => void
@@ -158,12 +151,16 @@ function SummaryHero({
   const topicPercent = s.topicsTotal ? Math.round((s.topicsDone / s.topicsTotal) * 100) : null
 
   return (
-    <section className="bg-inverse rounded-card p-6 text-on-ink sm:p-7">
+    // 목표 요약 카드 (Figma NowCard) — 목표 톤 바탕 · 1px accent 20% 테두리 · 다크 모드는 목표 dark bg
+    <section
+      style={goalVars(colorCode)}
+      className="text-text-primary rounded-card border border-[color-mix(in_srgb,var(--goal-accent)_20%,transparent)] bg-(--goal-bg) p-6 sm:p-7"
+    >
       <div className="flex flex-wrap items-start gap-x-8 gap-y-5">
         {/* 다음 마감 */}
         <div className="max-w-full min-w-[200px]">
-          <p className="flex items-center gap-1.5 text-[13px] text-on-ink/70">
-            <Flag className="size-4" />
+          <p className="text-text-secondary flex items-center gap-1.5 text-[13px]">
+            <Flag className="size-4" strokeWidth={1.5} />
             다음 마감
           </p>
           {next ? (
@@ -174,13 +171,13 @@ function SummaryHero({
               </p>
               <p
                 className={cn(
-                  'mt-1 text-[44px] leading-none font-bold tracking-tight',
-                  next.dDay! < 0 && 'text-action-danger-bg'
+                  'mt-1 text-[44px] leading-none font-bold tracking-tight text-(--goal-fg)',
+                  next.dDay! < 0 && 'text-status-error-fg'
                 )}
               >
                 {goalDDay(next.dDay)}
               </p>
-              <p className="mt-1.5 text-[14px] text-on-ink/80">
+              <p className="text-text-secondary mt-1.5 text-[14px]">
                 {fullDate(next.dueDate!)}까지
                 {next.remaining > 0 && ` · 남은 ${next.remaining}개`}
               </p>
@@ -194,7 +191,7 @@ function SummaryHero({
                     ? '모든 주제를 끝냈어요'
                     : '마감 정한 주제가 없어요'}
               </p>
-              <p className="mt-1.5 text-[13px] text-on-ink/70">
+              <p className="text-text-secondary mt-1.5 text-[13px]">
                 {s.topicsTotal === 0
                   ? '로드맵에 주제를 만들고 마감을 정해 보세요'
                   : s.topicsDone === s.topicsTotal
@@ -207,10 +204,10 @@ function SummaryHero({
 
         {/* 진행 */}
         <div className="min-w-[220px] flex-1">
-          <p className="text-[13px] text-on-ink/70">진행</p>
-          <p className="mt-1 text-[32px] leading-none font-bold">
+          <p className="text-text-secondary text-[13px]">진행</p>
+          <p className="mt-1 text-[32px] leading-none font-bold text-(--goal-fg)">
             {s.done}
-            <span className="text-[18px] font-semibold text-on-ink/60"> / {s.total}개 완료</span>
+            <span className="text-text-secondary text-[18px] font-semibold"> / {s.total}개 완료</span>
           </p>
           <div className="mt-4 space-y-2.5">
             <Meter label="Task 완료" value={s.progressPercent} />
@@ -267,10 +264,10 @@ function Pill({
       className={cn(
         'rounded-full px-3 py-1 font-semibold',
         tone === 'danger'
-          ? 'bg-action-danger-bg text-action-danger-fg'
+          ? 'bg-status-error-bg text-status-error-fg'
           : tone === 'warning'
-            ? 'bg-warning text-accent-on-mint'
-            : 'bg-on-ink/12 text-on-ink/90'
+            ? 'bg-status-warning-bg text-status-warning-fg'
+            : 'bg-bg-surface/70 text-text-secondary'
       )}
     >
       {children}
@@ -603,7 +600,7 @@ function RoadmapItem({
           {t.status === 'OVERDUE' ? (
             <AlertTriangle className="size-3.5" strokeWidth={2.5} />
           ) : (
-            <Check className="size-3.5" strokeWidth={3} />
+            <Check className="size-3.5" />
           )}
         </button>
       </span>
@@ -920,7 +917,7 @@ function Roadmap({
             </NoTopicItem>
           )}
           <li className="flex items-center gap-3">
-            <span className="bg-ink text-on-ink grid size-7 shrink-0 place-items-center rounded-full">
+            <span className="bg-action-primary-bg text-action-primary-fg grid size-7 shrink-0 place-items-center rounded-full">
               <Flag className="size-3.5" />
             </span>
             <span className="text-[13px] font-bold">
@@ -957,7 +954,7 @@ function CheckButton({ task, onToggle, small = false }: { task: WorkTask; onTogg
         done ? 'border-brand bg-brand text-white' : 'border-line-strong hover:border-brand text-transparent'
       )}
     >
-      <Check className={small ? 'size-3' : 'size-3.5'} strokeWidth={3} />
+      <Check className={small ? 'size-3' : 'size-3.5'} />
     </button>
   )
 }
@@ -1732,6 +1729,7 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
     <div className="space-y-5">
       <SummaryHero
         board={board}
+        colorCode={goal.colorCode}
         onShare={() => {
           track('work_board.share_click', { goal_category_id: goalId, open_task_count: board.summary.remaining })
           setSharing(true)

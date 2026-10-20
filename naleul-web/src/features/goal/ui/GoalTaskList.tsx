@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronDown, Repeat } from 'lucide-react'
+import { Check, ChevronDown, Repeat } from '@/components/icons'
 import { Card } from '@/components/ui/Card'
 import { Badge, Chip } from '@/components/ui/Chip'
 import { Spinner } from '@/components/ui/Spinner'
@@ -186,7 +186,7 @@ function TaskRow({
           done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-ink-4'
         )}
       >
-        {toggling ? <Spinner className="size-3" /> : done && <Check className="size-3.5" strokeWidth={3.5} />}
+        {toggling ? <Spinner className="size-3" /> : done && <Check className="size-3.5" />}
       </button>
 
       {/* 날짜 */}

@@ -1,6 +1,6 @@
 'use client'
 
-import { Check } from 'lucide-react'
+import { Check } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
 /** 동그란 완료 체크 — 홈의 Task · 루틴 · 습관 공통 */
@@ -33,7 +33,7 @@ export function TaskCheck({
         done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-success text-transparent'
       )}
     >
-      <Check className={size === 'sm' ? 'size-3' : 'size-3.5'} strokeWidth={3.5} />
+      <Check className={size === 'sm' ? 'size-3' : 'size-3.5'} />
     </button>
   )
   if (!disabled || !onDisabledPress) return button

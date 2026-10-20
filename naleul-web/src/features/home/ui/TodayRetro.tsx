@@ -2,7 +2,8 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Check, Library, Pencil, PencilLine, Trash2 } from 'lucide-react'
+import { Library, PencilLine } from 'lucide-react'
+import { ArrowRight, Check, Pencil, Trash2 } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
@@ -229,7 +230,7 @@ export function RetroPanel({
       )}
     >
       {hasRetro(g) ? (
-        <Check className="text-success size-3.5 shrink-0" strokeWidth={3} />
+        <Check className="text-success size-3.5 shrink-0" />
       ) : (
         <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(g.colorCode) }} aria-hidden />
       )}
@@ -312,7 +313,7 @@ export function RetroPanel({
                   key={`d${i}`}
                   className="bg-success-soft text-success flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold"
                 >
-                  <Check className="size-3 shrink-0" strokeWidth={3} />
+                  <Check className="size-3 shrink-0" />
                   <span className="truncate">{name}</span>
                 </li>
               ))}

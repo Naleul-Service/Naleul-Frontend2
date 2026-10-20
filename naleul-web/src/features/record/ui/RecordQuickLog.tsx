@@ -1,7 +1,8 @@
 'use client'
 
 import { useRef, useState, type KeyboardEvent } from 'react'
-import { Clock, CornerDownLeft, Timer } from 'lucide-react'
+import { CornerDownLeft, Timer } from 'lucide-react'
+import { Clock } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { toast } from '@/stores/toastStore'

@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react'
+import { Sparkles } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
 /**
@@ -20,7 +20,6 @@ export function AIBadge({ size = 'md', className }: { size?: 'sm' | 'md' | 'lg';
     >
       <Sparkles
         className={size === 'sm' ? 'size-3' : size === 'md' ? 'size-4' : 'size-6'}
-        strokeWidth={size === 'sm' ? 1.5 : 1.75}
       />
     </span>
   )

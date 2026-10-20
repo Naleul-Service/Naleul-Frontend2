@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { LogOut } from 'lucide-react'
+import { LogOut } from '@/components/icons'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { logout } from '@/lib/client/api'
 import { EVENTS, track } from '@/lib/client/analytics'

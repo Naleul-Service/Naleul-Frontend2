@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { BarChart3, KanbanSquare, LayoutDashboard, Library, type LucideIcon } from 'lucide-react'
+import { KanbanSquare, LayoutDashboard, Library } from 'lucide-react'
+import { BarChart3, type IconComponent } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { track } from '@/lib/client/analytics'
+import { goalVars } from '@/lib/goalTone'
 import { isApiError } from '@/lib/client/api'
 import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { errorStatusOf } from '@/features/home/analytics'
@@ -40,29 +42,29 @@ function Ring({ ratio, label }: { ratio: number; label: string }) {
   return (
     <div className="relative size-32 shrink-0">
       <svg viewBox="0 0 120 120" className="size-full -rotate-90">
-        <circle cx="60" cy="60" r={R} fill="none" stroke="white" strokeOpacity="0.25" strokeWidth="10" />
+        <circle cx="60" cy="60" r={R} fill="none" className="stroke-bg-surface/70" strokeWidth="10" />
         <circle
           cx="60"
           cy="60"
           r={R}
           fill="none"
-          stroke="white"
+          style={{ stroke: 'var(--goal-accent)' }}
           strokeWidth="10"
           strokeLinecap="round"
           strokeDasharray={C}
           strokeDashoffset={C * (1 - Math.min(Math.max(ratio, 0), 1))}
         />
       </svg>
-      <span className="absolute inset-0 grid place-items-center text-[26px] font-bold">{label}</span>
+      <span className="text-text-primary absolute inset-0 grid place-items-center text-[26px] font-bold">{label}</span>
     </div>
   )
 }
 
 function StatBox({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-[120px] flex-1 rounded-2xl bg-white/15 px-4 py-3">
-      <p className="text-xs text-white/75">{label}</p>
-      <p className="mt-0.5 text-xl font-bold whitespace-nowrap">{value}</p>
+    <div className="bg-bg-surface/70 min-w-[120px] flex-1 rounded-xl px-4 py-3">
+      <p className="text-caption-md text-text-secondary">{label}</p>
+      <p className="text-h2 text-text-primary mt-0.5 whitespace-nowrap">{value}</p>
     </div>
   )
 }
@@ -89,12 +91,16 @@ function Hero({ goal }: { goal: GoalCategory }) {
   }
 
   return (
-    <section className="bg-brand flex flex-col gap-6 rounded-card p-6 text-white sm:p-8 lg:flex-row lg:items-center">
+    // 목표 요약 카드 (Figma NowCard) — 목표 톤 바탕 (다크 모드는 목표 dark bg)
+    <section
+      style={goalVars(goal.colorCode)}
+      className="text-text-primary rounded-card flex flex-col gap-6 border border-[color-mix(in_srgb,var(--goal-accent)_20%,transparent)] bg-(--goal-bg) p-6 sm:p-8 lg:flex-row lg:items-center"
+    >
       <div className="flex items-center gap-6">
         <Ring ratio={ratio} label={`${Math.round(Math.min(Math.max(ratio, 0), 1) * 100)}%`} />
         <div>
-          <p className="text-sm text-white/80">{caption}</p>
-          <p className="mt-1 text-[40px] leading-none font-bold tracking-tight">{headline}</p>
+          <p className="text-text-secondary text-sm">{caption}</p>
+          <p className="mt-1 text-[40px] leading-none font-bold tracking-tight text-(--goal-fg)">{headline}</p>
         </div>
       </div>
       {period && (
@@ -113,7 +119,7 @@ function Hero({ goal }: { goal: GoalCategory }) {
 interface TabDef<T extends string> {
   value: T
   label: string
-  icon: LucideIcon
+  icon: IconComponent
 }
 
 /**

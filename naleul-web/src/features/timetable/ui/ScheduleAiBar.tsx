@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, CornerDownLeft, Repeat } from 'lucide-react'
+import { AlertTriangle, CornerDownLeft } from 'lucide-react'
+import { Repeat } from '@/components/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
-import { BarChart3, Bell, CalendarPlus, ChevronRight, Clock, Crown, FileText, type LucideIcon } from 'lucide-react'
+import { CalendarPlus, FileText } from 'lucide-react'
+import { BarChart3, Bell, ChevronRight, Clock, Crown, type IconComponent } from '@/components/icons'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { LogoutButton } from '@/features/account/ui/LogoutButton'
@@ -16,7 +17,7 @@ export const metadata: Metadata = { title: '설정' }
 const ITEMS: {
   href: string
   destination: SettingsDestination
-  icon: LucideIcon
+  icon: IconComponent
   title: string
   description: string
 }[] = [

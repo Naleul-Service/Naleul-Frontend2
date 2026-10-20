@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Menu } from 'lucide-react'
+import { Menu } from '@/components/icons'
 import { Logo } from '@/components/brand/Logo'
 import { GuestBanner } from '@/components/auth/LoginRequiredDialog'
 import { GuestSessionTracker } from '@/components/analytics/GuestSessionTracker'
@@ -69,11 +69,11 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
           aria-label="메뉴 열기"
           className={cn(iconButtonClass('md'), '-ml-1.5')}
         >
-          <Menu className="size-5" strokeWidth={1.5} />
+          <Menu className="size-5" />
         </button>
         {/* 위쪽 바 로고는 링크가 아니에요 (사이드바 로고는 홈으로 감) → 눌러 보는지 확인 */}
         <span onClick={() => track(CE.mobileHeaderDeadClick, { dead_target: 'logo', current_path: currentPath() })}>
-          <Logo />
+          <Logo size="lg" />
         </span>
       </header>
 

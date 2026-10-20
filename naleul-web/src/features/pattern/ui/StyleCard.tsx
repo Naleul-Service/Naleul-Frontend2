@@ -1,20 +1,24 @@
 'use client'
 
 import type { PatternStyle } from '../types'
+import { AIBadge } from '@/components/ui/AIBadge'
 import { useDeadClick } from '../analytics'
 import { INSIGHT_ICON } from '../format'
 import { Emphasis } from './Emphasis'
 
-/** 상단 검은 카드: AI가 분석한 나의 실행 스타일 */
+/** 상단 AI 분석 카드: AI가 분석한 나의 실행 스타일 (ai-tint-soft 바탕 + 그라데이션 테두리) */
 export function StyleCard({ style }: { style?: PatternStyle | null }) {
   const ready = !!style?.title
   const onSentenceClick = useDeadClick('style_sentence')
   return (
     <section
-      className="bg-inverse rounded-card flex h-full flex-col p-6 text-on-ink sm:p-8"
+      className="ai-border ai-card text-text-primary rounded-card flex h-full flex-col p-6 sm:p-8"
       aria-label="나의 실행 스타일"
     >
-      <p className="text-[13px] text-on-ink/60">✦ AI가 분석한 나의 실행 스타일</p>
+      <p className="text-label-md text-text-secondary flex items-center gap-2">
+        <AIBadge size="sm" />
+        AI가 분석한 나의 실행 스타일
+      </p>
       {ready ? (
         <>
           <h2
@@ -27,17 +31,17 @@ export function StyleCard({ style }: { style?: PatternStyle | null }) {
             {style!.insights.map((it) => (
               <li
                 key={it.key}
-                className="flex items-start gap-3 text-[14px] leading-relaxed text-on-ink/85 sm:text-[15px]"
+                className="text-text-secondary flex items-start gap-3 text-[14px] leading-relaxed sm:text-[15px]"
                 onClick={onSentenceClick}
               >
                 <span
-                  className="grid size-7 shrink-0 place-items-center rounded-lg bg-on-ink/10 text-[14px]"
+                  className="bg-bg-surface grid size-7 shrink-0 place-items-center rounded-lg text-[14px]"
                   aria-hidden
                 >
                   {INSIGHT_ICON[it.icon] ?? '•'}
                 </span>
                 <span className="pt-0.5">
-                  <Emphasis text={it.text} className="text-on-ink" />
+                  <Emphasis text={it.text} className="text-text-primary" />
                 </span>
               </li>
             ))}
@@ -50,12 +54,12 @@ export function StyleCard({ style }: { style?: PatternStyle | null }) {
   )
 }
 
-/** "저녁에 강한 꾸준형" 에서 "저녁에 강한" 부분만 파란색 */
+/** "저녁에 강한 꾸준형" 에서 "저녁에 강한" 부분만 AI 그라데이션 글자 */
 function Title({ title, highlight }: { title: string; highlight?: string | null }) {
   if (!highlight || !title.startsWith(highlight)) return <>{title}</>
   return (
     <>
-      <span className="text-on-inverse-accent">{highlight}</span>
+      <span className="text-ai-gradient">{highlight}</span>
       {title.slice(highlight.length)}
     </>
   )
@@ -77,13 +81,13 @@ export function Locked({ style }: { style?: PatternStyle | null }) {
       <h2 className="text-[22px] leading-snug font-extrabold">
         {remain ? (
           <>
-            실행 스타일까지 <span className="text-on-inverse-accent">{remain}</span> 더
+            실행 스타일까지 <span className="text-ai-gradient">{remain}</span> 더
           </>
         ) : (
           '아직 스타일을 알기엔 기록이 적어요'
         )}
       </h2>
-      <p className="mt-2 text-sm text-on-ink/70">
+      <p className="text-text-secondary mt-2 text-sm">
         {p
           ? `Task ${p.requiredTasks}개를 ${p.requiredDays}일 이상에 걸쳐 실행하면 아침형·저녁형, 꾸준형·몰아치기형 같은 나만의 스타일을 알려드려요. 오늘 완료한 Task도 바로 반영돼요.`
           : style?.remainingForStyle
@@ -105,10 +109,10 @@ function Bar({ label, value, max, unit }: { label: string; value: number; max: n
   return (
     <div>
       <div className="mb-1.5 flex items-baseline justify-between text-[13px]">
-        <span className="text-on-ink/70">{label}</span>
+        <span className="text-text-secondary">{label}</span>
         <span className="font-semibold tabular-nums">
           {Math.min(value, max)}
-          <span className="text-on-ink/50">
+          <span className="text-text-tertiary">
             {' '}
             / {max}
             {unit}
@@ -116,13 +120,13 @@ function Bar({ label, value, max, unit }: { label: string; value: number; max: n
         </span>
       </div>
       <div
-        className="h-2 overflow-hidden rounded-full bg-on-ink/15"
+        className="bg-bg-surface/70 h-2 overflow-hidden rounded-full"
         role="progressbar"
         aria-label={label}
         aria-valuenow={value}
         aria-valuemax={max}
       >
-        <div className="h-full rounded-full bg-on-inverse-accent transition-all" style={{ width: `${ratio * 100}%` }} />
+        <div className="bg-ai-gradient h-full rounded-full transition-all" style={{ width: `${ratio * 100}%` }} />
       </div>
     </div>
   )

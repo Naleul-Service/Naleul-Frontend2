@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Repeat } from 'lucide-react'
+import { Repeat } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { goalAccent } from '@/lib/goalTone'
 import type { BlockKeepItem, PatternBlockKeeping } from '../types'

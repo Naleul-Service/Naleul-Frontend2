@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Field, inputClass, textareaClass, toNumber } from '../formParts'
-import { Plus, X } from 'lucide-react'
+import { Plus, X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'

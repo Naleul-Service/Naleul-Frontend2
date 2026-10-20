@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Sparkles, Trash2 } from '@/components/icons'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader } from '@/components/ui/Card'
@@ -132,7 +132,7 @@ export function LifePatternView() {
             disabled={full || isError}
             title={full ? `고정 시간은 최대 ${MAX_PATTERNS}개까지 만들 수 있어요` : undefined}
           >
-            <Plus className="size-4" strokeWidth={2.6} />
+            <Plus className="size-4" />
             고정 시간 추가
           </Button>
         }

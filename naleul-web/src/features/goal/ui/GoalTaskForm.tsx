@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '@/components/icons'
 import { track, type EventProps } from '@/lib/client/analytics'
 import { errorStatusOf } from '@/features/home/analytics'
 import { formatDuration, hm, timeToMinutes, todayKst } from '@/features/timetable/time'

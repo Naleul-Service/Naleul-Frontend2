@@ -2,19 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import {
-  Bell,
-  Check,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Flame,
-  Pause,
-  Pencil,
-  Play,
-  Plus,
-  Trash2,
-} from 'lucide-react'
+import { Flame, Pause, Play } from 'lucide-react'
+import { Bell, Check, ChevronDown, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -190,7 +179,7 @@ function HabitRow({ habit, day, isToday, daysAgo }: { habit: Habit; day: string;
           paused && 'cursor-not-allowed'
         )}
       >
-        <Check className="size-5" strokeWidth={3} />
+        <Check className="size-5" />
       </button>
 
       <div className="min-w-0 flex-1">

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight, Check } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import { useHabitHome } from '../api'
@@ -72,7 +72,7 @@ export function HabitSummaryCard({ className }: { className?: string }) {
                   h.checked ? 'bg-success-soft text-success' : 'bg-subtle text-ink-2'
                 )}
               >
-                {h.checked && <Check className="size-3" strokeWidth={3} />}
+                {h.checked && <Check className="size-3" />}
                 {h.emoji ? `${h.emoji} ` : ''}
                 {h.name}
               </span>

@@ -1,8 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
-import { ChevronLeft, ChevronRight, PencilLine, X } from 'lucide-react'
+import { PencilLine } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
+import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
@@ -488,10 +490,11 @@ function Summary({
   const focus = current ?? next
 
   return (
-    <section className="bg-inverse flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 rounded-card px-5 py-4 text-on-ink">
+    // 오늘 요약 카드 — 예전 검은(inverse) 바 → 밝은 카드 (bg/surface · border/subtle)
+    <section className="bg-bg-surface border-border-subtle shadow-card text-text-primary rounded-card flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3 border px-5 py-4">
       <div className="min-w-0">
-        <DayNav {...nav} dark className="-ml-1.5" />
-        <h1 className="truncate text-[19px] leading-snug font-bold">
+        <DayNav {...nav} className="-ml-1.5" />
+        <h1 className="text-h3 text-text-primary truncate">
           {isToday
             ? total === 0
               ? `${userName}님, 오늘은 비어 있어요`
@@ -509,12 +512,10 @@ function Summary({
       </div>
 
       <div data-dead="progress" className="flex min-w-[180px] items-center gap-3">
-        <span className="text-[26px] leading-none font-bold tabular-nums">{percent}%</span>
+        <span className="text-display-lg leading-none tabular-nums">{percent}%</span>
         <div>
-          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-on-ink/15">
-            <div className="h-full rounded-full bg-on-ink transition-all" style={{ width: `${percent}%` }} />
-          </div>
-          <p className="mt-1 text-[11px] whitespace-nowrap text-on-ink/65 tabular-nums">
+          <ProgressBar value={percent / 100} className="w-28" />
+          <p className="text-caption-sm text-text-secondary mt-1 whitespace-nowrap tabular-nums">
             할 일 {taskDone}/{tasks.length}
             {routines.length > 0 && ` · 루틴 ${routineDone}/${routines.length}`}
             {habitTotal > 0 && ` · 습관 ${habitDone}/${habitTotal}`}
@@ -537,16 +538,16 @@ function Summary({
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {isToday && (
-          <div data-dead="focus_box" className="max-w-[260px] min-w-0 rounded-xl bg-on-ink/8 px-3 py-1.5">
-            <p className="text-[11px] font-semibold text-on-ink/60">{current ? '지금 할 일' : '다음 일정'}</p>
+          <div data-dead="focus_box" className="bg-bg-sunken max-w-[260px] min-w-0 rounded-xl px-3 py-1.5">
+            <p className="text-label-xs text-text-secondary">{current ? '지금 할 일' : '다음 일정'}</p>
             {focus ? (
               <p className="truncate text-[13px] font-bold">
                 {formatMinutes(focus.start)} {focus.task.emoji ? `${focus.task.emoji} ` : ''}
                 {focus.task.taskName}
-                {!current && <span className="font-medium text-on-ink/70"> · {inLabel(focus.start - nowMinutes)}</span>}
+                {!current && <span className="text-text-secondary font-medium"> · {inLabel(focus.start - nowMinutes)}</span>}
               </p>
             ) : (
-              <p className="text-[13px] font-semibold text-on-ink/80">남은 일정이 없어요</p>
+              <p className="text-text-secondary text-[13px] font-semibold">남은 일정이 없어요</p>
             )}
           </div>
         )}
@@ -571,10 +572,10 @@ function Pill({ children, tone, dead }: { children: React.ReactNode; tone?: 'dan
       className={cn(
         'rounded-full px-2.5 py-0.5 font-semibold tabular-nums',
         tone === 'danger'
-          ? 'bg-action-danger-bg text-action-danger-fg'
+          ? 'bg-status-error-bg text-status-error-fg'
           : tone === 'warning'
-            ? 'bg-warning text-accent-on-mint'
-            : 'bg-on-ink/12 text-on-ink/90'
+            ? 'bg-status-warning-bg text-status-warning-fg'
+            : 'bg-bg-subtle text-text-secondary'
       )}
     >
       {children}
