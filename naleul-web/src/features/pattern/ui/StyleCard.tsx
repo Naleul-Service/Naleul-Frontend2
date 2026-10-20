@@ -22,7 +22,7 @@ export function StyleCard({ style }: { style?: PatternStyle | null }) {
       {ready ? (
         <>
           <h2
-            className="mt-2 text-[26px] leading-tight font-extrabold tracking-tight sm:text-[32px]"
+            className="text-h3 sm:text-h2 mt-2"
             onClick={onSentenceClick}
           >
             <Title title={style!.title!} highlight={style!.highlight} />
@@ -78,7 +78,7 @@ export function Locked({ style }: { style?: PatternStyle | null }) {
     : null
   return (
     <div className="mt-3">
-      <h2 className="text-[22px] leading-snug font-extrabold">
+      <h2 className="text-h3 sm:text-h2">
         {remain ? (
           <>
             실행 스타일까지 <span className="text-ai-gradient">{remain}</span> 더
