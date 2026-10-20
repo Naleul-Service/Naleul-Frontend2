@@ -2,26 +2,28 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { KanbanSquare, LayoutDashboard, Library } from 'lucide-react'
-import { BarChart3, type IconComponent } from '@/components/icons'
+import { BarChart3, NotebookPen } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { track } from '@/lib/client/analytics'
 import { goalVars } from '@/lib/goalTone'
 import { isApiError } from '@/lib/client/api'
-import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
 import { errorStatusOf } from '@/features/home/analytics'
 import { RecordPatternSection } from '@/features/record/ui/pattern/RecordPatternSection'
 import { HabitView } from '@/features/habit/ui/HabitView'
 import { ReflectionTimeline } from '@/features/reflection/ui/ReflectionsView'
-import { WorkBoardView } from '@/features/work/ui/WorkBoardView'
 import { isHabitGoal, isRecordGoal, useGoalCategory, type GoalCategory } from '../api'
 import { EditingContext } from '../edit/inline'
 import { dDayLabel, periodProgress } from '../format'
 import { GoalAiEditBar } from './GoalAiEditBar'
 import { GoalHeader, GoalNotes, routineCountOf } from './GoalHeader'
+import { GoalScrollTitle, GoalTabBar, useGoalTab, type TabDef } from './GoalTabs'
+import { GoalFab, GoalFabs } from './GoalFab'
+import { Modal } from '@/components/ui/Modal'
+import { WorkBoardView, WorkSummaryCard } from '@/features/work/ui/WorkBoardView'
 import { GoalAdjustmentBanner, GoalOutcomeSection, GoalWrapUpSection } from './GoalOutcomeSection'
 import { GoalTaskList } from './GoalTaskList'
 import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
@@ -111,71 +113,6 @@ function Hero({ goal }: { goal: GoalCategory }) {
         </div>
       )}
     </section>
-  )
-}
-
-// ─── 탭 ────────────────────────────────────────────────────────
-
-interface TabDef<T extends string> {
-  value: T
-  label: string
-  icon: IconComponent
-}
-
-/**
- * 고른 탭은 주소(?tab=)에 남겨서 새로고침·공유해도 그대로예요. 첫 탭(기본)은 주소에서 빼요.
- * 모르는 값(예전 ?tab=journal 등)은 첫 탭으로.
- */
-function useGoalTab<T extends string>(tabs: TabDef<T>[]) {
-  const params = useSearchParams()
-  const router = useRouter()
-  const pathname = usePathname()
-  const raw = params.get('tab')
-  const tab = tabs.find((t) => t.value === raw)?.value ?? tabs[0].value
-  const setTab = (t: T, goal: GoalCategory) => {
-    // 같은 탭을 또 눌러도 보내요
-    track('goal_detail.tab_click', {
-      goal_category_id: goal.goalCategoryId,
-      goal_mode: goal.goalMode ?? 'ACHIEVEMENT',
-      tab: t,
-      from_tab: tab,
-    })
-    const next = new URLSearchParams(params)
-    if (t === tabs[0].value) next.delete('tab')
-    else next.set('tab', t)
-    const qs = next.toString()
-    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
-  }
-  return [tab, setTab] as const
-}
-
-function GoalTabBar<T extends string>({
-  tabs,
-  tab,
-  onChange,
-}: {
-  tabs: TabDef<T>[]
-  tab: T
-  onChange: (t: T) => void
-}) {
-  return (
-    <div className={segmentedClass('mt-6')} role="tablist" aria-label="보기">
-      {tabs.map(({ value, label, icon: Icon }) => (
-        <button
-          key={value}
-          type="button"
-          role="tab"
-          id={`goal-tab-${value}`}
-          aria-selected={tab === value}
-          aria-controls={`goal-panel-${value}`}
-          onClick={() => onChange(value)}
-          className={segmentClass(tab === value, 'text-body-md h-9 px-4 font-medium')}
-        >
-          <Icon className="size-4" />
-          {label}
-        </button>
-      ))}
-    </div>
   )
 }
 
@@ -344,13 +281,24 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
 
   return (
     <EditingContext.Provider value={editingCtx}>
-      <GoalHeader goal={goal} />
+      {/* goal-detail: 이 화면 카드 그림자는 더 연하게 (명세 12.3 — globals.css) */}
+      <div className="goal-detail">
+        <GoalScrollTitle title={`${goal.emoji ? `${goal.emoji} ` : ''}${goal.goalCategoryName}`} />
+        {isRecordGoal(goal) ? (
+          // 업무형: 머리말 + 다음 마감 · 진행 · 공유를 한 요약 카드로 (명세 12.1)
+          <div id="goal-summary">
+            <WorkSummaryCard goal={goal} header={<GoalHeader goal={goal} embedded />} />
+          </div>
+        ) : (
+          <GoalHeader goal={goal} />
+        )}
 
-      {/* 기록형은 만들 때 루틴·Task 가 없어서 "TimeTable 에 배치할까요?"를 묻지 않아요 */}
-      {justCreated && !isRecordGoal(goal) && <PlaceAfterCreateCard goal={goal} className="mt-6" />}
-      {goal.temporary && <RefineWithAiCard goal={goal} className="mt-6" />}
+        {/* 기록형은 만들 때 루틴·Task 가 없어서 "TimeTable 에 배치할까요?"를 묻지 않아요 */}
+        {justCreated && !isRecordGoal(goal) && <PlaceAfterCreateCard goal={goal} className="mt-6" />}
+        {goal.temporary && <RefineWithAiCard goal={goal} className="mt-6" />}
 
-      {isRecordGoal(goal) ? <RecordGoalBody goal={goal} /> : <AchievementGoalBody goal={goal} />}
+        {isRecordGoal(goal) ? <RecordGoalBody goal={goal} /> : <AchievementGoalBody goal={goal} />}
+      </div>
     </EditingContext.Provider>
   )
 }
@@ -372,8 +320,36 @@ const ACHIEVEMENT_TABS: TabDef<AchievementTab>[] = [
 
 function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
   const [tab, setTab] = useGoalTab(ACHIEVEMENT_TABS)
+  const [checkInOpen, setCheckInOpen] = useState(false)
   return (
     <>
+      {/* 이 목표를 시작한 이유 — 요약 바로 위, 맨 위쪽 (명세 12.6) */}
+      {(goal.motive || goal.aiNote) && (
+        <div className="mt-5">
+          <GoalNotes goal={goal} />
+        </div>
+      )}
+      {/* 요약 (진행 링 · 경과) — 탭 위에 두어 어느 탭에서도 보여요. 임시 목표는 기간·수치가 없어 빼요 */}
+      <div id="goal-summary">
+        {!goal.temporary && (
+          <div className="mt-5">
+            <Hero goal={goal} />
+          </div>
+        )}
+      </div>
+
+      {/* 오늘 기록(수치 · 기분 · 한 줄 회고) — 카드 대신 떠 있는 버튼으로 (명세 12.7 · 12.9) */}
+      {goal.goalCategoryStatus !== 'COMPLETED' && (
+        <>
+          <GoalFabs>
+            <GoalFab label="오늘 기록" icon={<NotebookPen />} onClick={() => setCheckInOpen(true)} />
+          </GoalFabs>
+          <Modal open={checkInOpen} onClose={() => setCheckInOpen(false)} size="md">
+            <DailyCheckInCard goal={goal} />
+          </Modal>
+        </>
+      )}
+
       <GoalTabBar tabs={ACHIEVEMENT_TABS} tab={tab} onChange={(t) => setTab(t, goal)} />
       {tab === 'overview' ? (
         <div id="goal-panel-overview" role="tabpanel" aria-labelledby="goal-tab-overview">
@@ -395,22 +371,10 @@ function AchievementOverview({ goal }: { goal: GoalCategory }) {
   const ongoing = !goal.temporary && goal.goalCategoryStatus === 'IN_PROGRESS'
   return (
     <>
-      {/* 임시 목표는 기간·수치가 없어 진행률이 의미 없어요 → 구체화 카드만 보여줘요 */}
-      {!goal.temporary && (
-        <div className="mt-5">
-          <Hero goal={goal} />
-        </div>
-      )}
       {/* 주간 점검: 2주 연속 너무 힘들거나 너무 쉬우면 루틴 하루 빼기/더하기 제안 */}
       {ongoing && (
-        <div className="mt-4 empty:hidden">
+        <div className="mt-5 empty:hidden">
           <GoalAdjustmentBanner goal={goal} />
-        </div>
-      )}
-      {/* 사용자가 매일 채우는 칸 — 진행 요약 바로 아래에 크게 (수치 · 오늘 어땠는지 · 무엇을 했는지) */}
-      {goal.goalCategoryStatus !== 'COMPLETED' && (
-        <div className="mt-4">
-          <DailyCheckInCard goal={goal} />
         </div>
       )}
       {!goal.temporary && goal.goalCategoryStatus !== 'COMPLETED' && (
@@ -418,12 +382,6 @@ function AchievementOverview({ goal }: { goal: GoalCategory }) {
           <GoalAiEditBar goal={goal} />
         </div>
       )}
-      {(goal.motive || goal.aiNote) && (
-        <div className="mt-4">
-          <GoalNotes goal={goal} />
-        </div>
-      )}
-
       <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
         <div className="space-y-5">
           <RoutinesSection goal={goal} />

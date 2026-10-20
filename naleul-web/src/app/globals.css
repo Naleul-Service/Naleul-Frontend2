@@ -565,6 +565,14 @@ svg.lucide:is(.size-3, .size-3\.5, .size-4, .size-2\.5) {
   }
 }
 
+/* 목표 상세 카드 그림자는 더 연하게 (명세 12.3) */
+.goal-detail [class*='shadow-card'] {
+  --tw-shadow: 0 2px 8px var(--tw-shadow-color, rgb(18 24 32 / 0.04));
+}
+:root[data-theme='dark'] .goal-detail [class*='shadow-card'] {
+  --tw-shadow-color: rgb(0 0 0 / 0.25);
+}
+
 /* Tailwind dark: 변형 (dark:bg-…) 도 같은 기준으로 */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 

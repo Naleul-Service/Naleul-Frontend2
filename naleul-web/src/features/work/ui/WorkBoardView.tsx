@@ -10,11 +10,13 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from 'react'
-import { AlertTriangle, CircleDashed, Flag, ListTodo, Loader, MessageSquareText, PencilLine, PenLine, Share2 } from 'lucide-react'
-import { Check, ChevronDown, Pencil, Plus, Trash2, X } from '@/components/icons'
+import { AlertTriangle, CircleDashed, Flag, ListTodo, Loader, MessageSquareText, PenLine, Share2 } from 'lucide-react'
+import { Check, ChevronDown, Pencil, Plus, SquarePen, Trash2, X } from '@/components/icons'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Modal } from '@/components/ui/Modal'
+import { GoalFab, GoalFabs } from '@/features/goal/ui/GoalFab'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { goalVars } from '@/lib/goalTone'
@@ -137,7 +139,10 @@ function SummaryHero({
   colorCode,
   onShare,
   onPill,
+  header,
 }: {
+  /** 목표 머리말 (이름 · 태그 · 기간) — 요약 카드 안 맨 위에 합쳐요 (명세 12.1) */
+  header?: React.ReactNode
   board: WorkBoard
   /** 목표 색 — 카드 바탕을 목표 톤으로 (Figma NowCard) */
   colorCode?: string | null
@@ -154,8 +159,16 @@ function SummaryHero({
     // 목표 요약 카드 (Figma NowCard) — 목표 톤 바탕 · 1px accent 20% 테두리 · 다크 모드는 목표 dark bg
     <section
       style={goalVars(colorCode)}
-      className="text-text-primary rounded-card border border-[color-mix(in_srgb,var(--goal-accent)_20%,transparent)] bg-(--goal-bg) p-6 sm:p-7"
+      className="text-text-primary rounded-card border border-[color-mix(in_srgb,var(--goal-accent)_20%,transparent)] bg-(--goal-bg) p-5"
     >
+      {/* 1줄: 목표 이름 · 색 점 · 공유 / 2줄: 태그 — 아래 1px border/soft */}
+      <div className="border-border-soft mb-4 flex items-start gap-3 border-b pb-4">
+        <div className="min-w-0 flex-1">{header}</div>
+        <Button variant="secondary" size="sm" onClick={onShare} className="shrink-0">
+          <Share2 className="size-4" />
+          공유
+        </Button>
+      </div>
       <div className="flex flex-wrap items-start gap-x-8 gap-y-5">
         {/* 다음 마감 */}
         <div className="max-w-full min-w-[200px]">
@@ -165,13 +178,13 @@ function SummaryHero({
           </p>
           {next ? (
             <>
-              <p className="mt-1.5 truncate text-[17px] font-bold">
+              <p className="text-label-lg mt-1.5 truncate">
                 {next.emoji ? `${next.emoji} ` : ''}
                 {next.name}
               </p>
               <p
                 className={cn(
-                  'mt-1 text-[44px] leading-none font-bold tracking-tight text-(--goal-fg)',
+                  'text-display-lg mt-1 leading-none text-(--goal-fg)',
                   next.dDay! < 0 && 'text-status-error-fg'
                 )}
               >
@@ -205,9 +218,9 @@ function SummaryHero({
         {/* 진행 */}
         <div className="min-w-[220px] flex-1">
           <p className="text-text-secondary text-[13px]">진행</p>
-          <p className="mt-1 text-[32px] leading-none font-bold text-(--goal-fg)">
+          <p className="text-h2 mt-1 leading-none text-(--goal-fg)">
             {s.done}
-            <span className="text-text-secondary text-[18px] font-semibold"> / {s.total}개 완료</span>
+            <span className="text-text-secondary text-body-md font-medium"> / {s.total}개 완료</span>
           </p>
           <div className="mt-4 space-y-2.5">
             <Meter label="Task 완료" value={s.progressPercent} />
@@ -215,10 +228,6 @@ function SummaryHero({
           </div>
         </div>
 
-        <Button variant="secondary" size="sm" onClick={onShare} className="ml-auto">
-          <Share2 className="size-4" />
-          공유
-        </Button>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2 text-[13px]">
@@ -1287,12 +1296,9 @@ function ComposePanel({
   inputRef: RefObject<HTMLTextAreaElement | null>
 }) {
   return (
-    <Card id="work-compose" className="scroll-mt-4 p-4 sm:p-5">
-      <h2 className="flex items-center gap-1.5 text-h4">
-        <PencilLine className="size-4" />
-        적기
-      </h2>
-      <div className={segmentedClass('mt-3 grid grid-cols-3')} role="tablist" aria-label="무엇을 적을지">
+    // 떠 있는 "적기" 버튼으로 여는 창 안 (명세 12.2 — 오른쪽 적기 카드는 없앴어요)
+    <div id="work-compose">
+      <div className={segmentedClass('grid grid-cols-3')} role="tablist" aria-label="무엇을 적을지">
         {COMPOSE_TABS.map(({ value, label, icon: Icon }) => (
           <button
             key={value}
@@ -1322,7 +1328,7 @@ function ComposePanel({
           <RetroCompose goalId={goal.goalCategoryId} board={board} />
         )}
       </div>
-    </Card>
+    </div>
   )
 }
 
@@ -1593,10 +1599,10 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
   const [opened, setOpened] = useState<WorkTask | null>(null)
   /** 자세히 창을 연 화면 — 창 안에서 칸을 바꾸면 work_task.status_change 의 surface 로 써요 */
   const [openedFrom, setOpenedFrom] = useState<Surface>('board')
-  const [sharing, setSharing] = useState(false)
   const [composeTab, setComposeTab] = useState<ComposeTab>('task')
   const [composeTopic, setComposeTopic] = useState<number | null>(null)
   const composeInput = useRef<HTMLTextAreaElement>(null)
+  const [composeOpen, setComposeOpen] = useState(false)
   const routineCount = routineCountOf(goal)
 
   // 보드를 다 불러와 그렸을 때 한 번 (탭을 다시 열면 다시 마운트돼서 또 한 번)
@@ -1714,46 +1720,16 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
     track('work_roadmap.add_task_click', { goal_category_id: goalId, topic_id: topicId, compose_tab: composeTab })
     setComposeTab('task')
     setComposeTopic(topicId)
-    requestAnimationFrame(() => {
-      const el = composeInput.current
-      if (!el) return
-      // 넓은 화면은 패널이 옆에 붙어 있어 바로 보이고, 좁은 화면은 위에 있어서 올라가요
-      if (el.getBoundingClientRect().top < 0 || el.getBoundingClientRect().bottom > window.innerHeight) {
-        document.getElementById('work-compose')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-      el.focus({ preventScroll: true })
-    })
+    setComposeOpen(true)
+    // 창이 열린 뒤 입력칸에 커서
+    window.setTimeout(() => composeInput.current?.focus({ preventScroll: true }), 50)
   }
 
   return (
     <div className="space-y-5">
-      <SummaryHero
-        board={board}
-        colorCode={goal.colorCode}
-        onShare={() => {
-          track('work_board.share_click', { goal_category_id: goalId, open_task_count: board.summary.remaining })
-          setSharing(true)
-        }}
-        onPill={(kind) => track('work_board.pill_dead_click', { goal_category_id: goalId, pill_kind: kind })}
-      />
-
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        {/* 적기 + 루틴 — 좁은 화면에선 맨 위, 넓은 화면에선 오른쪽에 붙어서 따라와요 (길면 패널 안에서 스크롤) */}
+        {/* 반복 루틴 — 넓은 화면에선 오른쪽에 붙어서 따라와요 */}
         <aside className="space-y-5 lg:sticky lg:top-4 lg:order-last lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto lg:pb-1">
-          <ComposePanel
-            goal={goal}
-            board={board}
-            tab={composeTab}
-            onTab={(t) => {
-              if (t !== composeTab)
-                track('work_compose.tab_click', { goal_category_id: goalId, compose_tab: t, from_tab: composeTab })
-              setComposeTab(t)
-            }}
-            topicId={composeTopic}
-            onTopic={setComposeTopic}
-            inputRef={composeInput}
-          />
-          {/* 반복 루틴 — 맨 아래에 있으면 잘 안 보여서 적기 패널 바로 아래로 */}
           <RoutinesSection goal={goal} />
         </aside>
 
@@ -1801,7 +1777,60 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
           onClose={() => setOpened(null)}
         />
       )}
-      <WorkShareModal goalId={goalId} open={sharing} onClose={() => setSharing(false)} />
+      {/* 적기 — 떠 있는 버튼 → 창 (할 일 · 한 일 · 회고) (명세 12.2 · 12.9) */}
+      <GoalFabs>
+        <GoalFab label="적기" icon={<SquarePen />} onClick={() => setComposeOpen(true)} />
+      </GoalFabs>
+      <Modal open={composeOpen} onClose={() => setComposeOpen(false)} title="적기" size="md">
+        <ComposePanel
+          goal={goal}
+          board={board}
+          tab={composeTab}
+          onTab={(t) => {
+            if (t !== composeTab)
+              track('work_compose.tab_click', { goal_category_id: goalId, compose_tab: t, from_tab: composeTab })
+            setComposeTab(t)
+          }}
+          topicId={composeTopic}
+          onTopic={setComposeTopic}
+          inputRef={composeInput}
+        />
+      </Modal>
     </div>
+  )
+}
+
+/**
+ * 업무형 목표 요약 카드 (명세 12.1) — 목표 머리말(header)과 다음 마감 · 진행 · 공유를 한 카드로.
+ * 탭 위에 놓여서 보드 · 통계 · 회고 어느 탭에서도 보여요.
+ */
+export function WorkSummaryCard({ goal, header }: { goal: GoalCategory; header: React.ReactNode }) {
+  const goalId = goal.goalCategoryId
+  const { data: board } = useWorkBoard(goalId)
+  const [sharing, setSharing] = useState(false)
+  if (!board) {
+    return (
+      <section
+        style={goalVars(goal.colorCode)}
+        className="rounded-card border border-[color-mix(in_srgb,var(--goal-accent)_20%,transparent)] bg-(--goal-bg) p-5"
+      >
+        {header}
+      </section>
+    )
+  }
+  return (
+    <>
+      <SummaryHero
+        board={board}
+        colorCode={goal.colorCode}
+        header={header}
+        onShare={() => {
+          track('work_board.share_click', { goal_category_id: goalId, open_task_count: board.summary.remaining })
+          setSharing(true)
+        }}
+        onPill={(kind) => track('work_board.pill_dead_click', { goal_category_id: goalId, pill_kind: kind })}
+      />
+      <WorkShareModal goalId={goalId} open={sharing} onClose={() => setSharing(false)} />
+    </>
   )
 }

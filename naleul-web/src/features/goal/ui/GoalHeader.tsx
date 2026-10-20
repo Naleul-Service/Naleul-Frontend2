@@ -355,7 +355,14 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
  * 목표 상세 머리말 — 이름·상태·기간 + 시작한 이유/AI 노트.
  * 연필을 누르면 그 자리가 수정 폼으로 바뀌어요. 삭제는 폼 안의 "목표 삭제" → 그 자리에서 확인.
  */
-export function GoalHeader({ goal }: { goal: GoalCategory }) {
+export function GoalHeader({
+  goal,
+  embedded = false,
+}: {
+  goal: GoalCategory
+  /** 요약 카드 안에 합쳐 넣을 때 (명세 12.1) — 경로 줄 없이, 제목 H2 20 · 둘째 줄에 태그 · 📅 기간 */
+  embedded?: boolean
+}) {
   const edit = useEditing('goal')
   const del = useEditing('del:goal')
   const remove = useDeleteGoal(goal.goalCategoryId)
@@ -375,6 +382,7 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
 
   return (
     <div>
+      {!embedded && (
       <p className="text-ink-3 text-[13px]">
         <Link
           href="/goal"
@@ -385,6 +393,7 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
         </Link>{' '}
         › {goal.goalCategoryName}
       </p>
+      )}
 
       {del.isOpen ? (
         <div className="mt-2">
@@ -425,6 +434,49 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
           <GoalEditForm goal={goal} onDone={edit.close} onDelete={() => del.open()} />
         </div>
       ) : (
+        embedded ? (
+          <>
+            <div className="flex min-w-0 items-center gap-2">
+              <h1 className="text-h2 text-text-primary min-w-0 truncate">
+                {goal.emoji ? `${goal.emoji} ` : ''}
+                {goal.goalCategoryName}
+              </h1>
+              <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: goalColor(goal.colorCode) }} />
+              <button
+                type="button"
+                onClick={() => {
+                  trackEditOpen(goal, 'header')
+                  edit.open()
+                }}
+                aria-label="목표 수정"
+                className="text-text-secondary hover:bg-bg-surface/70 grid size-7 shrink-0 place-items-center rounded-[6px]"
+              >
+                <Pencil className="size-4" />
+              </button>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <Badge tone={goal.goalCategoryStatus === 'COMPLETED' ? 'success' : 'neutral'} className="bg-bg-surface/70">
+                {statusLabel(goal.goalCategoryStatus)}
+              </Badge>
+              {goal.temporary && <Badge tone="warning">임시 목표</Badge>}
+              {goal.goalMode === 'RECORD' && (
+                <Badge tone="neutral" className="bg-bg-surface/70">
+                  업무형
+                </Badge>
+              )}
+              {goal.goalCategoryStartDate && (
+                <Badge tone="neutral" className="bg-bg-surface/70">
+                  📅 {formatDot(goal.goalCategoryStartDate)} –{' '}
+                  {goal.goalMode === 'RECORD'
+                    ? ''
+                    : goal.goalCategoryEndDate
+                      ? formatDot(goal.goalCategoryEndDate)
+                      : '종료일 미정'}
+                </Badge>
+              )}
+            </div>
+          </>
+        ) : (
         <>
           <div className="group mt-1 flex flex-wrap items-center gap-3">
             <span className="size-3 rounded-full" style={{ backgroundColor: goalColor(goal.colorCode) }} />
@@ -462,6 +514,7 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
             </p>
           )}
         </>
+        )
       )}
     </div>
   )

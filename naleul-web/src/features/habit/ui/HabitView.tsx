@@ -3,7 +3,18 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Flame, Pause, Play } from 'lucide-react'
-import { Bell, Check, ChevronDown, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from '@/components/icons'
+import {
+  BarChart3,
+  Bell,
+  Check,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ListChecks,
+  Pencil,
+  Plus,
+  Trash2,
+} from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -28,6 +39,8 @@ import {
 import { HABIT_SUGGESTIONS, HabitForm } from './HabitForm'
 import { GoalTaskList } from '@/features/goal/ui/GoalTaskList'
 import { HabitHeatmap } from './HabitHeatmap'
+import { GoalScrollTitle, GoalTabBar, useGoalTab, type TabDef } from '@/features/goal/ui/GoalTabs'
+import { CalendarCheck } from 'lucide-react'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 
 // ─── 표시 도우미 ───────────────────────────────────────────────
@@ -343,7 +356,16 @@ function AddHabit({ existing, dueCount }: { existing: Habit[]; dueCount: number 
  *  - 오른쪽: 습관별 잔디 (‹ › 로 한 달씩, 세로 요일 × 가로 주)
  *  - 아래: 일회성 할 일 (병원 가기 · 친구 만나기) — 습관과 달리 한 번 하고 끝나요
  */
+/** 기본 생활 습관 탭 (명세 12.5) — 오늘(체크) · 진행(잔디) · 할 일 */
+type HabitTab = 'today' | 'progress' | 'tasks'
+const HABIT_TABS: TabDef<HabitTab>[] = [
+  { value: 'today', label: '오늘', icon: CalendarCheck },
+  { value: 'progress', label: '진행', icon: BarChart3 },
+  { value: 'tasks', label: '할 일', icon: ListChecks },
+]
+
 export function HabitView({ goal }: { goal: GoalCategory }) {
+  const [tab, setTab] = useGoalTab(HABIT_TABS)
   const today = todayKst()
   const [day, setDay] = useState(today)
   const isToday = day === today
@@ -402,7 +424,9 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
   }
 
   return (
-    <>
+    <div className="goal-detail">
+      <GoalScrollTitle title={`${goal.emoji ? `${goal.emoji} ` : ''}${goal.goalCategoryName}`} />
+      <div id="goal-summary">
       <p className="text-ink-3 text-[13px]">
         <Link href="/goal" className="hover:text-ink" onClick={() => track('habit.breadcrumb_click')}>
           목표
@@ -416,8 +440,12 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
       <p className="text-ink-3 mt-1.5 text-sm">
         했는지만 체크하는 생활 습관과, 병원 가기처럼 한 번만 할 일을 여기서 챙겨요.
       </p>
+      </div>
 
-      <div className="mt-6 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <GoalTabBar tabs={HABIT_TABS} tab={tab} onChange={(t) => setTab(t, goal)} />
+
+      {tab === 'today' && (
+        <div id="goal-panel-today" role="tabpanel" aria-labelledby="goal-tab-today" className="mt-5 max-w-3xl">
         <Card className="p-5 sm:p-6">
           {/* 날짜 + 진행 */}
           <div className="flex items-center gap-2">
@@ -535,11 +563,24 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
           {!isPending && !isError && <AddHabit existing={habits} dueCount={due.length} />}
         </Card>
 
-        {/* 오른쪽: 습관별 잔디 (한 달씩) — 할 일은 많아지면 길어져서 아래로 */}
-        {!isPending && !isError ? <HabitHeatmap habits={habits} today={today} /> : <div />}
-      </div>
+        </div>
+      )}
 
-      <div className="mt-5">
+      {/* 진행: 습관별 잔디 (한 달씩) */}
+      {tab === 'progress' && (
+        <div id="goal-panel-progress" role="tabpanel" aria-labelledby="goal-tab-progress" className="mt-5">
+          {isPending ? (
+            <div className="grid h-40 place-items-center">
+              <Spinner className="text-ink-3 size-5" />
+            </div>
+          ) : !isError ? (
+            <HabitHeatmap habits={habits} today={today} />
+          ) : null}
+        </div>
+      )}
+
+      {tab === 'tasks' && (
+      <div id="goal-panel-tasks" role="tabpanel" aria-labelledby="goal-tab-tasks" className="mt-5">
         <GoalTaskList
           goal={goal}
           title="할 일"
@@ -550,6 +591,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
           surface="habit"
         />
       </div>
-    </>
+      )}
+    </div>
   )
 }
