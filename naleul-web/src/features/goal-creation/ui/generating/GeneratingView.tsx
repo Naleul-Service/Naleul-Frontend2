@@ -206,8 +206,8 @@ export function GeneratingView({
       <div className="grid flex-1 place-items-center px-4">
         <div className="w-full max-w-sm">
           <div className="relative mx-auto size-20">
-            <span className="bg-brand/15 absolute inset-0 animate-ping rounded-full" />
-            <span className="bg-brand relative grid size-20 place-items-center rounded-full text-white">
+            <span className="bg-ai-gradient absolute inset-0 animate-ping rounded-full opacity-20" />
+            <span className="bg-ai-gradient relative grid size-20 place-items-center rounded-full text-white">
               <Sparkles className="size-8" />
             </span>
           </div>
@@ -225,7 +225,7 @@ export function GeneratingView({
                   <span
                     className={cn(
                       'grid size-6 shrink-0 place-items-center rounded-full',
-                      state === 'done' && 'bg-ink text-on-ink',
+                      state === 'done' && 'bg-action-primary-bg text-action-primary-fg',
                       state === 'current' && 'bg-brand-soft text-text-brand',
                       state === 'todo' && 'bg-subtle'
                     )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { AlertTriangle, CornerDownLeft, Repeat, Sparkles } from 'lucide-react'
+import { AlertTriangle, CornerDownLeft, Repeat } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
@@ -14,6 +14,7 @@ import { toast } from '@/stores/toastStore'
 import { goalKeys } from '@/features/goal/api'
 import { timetableKeys } from '../api'
 import { goalAccent } from '@/lib/goalTone'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 // ── API (POST /timetable/ai-edit/preview · /apply) ─────────────────────
 
@@ -184,9 +185,10 @@ export function ScheduleAiBar({
   }
 
   return (
-    <section className="border-line bg-surface mb-3 rounded-card border px-4 py-2.5 sm:px-5">
+    // AI 요청 바 (명세 6B) — 그라데이션 테두리
+    <section className="ai-border-flat rounded-card mb-3 px-4 py-2.5 sm:px-5">
       <div className="flex items-center gap-2">
-        <Sparkles className="text-text-brand size-5 shrink-0" />
+        <AIBadge size="sm" />
         <input
           ref={inputRef}
           value={text}
@@ -204,7 +206,7 @@ export function ScheduleAiBar({
         />
         <Button
           size="sm"
-          variant="brand"
+          variant="ai"
           onClick={() => submit('button')}
           loading={ask.isPending}
           disabled={!text.trim()}

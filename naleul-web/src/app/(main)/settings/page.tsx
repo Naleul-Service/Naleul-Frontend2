@@ -5,12 +5,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { LogoutButton } from '@/features/account/ui/LogoutButton'
 import { ProfileSummaryCard } from '@/features/account/ui/ProfileSummaryCard'
-import {
-  SettingsMenuLink,
-  SettingsPageview,
-  isPremiumRole,
-  type SettingsDestination,
-} from '@/features/account/ui/SettingsAnalytics'
+import { isPremiumRole, type SettingsDestination } from '@/features/account/settingsRole'
+import { SettingsMenuLink, SettingsPageview } from '@/features/account/ui/SettingsAnalytics'
 import { ThemePicker } from '@/features/theme/ThemePicker'
 import { UsageCard } from '@/features/usage/ui/UsageCard'
 import { COOKIE, type UserRole } from '@/lib/server/session'

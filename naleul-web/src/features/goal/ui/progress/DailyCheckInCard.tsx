@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { track } from '@/lib/client/analytics'
 import { errorStatusOf } from '@/features/home/analytics'
 import Link from 'next/link'
-import { NotebookPen, PencilLine, Sparkles } from 'lucide-react'
+import { NotebookPen, PencilLine } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
@@ -17,6 +17,7 @@ import {
   type ReflectionMood,
 } from '../../api'
 import { inlineInput } from '../../edit/inline'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 /** "말로 고치기" 입력창에 문장을 채워 넣어요 (GoalAiEditBar 가 듣고 있어요) */
 export const AI_EDIT_PREFILL_EVENT = 'goal-ai-edit:prefill'
@@ -343,9 +344,9 @@ function AdjustHint({ goal }: { goal: GoalCategory }) {
         })
         prefillAiEdit('최근 기록과 회고를 보고 계획을 조정해줘')
       }}
-      className="text-text-brand hover:bg-brand-soft flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold"
+      className="text-text-brand hover:bg-action-ghost-hover flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12px] font-semibold"
     >
-      <Sparkles className="size-3.5" />
+      <AIBadge size="sm" />
       최근 기록 보고 계획 조정받기
     </button>
   )

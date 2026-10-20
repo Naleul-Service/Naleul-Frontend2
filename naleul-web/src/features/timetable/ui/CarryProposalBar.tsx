@@ -1,8 +1,12 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
-import { ArrowRight, CalendarClock } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Check, ChevronLeft, ChevronRight, Info, X } from 'lucide-react'
+import { AIBadge } from '@/components/ui/AIBadge'
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Chip'
+import { IconButton } from '@/components/ui/IconButton'
+import { cn } from '@/lib/cn'
 import { errorStatusOf } from '@/features/home/analytics'
 import { track } from '@/lib/client/analytics'
 import type { TimetableSurface } from '../analytics'
@@ -48,12 +52,16 @@ export function CarryProposalBar({
   const decline = useDeclineCarry()
   const acceptAll = useAcceptAllCarry()
   const busy = accept.isPending || decline.isPending || acceptAll.isPending
-  const t = tasks[0]
+  // 넘겨 보기 (명세 6D 페이저) — 화면에서만 고르는 것, 답하면 목록이 줄어 자연히 다음 제안이 보여요
+  const [page, setPage] = useState(0)
+  const idx = Math.min(page, Math.max(tasks.length - 1, 0))
+  const t = tasks[idx]
   const surf = surface ?? 'calendar'
 
-  // 분석: 제안이 하나씩 뜰 때마다 한 번 (같은 제안을 다시 그려도 한 번만)
-  const shownId = t?.taskId
-  const fromDate = t?.carriedFromDate ?? null
+  // 분석: 제안이 하나씩 뜰 때마다 한 번 (같은 제안을 다시 그려도 한 번만) — 맨 앞 제안 기준 (넘겨 보기는 세지 않아요)
+  const first = tasks[0]
+  const shownId = first?.taskId
+  const fromDate = first?.carriedFromDate ?? null
   const remaining = tasks.length
   const viewedId = useRef<number | null>(null)
   useEffect(() => {
@@ -86,69 +94,142 @@ export function CarryProposalBar({
   const when = t.plannedStartAt ? `${to} ${hm(t.plannedStartAt)}–${hm(t.plannedEndAt)}` : `${to}(시간 미정)`
   const sameDay = tasks.filter((x) => (x.plannedStartAt?.slice(0, 10) ?? x.date) === date)
 
+  const sentence = `${from} 못한 ${eulReul(name)} ${when}로 옮길까요?`
+  const hint = '점선으로 표시한 자리예요. 블록을 직접 끌어 옮겨도 돼요.'
+
+  const acceptAllBtn = (compact: boolean) =>
+    sameDay.length > 1 && (
+      <Button
+        size={compact ? 'sm' : 'md'}
+        variant={compact ? 'ghost' : 'secondary'}
+        disabled={busy}
+        loading={acceptAll.isPending}
+        onClick={() => {
+          track('carry_proposal.accept_all_click', { surface: surf, item_count: sameDay.length })
+          acceptAll.mutate(date, result('accept_all'))
+        }}
+      >
+        {compact ? `${sameDay.length}개 모두 적용` : '모두 적용'}
+      </Button>
+    )
+  const pager = tasks.length > 1 && (
+    <div className="flex shrink-0 items-center gap-0.5">
+      <IconButton label="이전 제안" disabled={idx === 0} onClick={() => setPage(idx - 1)}>
+        <ChevronLeft strokeWidth={1.5} />
+      </IconButton>
+      <span className="text-body-sm text-text-secondary min-w-9 text-center font-medium tabular-nums">
+        {idx + 1} / {tasks.length}
+      </span>
+      <IconButton label="다음 제안" disabled={idx >= tasks.length - 1} onClick={() => setPage(idx + 1)}>
+        <ChevronRight strokeWidth={1.5} />
+      </IconButton>
+    </div>
+  )
+  const skipBtn = (
+    <Button
+      variant="secondary"
+      disabled={busy}
+      loading={decline.isPending}
+      leftIcon={<X className="size-4" strokeWidth={1.5} />}
+      onClick={() => {
+        track('carry_proposal.decline_click', { surface: surf, task_id: t.taskId, item_count: tasks.length })
+        decline.mutate(t.taskId, result('decline'))
+      }}
+    >
+      건너뛰기
+    </Button>
+  )
+  const applyBtn = (
+    <Button
+      variant="primary"
+      disabled={busy}
+      loading={accept.isPending}
+      leftIcon={<Check className="size-4" strokeWidth={1.5} />}
+      onClick={() => {
+        track('carry_proposal.accept_click', { surface: surf, task_id: t.taskId, item_count: tasks.length })
+        accept.mutate(t.taskId, result('accept'))
+      }}
+    >
+      적용
+    </Button>
+  )
+  const divider = <span aria-hidden className="bg-border-subtle h-7 w-px shrink-0" />
+  const info = (
+    <span title={`${sentence} ${hint}`} className="text-text-tertiary shrink-0">
+      <Info className="size-4" strokeWidth={1.25} />
+    </span>
+  )
+  const title = (
+    <span className="text-label-lg text-text-primary min-w-0 truncate">
+      {t.emoji ? `${t.emoji} ` : ''}
+      {t.taskName}
+    </span>
+  )
+  const time = (
+    <span className="text-body-sm text-text-secondary shrink-0 tabular-nums">
+      {t.carriedFromDate ? `${formatMonthDay(t.carriedFromDate)} → ` : ''}
+      {when}
+    </span>
+  )
+
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+      {/* 제안 바 (명세 6D) — AI 그라데이션 테두리 · 넓은 화면 한 줄 / 좁은 화면 3줄 */}
       <div
         role="dialog"
         aria-label="못 한 일 옮기기"
-        className="bg-surface shadow-pop border-line pointer-events-auto w-full max-w-[600px] animate-[modal-in_160ms_ease-out] rounded-2xl border p-4"
+        className="ai-border rounded-card pointer-events-auto w-full max-w-[920px] animate-[modal-in_160ms_ease-out]"
       >
-        <div className="flex items-start gap-3">
-          <span className="bg-brand-soft text-text-brand grid size-9 shrink-0 place-items-center rounded-full">
-            <CalendarClock className="size-4" />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[15px] leading-snug font-bold">
-              {from} 못한 {eulReul(name)} {when}로 옮길까요?
-            </p>
-            <p className="text-ink-3 mt-0.5 flex flex-wrap items-center gap-1 text-[12px]">
-              {t.carriedFromDate && <span>{formatMonthDay(t.carriedFromDate)}</span>}
-              {t.carriedFromDate && <ArrowRight className="size-3" />}
-              <span>점선으로 표시한 자리예요. 블록을 직접 끌어 옮겨도 돼요.</span>
-              {tasks.length > 1 && <b className="text-ink-2">· 남은 제안 {tasks.length}개</b>}
-            </p>
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            variant="brand"
-            disabled={busy}
-            loading={accept.isPending}
-            onClick={() => {
-              track('carry_proposal.accept_click', { surface: surf, task_id: t.taskId, item_count: tasks.length })
-              accept.mutate(t.taskId, result('accept'))
-            }}
-          >
-            옮기기
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            disabled={busy}
-            loading={decline.isPending}
-            onClick={() => {
-              track('carry_proposal.decline_click', { surface: surf, task_id: t.taskId, item_count: tasks.length })
-              decline.mutate(t.taskId, result('decline'))
-            }}
-          >
-            안 옮기기
-          </Button>
+        <p className="sr-only">
+          {sentence} {hint}
+          {tasks.length > 1 && ` 남은 제안 ${tasks.length}개`}
+        </p>
+
+        {/* 넓은 화면: h56 · 안쪽 9 · 간격 12 */}
+        <div className="hidden h-14 items-center gap-3 p-[9px] md:flex">
           {sameDay.length > 1 && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="ml-auto"
-              disabled={busy}
-              loading={acceptAll.isPending}
-              onClick={() => {
-                track('carry_proposal.accept_all_click', { surface: surf, item_count: sameDay.length })
-                acceptAll.mutate(date, result('accept_all'))
-              }}
-            >
-              {to} {sameDay.length}개 모두 옮기기
-            </Button>
+            <>
+              {acceptAllBtn(false)}
+              {divider}
+            </>
           )}
+          {pager && (
+            <>
+              {pager}
+              {divider}
+            </>
+          )}
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <AIBadge />
+            {title}
+            <Badge tone="neutral">새로 배치</Badge>
+            {time}
+            {info}
+          </div>
+          {divider}
+          {skipBtn}
+          {applyBtn}
+        </div>
+
+        {/* 좁은 화면: 12/14 · 간격 8 · 3줄 */}
+        <div className={cn('flex flex-col gap-2 px-3.5 py-3 md:hidden')}>
+          <div className="flex min-w-0 items-center gap-2">
+            <AIBadge />
+            {title}
+            <Badge tone="neutral">새로 배치</Badge>
+          </div>
+          <div className="flex min-w-0 items-center gap-2">
+            {time}
+            {info}
+            <span className="ml-auto">{pager}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            {acceptAllBtn(true)}
+            <span className="ml-auto flex gap-2">
+              {skipBtn}
+              {applyBtn}
+            </span>
+          </div>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client'
 
-import { Sparkles } from 'lucide-react'
+import { Check, X } from 'lucide-react'
+import { AIBadge } from '@/components/ui/AIBadge'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 
@@ -42,14 +43,13 @@ export function FillProposalBar({
       <div
         role="dialog"
         aria-label="AI 배치 확인"
-        className="bg-surface shadow-pop border-line pointer-events-auto w-full max-w-[600px] animate-[modal-in_160ms_ease-out] rounded-2xl border p-4"
+        // AI 제안 바 (명세 6B·6D) — 그라데이션 테두리 · AIBadge · 적용(Primary ✓) / 취소(Secondary ✕)
+        className="ai-border rounded-card pointer-events-auto w-full max-w-[640px] animate-[modal-in_160ms_ease-out] px-3.5 py-3 sm:p-4"
       >
         <div className="flex items-start gap-3">
-          <span className="bg-brand grid size-9 shrink-0 place-items-center rounded-full text-white">
-            <Sparkles className="size-4" />
-          </span>
+          <AIBadge />
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] leading-snug font-bold">
+            <p className="text-label-lg text-text-primary">
               {isNew
                 ? count > 0
                   ? `새 Task ${count}개를 점선 자리에 놓을게요. 이대로 진행할까요?`
@@ -58,7 +58,7 @@ export function FillProposalBar({
                   ? `점선 자리에 ${count}개를 배치할게요. 이대로 진행할까요?`
                   : '배치할 빈 시간을 찾지 못했어요'}
             </p>
-            <p className="text-ink-3 mt-0.5 text-[12px] leading-relaxed">
+            <p className="text-caption-md text-text-secondary mt-0.5">
               {count > 0 && '마음에 안 드는 블록은 끌어서 옮겨 보세요. 시간 미정 칸으로 끌면 이번 배치에서 빠져요.'}
               {isNew && ' Task는 이미 추가됐어요 — 아니요를 누르면 시간 미정으로 남아요.'}
               {edited > 0 && ` 직접 옮긴 ${edited}개는 📌 고정돼요.`}
@@ -67,15 +67,27 @@ export function FillProposalBar({
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          {count > 0 && (
-            <Button size="sm" variant="brand" loading={loading} onClick={onApply}>
-              이대로 진행
+          <span className="text-caption-sm text-text-tertiary hidden sm:inline">Esc 취소</span>
+          <span className="ml-auto flex flex-wrap justify-end gap-2">
+            <Button
+              variant="secondary"
+              disabled={loading}
+              leftIcon={<X className="size-4" strokeWidth={1.5} />}
+              onClick={() => onCancel('cancel_button')}
+            >
+              {count === 0 ? '닫기' : isNew ? '아니요 (시간 미정으로 두기)' : '취소 (반영 안 함)'}
             </Button>
-          )}
-          <Button size="sm" variant="secondary" disabled={loading} onClick={() => onCancel('cancel_button')}>
-            {count === 0 ? '닫기' : isNew ? '아니요 (시간 미정으로 두기)' : '취소 (반영 안 함)'}
-          </Button>
-          <span className="text-ink-4 ml-auto hidden text-[11px] sm:inline">Esc 취소</span>
+            {count > 0 && (
+              <Button
+                variant="primary"
+                loading={loading}
+                leftIcon={<Check className="size-4" strokeWidth={1.5} />}
+                onClick={onApply}
+              >
+                이대로 진행
+              </Button>
+            )}
+          </span>
         </div>
       </div>
     </div>

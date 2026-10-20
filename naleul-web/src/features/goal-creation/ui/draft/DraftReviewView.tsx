@@ -57,6 +57,7 @@ import {
   validatePlan,
   weeklyRoutineMinutes,
 } from './planUtils'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 const FEEDBACK_MAX = 200
 
@@ -504,7 +505,7 @@ export function DraftReviewView({ session, draft }: Props) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-[28px]">
-                <Sparkles className="size-6" />
+                <AIBadge />
                 AI 목표 설계
               </h1>
               <p className="text-ink-3 mt-1 text-sm">
@@ -723,7 +724,8 @@ export function DraftReviewView({ session, draft }: Props) {
               }}
             >
               <Button
-                className="bg-on-ink/10 hover:bg-on-ink/20 text-on-ink flex-1 shadow-none sm:flex-none"
+                variant="ai"
+                className="flex-1 sm:flex-none"
                 onClick={() => {
                   track('goal_draft.regen_open', {
                     session_id: sessionId,
@@ -739,11 +741,12 @@ export function DraftReviewView({ session, draft }: Props) {
               >
                 <RefreshCw className="size-4" />
                 다시 생성
-                {regenRemaining != null && <span className="text-on-ink/60">({regenRemaining}회 남음)</span>}
+                {regenRemaining != null && <span className="text-white/70">({regenRemaining}회 남음)</span>}
               </Button>
             </span>
             <Button
-              className="bg-on-ink text-inverse hover:bg-on-ink/90 flex-1 shadow-none sm:flex-none"
+              variant="primary"
+              className="flex-1 sm:flex-none"
               onClick={confirm}
               loading={confirming}
               disabled={busy && !confirming}
@@ -780,7 +783,8 @@ export function DraftReviewView({ session, draft }: Props) {
             >
               취소
             </Button>
-            <Button onClick={submitFeedback} loading={regenerating}>
+            <Button variant="ai" onClick={submitFeedback} loading={regenerating}>
+              {!regenerating && <Sparkles className="size-4" />}
               다시 생성
             </Button>
           </>

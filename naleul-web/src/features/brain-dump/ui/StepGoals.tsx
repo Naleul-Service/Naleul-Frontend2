@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, CalendarClock, Clock, Pencil, Sparkles } from 'lucide-react'
+import { AlertCircle, CalendarClock, Clock, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Chip'
@@ -14,6 +14,7 @@ import { formatDuration, formatMonthDay } from '@/features/timetable/time'
 import type { ConfirmItem, ConfirmResponse, TempGoalInput } from '../types'
 import type { TaskAddSurface } from '../analytics'
 import { ItemEditModal } from './ItemEditModal'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 /** 2단계에서 고치는 Task 하나 = 확정 요청 Item + AI 가 붙인 연결 이유 */
 export interface MapItem extends ConfirmItem {
@@ -371,7 +372,7 @@ function ItemRow({
           </p>
           {it.reason && !conflict && (
             <p className="text-ink-3 mt-1.5 flex items-start gap-1 text-xs">
-              <Sparkles className="text-text-brand mt-0.5 size-3 shrink-0" />
+              <AIBadge size="sm" className="mt-px size-4 rounded-[4px] [&_svg]:size-2.5" />
               {it.reason}
             </p>
           )}

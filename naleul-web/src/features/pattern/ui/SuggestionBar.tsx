@@ -1,7 +1,6 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { track } from '@/lib/client/analytics'
@@ -11,6 +10,7 @@ import { useApplySuggestions, useDismissSuggestions } from '../api'
 import type { PatternSuggestionBar, PatternSuggestionItem } from '../types'
 import { DAY_SHORT } from '../format'
 import { Emphasis } from './Emphasis'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 /** 하단 제안 바 + [TimeBlock에 반영하기] 확인 모달 */
 export function SuggestionBar({ suggestion }: { suggestion?: PatternSuggestionBar | null }) {
@@ -73,12 +73,11 @@ export function SuggestionBar({ suggestion }: { suggestion?: PatternSuggestionBa
   return (
     <>
       <section
-        className="rounded-card border-line bg-surface shadow-card flex flex-col gap-4 border p-5 sm:flex-row sm:items-center sm:p-6"
+        // AI 제안 상자 (명세 6B)
+        className="ai-border rounded-card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:p-6"
         aria-label="패턴 기반 제안"
       >
-        <span className="bg-brand grid size-10 shrink-0 place-items-center rounded-xl text-white" aria-hidden>
-          <Sparkles className="size-5" />
-        </span>
+        <AIBadge />
         <p className="text-ink-2 min-w-0 flex-1 text-[15px] leading-relaxed">
           <Emphasis text={suggestion.text} className="text-text-brand" />
         </p>

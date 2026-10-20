@@ -1,14 +1,13 @@
 'use client'
 
-import { AlertCircle, RotateCw, Sparkles } from 'lucide-react'
+import { AlertCircle, RotateCw } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import type { ChatItem } from '../hooks/useInterviewChat'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 function AiAvatar() {
   return (
-    <span className="bg-ai-tint text-text-brand grid size-8 shrink-0 place-items-center rounded-full" aria-hidden>
-      <Sparkles className="size-4" />
-    </span>
+    <AIBadge />
   )
 }
 

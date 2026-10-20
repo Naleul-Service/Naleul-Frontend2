@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { CornerDownLeft, MessageSquareText } from 'lucide-react'
+import { CornerDownLeft } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Chip'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
@@ -11,6 +11,7 @@ import { cn } from '@/lib/cn'
 import type { GoalCategory } from '../api'
 import { useGoalEditApply, useGoalEditPreview, type GoalEditPreview } from '../edit/mutations'
 import { AI_EDIT_PREFILL_EVENT } from './progress/DailyCheckInCard'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 const MAX = 200
 const EXAMPLES = [
@@ -125,9 +126,10 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
   }
 
   return (
-    <section className="border-line bg-surface rounded-card border px-4 py-3 sm:px-5">
+    // AI 요청 바 (명세 6B)
+    <section className="ai-border-flat rounded-card px-4 py-3 sm:px-5">
       <div className="flex items-center gap-2">
-        <MessageSquareText className="text-text-brand size-5 shrink-0" />
+        <AIBadge size="sm" />
         <input
           ref={inputRef}
           value={text}
@@ -145,7 +147,7 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
         />
         <Button
           size="sm"
-          variant="brand"
+          variant="ai"
           onClick={() => submit('button')}
           loading={ask.isPending}
           disabled={!text.trim()}

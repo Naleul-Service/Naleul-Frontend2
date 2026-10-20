@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Sparkles } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import { goalCreationApi, goalCreationKeys } from '../api'
 import { pathForStatus } from '../routes'
 import type { SessionStatus } from '../types'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 const STEP_LABEL: Partial<Record<SessionStatus, string>> = {
   INTERVIEWING: 'AI와 대화하는 중',
@@ -32,13 +33,11 @@ export function ResumeCard({ className }: { className?: string }) {
       href={href}
       onClick={() => track('goal_new.resume_click', { session_id: session.sessionId, resume_status: session.status })}
       className={cn(
-        'border-line bg-surface hover:border-line-strong flex items-center gap-4 rounded-2xl border p-4 transition-colors',
+        'ai-border-flat flex items-center gap-4 rounded-card p-4 transition-[filter] hover:brightness-[.98]',
         className
       )}
     >
-      <span className="bg-brand-soft text-text-brand grid size-10 shrink-0 place-items-center rounded-full">
-        <Sparkles className="size-5" />
-      </span>
+      <AIBadge />
       <span className="min-w-0 flex-1">
         <span className="text-ink-3 block text-[13px]">만들던 목표가 있어요 · {STEP_LABEL[session.status] ?? ''}</span>
         <span className="block truncate text-[15px] font-bold">

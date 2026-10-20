@@ -55,7 +55,7 @@ function TempGoalCard({ goal, position }: { goal: GoalCategory; position: number
         onClick={() =>
           track('goal_list.temp_refine_click', { goal_category_id: goal.goalCategoryId, list_position: position })
         }
-        className={buttonClass('brand', 'sm') + ' mt-auto self-start'}
+        className={buttonClass('ai', 'sm') + ' mt-auto self-start'}
       >
         <Sparkles className="size-3.5" />
         AI로 구체화하기
@@ -360,7 +360,7 @@ export function GoalListView() {
               <Link
                 href="/goal/new"
                 onClick={() => track('goal_list.empty_cta_click', { cta: 'ai' })}
-                className={buttonClass('brand', 'lg')}
+                className={buttonClass('ai', 'lg')}
               >
                 <Sparkles className="size-4" />
                 AI로 설계하기

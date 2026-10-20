@@ -20,6 +20,7 @@ import { EXAMPLE_GOALS } from '../constants'
 import { MustDoPicker, withDraft } from './MustDoPicker'
 import { FlowHeader } from './FlowHeader'
 import { ResumeCard } from './ResumeCard'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 /** /goal/new — 첫 문장 입력 + 이어서 만들기 */
 export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
@@ -141,7 +142,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-12 pb-10 sm:px-6 sm:pt-20">
         <Badge tone="brand" className="self-start">
-          <Sparkles className="size-3.5" />
+          <AIBadge size="sm" className="-ml-2 rounded-full" />
           AI 목표 설계
         </Badge>
         <h1 className="mt-4 text-[28px] leading-tight font-bold tracking-tight sm:text-[32px]">
@@ -281,7 +282,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
         >
           <Button
             size="lg"
-            variant="brand"
+            variant="ai"
             className="w-full"
             onClick={submit}
             loading={start.isPending}

@@ -22,7 +22,8 @@ const VARIANT: Record<ButtonVariant, string> = {
   ghost: 'bg-transparent text-text-brand hover:bg-action-ghost-hover active:bg-action-ghost-pressed',
   danger:
     'bg-action-danger-bg text-action-danger-fg hover:bg-action-danger-bg-hover active:bg-action-danger-bg-pressed',
-  ai: 'text-white bg-linear-to-r from-ai-gradient-start via-ai-gradient-mid to-ai-gradient-end hover:from-ai-gradient-hover-start hover:via-ai-gradient-hover-mid hover:to-ai-gradient-hover-end active:from-ai-gradient-pressed-start active:via-ai-gradient-pressed-mid active:to-ai-gradient-pressed-end',
+  // 명세 6A — 115° 그라데이션 (기본/hover/pressed) · 흰 글자 · primary 그림자 (누르는 동안 없음)
+  ai: 'bg-ai-gradient text-white shadow-primary hover:bg-ai-gradient-hover active:bg-ai-gradient-pressed active:shadow-none',
 }
 
 // LG h48 px20 · MD h40 px16 · SM h32 px12 (아이콘 쪽은 4px 줄여요)

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Chip'
 import type { SessionUserView } from '@/components/layout/types'
 import { track } from '@/lib/client/analytics'
 import { ProfileEditModal } from './ProfileEditModal'
-import { isPremiumRole } from './SettingsAnalytics'
+import { isPremiumRole } from '@/features/account/settingsRole'
 
 /** 설정 맨 위 프로필 요약 (iOS SettingProfileSummary) */
 export function ProfileSummaryCard({ user }: { user: SessionUserView }) {

@@ -11,6 +11,7 @@ import { errorStatusOf } from '@/features/home/analytics'
 import { useFillTimetable, type FillResponse } from '@/features/timetable/api'
 import { addDays, todayKst } from '@/features/timetable/time'
 import type { GoalCategory } from '../api'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 /** 목표를 만든 직후 채울 기간: 오늘부터 7일 */
 const DAYS = 7
@@ -65,13 +66,19 @@ export function PlaceAfterCreateCard({ goal, className }: { goal: GoalCategory; 
   return (
     <section
       className={cn(
-        'border-success/25 bg-success-soft/50 flex flex-col gap-4 rounded-card border p-5 sm:flex-row sm:items-center sm:p-6',
+        'flex flex-col gap-4 rounded-card p-5 sm:flex-row sm:items-center sm:p-6',
+        // 배치 전 = AI 제안 상자 (명세 6B) · 배치 후 = 성공 카드
+        result ? 'border-success/25 bg-success-soft/50 border' : 'ai-border',
         className
       )}
     >
-      <span className="bg-success grid size-11 shrink-0 place-items-center rounded-2xl text-white">
-        {result ? <CalendarCheck className="size-5" /> : <Sparkles className="size-5" />}
-      </span>
+      {result ? (
+        <span className="bg-success text-on-ink grid size-11 shrink-0 place-items-center rounded-[12px]">
+          <CalendarCheck className="size-5" />
+        </span>
+      ) : (
+        <AIBadge size="lg" />
+      )}
       {result ? (
         <>
           <div className="min-w-0 flex-1">
@@ -114,7 +121,7 @@ export function PlaceAfterCreateCard({ goal, className }: { goal: GoalCategory; 
             <Button variant="ghost" onClick={() => dismiss('before_fill')} disabled={fill.isPending}>
               나중에
             </Button>
-            <Button variant="brand" loading={fill.isPending} onClick={doFill}>
+            <Button variant="ai" loading={fill.isPending} onClick={doFill}>
               <Sparkles className="size-4" />
               AI로 이번 주 배치하기
             </Button>

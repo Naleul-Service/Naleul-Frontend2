@@ -272,7 +272,7 @@ export function StepResult({
             </p>
             <Link
               href={`/goal/new?sourceGoalId=${t.goalCategoryId}`}
-              className={buttonClass('secondary', 'sm')}
+              className={buttonClass('ai', 'sm')}
               onClick={() =>
                 track('task_add_result.temp_refine_click', { surface, goal_category_id: t.goalCategoryId })
               }

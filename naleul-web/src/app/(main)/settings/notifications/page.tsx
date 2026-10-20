@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
-import { isPremiumRole } from '@/features/account/ui/SettingsAnalytics'
+import { isPremiumRole } from '@/features/account/settingsRole'
 import { NotificationSettingsView } from '@/features/notification-settings/ui/NotificationSettingsView'
 import { COOKIE } from '@/lib/server/session'
 

@@ -334,15 +334,21 @@ export function TaskAddView({
                 'flex rounded-2xl border text-left transition-colors disabled:opacity-40',
                 panel ? 'flex-col items-center gap-1 rounded-xl p-2 text-center' : 'items-start gap-3 p-4',
                 mode === key
-                  ? 'border-ink bg-surface ring-ink ring-1'
-                  : 'border-line bg-surface hover:border-line-strong'
+                  ? key === 'ai'
+                    ? 'ai-border-flat' // AI 방식 (명세 6B)
+                    : 'border-action-outline-border bg-bg-surface ring-action-outline-border ring-[0.5px]'
+                  : 'border-border-subtle bg-bg-surface hover:border-line-strong'
               )}
             >
               <span
                 className={cn(
                   'grid shrink-0 place-items-center rounded-xl',
                   panel ? 'size-7 rounded-lg' : 'size-9',
-                  mode === key ? 'bg-ink text-on-ink' : 'bg-subtle text-ink-3'
+                  key === 'ai'
+                    ? 'bg-ai-gradient text-white' // AIBadge 와 같은 모양
+                    : mode === key
+                      ? 'bg-action-primary-bg text-action-primary-fg'
+                      : 'bg-bg-subtle text-text-secondary'
                 )}
               >
                 <Icon className="size-4" />
@@ -398,7 +404,7 @@ export function TaskAddView({
                   <span
                     className={cn(
                       'grid size-6 place-items-center rounded-full text-xs font-bold',
-                      i < step ? 'bg-success text-on-ink' : i === step ? 'bg-ink text-on-ink' : 'bg-subtle text-ink-3'
+                      i < step ? 'bg-success text-on-ink' : i === step ? 'bg-action-primary-bg text-action-primary-fg' : 'bg-subtle text-ink-3'
                     )}
                   >
                     {i < step ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}

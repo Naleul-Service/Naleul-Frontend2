@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Pencil, Sparkles, Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/Chip'
 import { Card } from '@/components/ui/Card'
 import { track } from '@/lib/client/analytics'
@@ -25,6 +25,7 @@ import { formatDot, goalColor, periodProgress, statusLabel } from '../format'
 import { metricSentence } from './metricSentence'
 import { isKindComplete, kindBody, type GoalKindValue } from '../kind'
 import { GoalKindPicker } from './GoalKindPicker'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 const numStr = (v: number | null | undefined) => (v == null ? '' : String(v))
 
@@ -492,8 +493,8 @@ export function GoalNotes({ goal }: { goal: GoalCategory }) {
         </button>
       )}
       {goal.aiNote && (
-        <p className="bg-canvas flex gap-2 rounded-2xl px-4 py-3 text-[14px] leading-relaxed">
-          <Sparkles className="text-text-brand mt-0.5 size-4 shrink-0" />
+        <p className="ai-border-flat flex gap-2.5 rounded-card px-4 py-3 text-[14px] leading-relaxed">
+          <AIBadge size="sm" className="mt-px" />
           {goal.aiNote}
         </p>
       )}

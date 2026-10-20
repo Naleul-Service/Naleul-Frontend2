@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Check, ChevronDown, Repeat, Sparkles } from 'lucide-react'
+import { Check, ChevronDown, Repeat } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Badge, Chip } from '@/components/ui/Chip'
 import { Spinner } from '@/components/ui/Spinner'
@@ -17,6 +17,7 @@ import { useGoalTasks, useToggleGoalTask, type GoalCategory } from '../api'
 import { useDeleteGoalTask } from '../edit/mutations'
 import { AddButton, InlineConfirm, RowActions, useEditing } from '../edit/inline'
 import { GoalTaskForm, daysFromToday, trackTaskList, type GoalTaskSurface } from './GoalTaskForm'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 type StatusFilter = 'ALL' | 'TODO' | 'DONE'
 type KindFilter = 'ALL' | 'ONE_TIME' | 'ROUTINE'
@@ -239,7 +240,7 @@ function TaskRow({
         )}
         {t.source === 'AI_GOAL' && (
           <Badge tone="brand">
-            <Sparkles className="size-3" />
+            <AIBadge size="sm" className="-ml-2 rounded-full" />
             AI
           </Badge>
         )}

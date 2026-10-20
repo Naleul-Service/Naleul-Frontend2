@@ -334,7 +334,7 @@ export function LogDoneView({ goals, surface = 'page' }: { goals: GoalCategory[]
         </span>
         <Button
           className="ml-auto"
-          variant="brand"
+          variant="ai"
           onClick={() => goParse('button')}
           loading={parse.isPending}
           disabled={!lines.length}

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, CalendarRange, ChevronDown, Sparkles } from 'lucide-react'
+import { AlertTriangle, CalendarRange, ChevronDown } from 'lucide-react'
 import { api } from '@/lib/client/api'
 import { track } from '@/lib/client/analytics'
 import { cn } from '@/lib/cn'
@@ -11,6 +11,7 @@ import { goalAccent, goalBg, goalFg } from '@/lib/goalTone'
 import { minutesToTime, timeToMinutes, todayKst } from '@/features/timetable/time'
 import { goalKeys, type JavaDayOfWeek } from '../api'
 import { JAVA_DAYS, JAVA_DAY_LABEL } from '../format'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 /** GET /routines/all — 내 모든 목표의 루틴 (목표 색 포함) */
 export interface AllRoutine {
@@ -217,9 +218,9 @@ export function RoutineWeekMap({
                   is_new: analytics.isNew,
                 })
               }
-              className="text-text-brand inline-flex items-center gap-0.5 font-semibold hover:underline"
+              className="text-text-brand inline-flex items-center gap-1 font-semibold hover:underline"
             >
-              <Sparkles className="size-3" />
+              <AIBadge size="sm" className="size-4 rounded-[4px] [&_svg]:size-2.5" />
               캘린더에서 AI로 한 번에 정리
             </Link>
             할 수 있어요.

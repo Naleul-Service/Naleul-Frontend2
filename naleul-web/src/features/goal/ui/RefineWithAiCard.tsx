@@ -9,6 +9,7 @@ import { track } from '@/lib/client/analytics'
 import { errorStatusOf } from '@/features/home/analytics'
 import { useKeepAsRecord } from '@/features/record/api'
 import { useGoalTasks, type GoalCategory } from '../api'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 export const refineHref = (goal: GoalCategory) => `/goal/new?sourceGoalId=${goal.goalCategoryId}`
 
@@ -51,13 +52,11 @@ export function RefineWithAiCard({ goal, className }: { goal: GoalCategory; clas
   return (
     <section
       className={cn(
-        'border-brand/20 from-brand-soft flex flex-col gap-4 rounded-card border bg-gradient-to-br to-surface p-5 sm:flex-row sm:items-center sm:p-6',
+        'ai-border flex flex-col gap-4 rounded-card p-5 sm:flex-row sm:items-center sm:p-6',
         className
       )}
     >
-      <span className="bg-brand grid size-11 shrink-0 place-items-center rounded-2xl text-white">
-        <Sparkles className="size-5" />
-      </span>
+      <AIBadge size="lg" />
       <div className="min-w-0 flex-1">
         <p className="text-[17px] leading-snug font-bold">AI로 &lsquo;{name}&rsquo; 목표를 구체화해 볼까요?</p>
         <p className="text-ink-3 mt-1 text-sm leading-relaxed">
@@ -73,8 +72,9 @@ export function RefineWithAiCard({ goal, className }: { goal: GoalCategory; clas
         <Link
           href={refineHref(goal)}
           onClick={() => track('goal_detail.refine_click', { goal_category_id: gid })}
-          className={buttonClass('brand', 'lg')}
+          className={buttonClass('ai', 'lg')}
         >
+          <Sparkles className="size-4" />
           AI로 구체화하기
           <ArrowRight className="size-4" />
         </Link>

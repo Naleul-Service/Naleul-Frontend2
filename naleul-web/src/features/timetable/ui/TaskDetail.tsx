@@ -14,7 +14,6 @@ import {
   PinOff,
   Pencil,
   Repeat,
-  Sparkles,
   Trash,
   Undo2,
   X,
@@ -42,6 +41,7 @@ import {
 import type { TimeBlockTask } from '../types'
 import type { TimetableSurface } from '../analytics'
 import { ScopeChips, scopeOptions } from './ScopeChooser'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 export interface TaskActions {
   onToggleComplete: (t: TimeBlockTask) => void
@@ -469,7 +469,7 @@ export function TaskDetail({
         ) : (
           t.placedBy === 'ENGINE' && (
             <Badge tone="brand">
-              <Sparkles className="size-3" />
+              <AIBadge size="sm" className="-ml-2 rounded-full" />
               자동 배치
             </Badge>
           )
@@ -672,9 +672,9 @@ export function TaskDetail({
 
       {/* 배치 이유 (명세: 항상 설명) */}
       {showReason && t.placementReason && (
-        <div className="bg-brand-soft mt-4 rounded-xl px-3.5 py-3">
-          <p className="text-text-brand flex items-center gap-1 text-xs font-bold">
-            <Sparkles className="size-3.5" />이 시간에 놓은 이유
+        <div className="ai-border-flat mt-4 rounded-xl px-3.5 py-3">
+          <p className="text-text-brand flex items-center gap-1.5 text-xs font-bold">
+            <AIBadge size="sm" />이 시간에 놓은 이유
           </p>
           <PlacementReason text={t.placementReason} codes={t.placementReasonCodes ?? []} />
         </div>

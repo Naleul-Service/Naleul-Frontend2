@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
 import type { TimetableDay } from '../types'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 /** 배치 대상: 오늘 이후 날짜의 "시간 미정" 미완료 Task (미션은 방장이 시간을 정하므로 제외) */
 export function unplacedOf(days: TimetableDay[], today: string) {
@@ -47,18 +48,18 @@ export function AutoPlaceBar({
   return (
     <div
       className={cn(
-        'mb-3 flex flex-wrap items-center gap-3 rounded-2xl border px-4 py-3',
-        active ? 'border-brand/25 bg-brand-soft/60' : 'border-line bg-surface'
+        'rounded-card mb-3 flex flex-wrap items-center gap-3 px-4 py-3',
+        // AI 제안 상자 (명세 6B) — 배치할 게 없으면 평범한 카드
+        active || proposing ? 'ai-border-flat' : 'border-border-subtle bg-bg-surface border'
       )}
     >
-      <span
-        className={cn(
-          'grid size-8 shrink-0 place-items-center rounded-xl',
-          active ? 'bg-brand text-white' : 'bg-subtle text-ink-4'
-        )}
-      >
-        <Sparkles className="size-4" />
-      </span>
+      {active || proposing ? (
+        <AIBadge />
+      ) : (
+        <span className="bg-bg-subtle text-text-tertiary grid size-7 shrink-0 place-items-center rounded-[8px]">
+          <Sparkles className="size-4" />
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <p className={cn('text-[14px] font-bold', !active && 'text-ink-3')}>
           {proposing
@@ -73,7 +74,7 @@ export function AutoPlaceBar({
         </p>
       </div>
       <Button
-        variant={active ? 'brand' : 'secondary'}
+        variant="ai"
         size="sm"
         disabled={!active}
         loading={loading}

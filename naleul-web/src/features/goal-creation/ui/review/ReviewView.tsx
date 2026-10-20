@@ -19,6 +19,7 @@ import type { PlanIntensity, PlanningStyle, SessionDetail, SlotKey, SlotsPatch }
 import { MustDoPicker, withDraft } from '../MustDoPicker'
 import { FlowShell } from '../SessionGate'
 import { SlotEditModal } from './SlotEditModal'
+import { AIBadge } from '@/components/ui/AIBadge'
 
 const STYLE_DESCRIPTION: Record<PlanningStyle, string> = {
   PLANNER: '요일·시간을 정해 매일 조금씩',
@@ -183,7 +184,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
       <div className="flex-1 overflow-y-auto">
         <main className="mx-auto w-full max-w-2xl px-4 pt-8 pb-10 sm:px-6 sm:pt-12">
           <Badge tone="brand">
-            <Sparkles className="size-3.5" />
+            <AIBadge size="sm" className="-ml-2 rounded-full" />
             정리 확인
           </Badge>
           <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-[28px]">이렇게 정리했어요</h1>
@@ -307,7 +308,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
 
       <div className="border-line bg-surface border-t pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto max-w-2xl px-4 py-3 sm:px-6 sm:py-4">
-          <Button variant="primary" size="lg" fullWidth onClick={generate} loading={generating}>
+          <Button variant="ai" size="lg" fullWidth onClick={generate} loading={generating}>
             {!generating && <Sparkles className="size-4" />}
             {regenerate ? '이 정보로 다시 만들기' : '계획 만들기'}
           </Button>

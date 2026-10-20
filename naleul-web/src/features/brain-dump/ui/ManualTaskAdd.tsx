@@ -176,7 +176,7 @@ export function ManualTaskAdd({
           <div className="mt-3 flex flex-wrap gap-2">
             {unplacedDates.length > 0 && (
               <Button
-                variant="brand"
+                variant="ai"
                 size="sm"
                 loading={fill.isPending}
                 onClick={() => {

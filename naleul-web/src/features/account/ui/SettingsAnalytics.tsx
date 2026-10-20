@@ -5,12 +5,7 @@ import Link from 'next/link'
 import { track } from '@/lib/client/analytics'
 import { readThemePref } from '@/features/theme/theme'
 
-/** 설정 메뉴 줄의 destination 값 (settings.menu_click) */
-export type SettingsDestination =
-  'membership' | 'life_pattern' | 'calendar_import' | 'notifications' | 'terms' | 'withdraw' | 'dashboard'
-
-/** 쿠키의 역할로 Pro 여부 (ADMIN 은 Pro 로 보지 않아요) */
-export const isPremiumRole = (role: string | undefined) => role === 'PRO'
+import type { SettingsDestination } from '@/features/account/settingsRole'
 
 /** settings.pageview — /settings 를 그린 직후 한 번 */
 export function SettingsPageview({ isPremium }: { isPremium: boolean }) {

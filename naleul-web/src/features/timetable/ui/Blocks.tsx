@@ -188,7 +188,12 @@ export function TaskBlock({
           </span>
         )}
         {proposed && (
-          <span className="bg-ink shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold text-on-ink">
+          <span
+            className={cn(
+              'shrink-0 rounded px-1 text-[9px] leading-[14px] font-bold',
+              t.proposed ? 'bg-ai-gradient text-white' : 'bg-bg-surface text-text-secondary'
+            )}
+          >
             {t.proposed ? 'AI 제안' : '옮길까요?'}
           </span>
         )}

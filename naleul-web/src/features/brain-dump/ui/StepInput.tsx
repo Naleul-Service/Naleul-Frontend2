@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
-import { Clock, CornerDownLeft, Lock, Timer, X } from 'lucide-react'
+import { Clock, CornerDownLeft, Lock, Timer, X, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
@@ -295,7 +295,8 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
             AI가 목표와 연결하고 있어요…
           </span>
         )}
-        <Button onClick={() => next('button')} disabled={!lines.length || loading} loading={loading}>
+        <Button variant="ai" onClick={() => next('button')} disabled={!lines.length || loading} loading={loading}>
+          {!loading && <Sparkles className="size-4" />}
           다음 · 목표 연결
         </Button>
       </div>
