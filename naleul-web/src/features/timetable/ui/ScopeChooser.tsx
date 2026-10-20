@@ -5,7 +5,14 @@ import { createPortal } from 'react-dom'
 import { CalendarDays, CalendarRange, Infinity as InfinityIcon, Repeat, X } from 'lucide-react'
 import { Chip } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
 import type { ChangeScope } from '../api'
+import type { TimetableSurface } from '../analytics'
+
+/** 범위를 묻는 대상 (scope_chooser.* scope_target) — 루틴 / 고정 시간 / 수면 기상 / 수면 취침 */
+export type ScopeTarget = 'routine' | 'fixed' | 'sleep_wake' | 'sleep_bed'
+/** 고르지 않고 '이날만'으로 저장된 이유 (scope_chooser.auto_day auto_reason) */
+export type ScopeAutoReason = 'outside_click' | 'focus_out' | 'next_drag' | 'leave_page'
 
 export interface ScopeOption {
   scope: ChangeScope
@@ -119,21 +126,54 @@ export function ScopeChooser({
   onChoose,
   onCancel,
   onDismiss,
+  surface,
+  scopeTarget,
 }: {
   title: string
   options: ScopeOption[]
   loading?: boolean
   onChoose: (s: ChangeScope) => void
   onCancel: () => void
-  /** 고르지 않고 바깥을 누르거나 포커스가 빠져나감 (없으면 아무것도 안 함) */
-  onDismiss?: () => void
+  /** 고르지 않고 바깥을 누르거나 포커스가 빠져나감 (없으면 아무것도 안 함) — reason 은 분석용 */
+  onDismiss?: (reason: ScopeAutoReason) => void
+  /** 분석: 이 바가 쓰인 화면 */
+  surface?: TimetableSurface
+  /** 분석: 범위를 묻는 대상 */
+  scopeTarget?: ScopeTarget
 }) {
   const firstRef = useRef<HTMLButtonElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
-  // 렌더마다 새 함수여도 키보드 핸들러가 최신 값을 쓰도록
-  const latest = useRef({ options, onChoose, onCancel, onDismiss, loading })
+  // Enter 로 버튼을 눌렀는지 (keydown 에서 켜고 click 에서 읽어요)
+  const enterRef = useRef(false)
+
+  // ── 분석 (scope_chooser.*) ──
+  const base = { surface: surface ?? 'calendar', scope_target: scopeTarget }
+  const choose = (scope: ChangeScope, method: 'button' | 'enter' | 'number_key') => {
+    track('scope_chooser.choose', { ...base, change_scope: scope, submit_method: method })
+    onChoose(scope)
+  }
+  const cancel = (method: 'x_button' | 'esc') => {
+    track('scope_chooser.cancel', { ...base, close_method: method })
+    onCancel()
+  }
+  const dismiss = (reason: ScopeAutoReason) => {
+    if (!onDismiss) return
+    track('scope_chooser.auto_day', { ...base, auto_reason: reason })
+    onDismiss(reason)
+  }
+  // 바가 뜰 때 한 번 (같은 변경이면 다시 그려도 한 번만)
+  const needsScope = options.some((o) => o.scope !== 'DAY' && !o.disabledReason)
+  const viewed = useRef(false)
   useEffect(() => {
-    latest.current = { options, onChoose, onCancel, onDismiss, loading }
+    if (viewed.current) return
+    viewed.current = true
+    track('scope_chooser.view', { surface: surface ?? 'calendar', scope_target: scopeTarget, needs_scope: needsScope })
+  }, [surface, scopeTarget, needsScope])
+
+  // 렌더마다 새 함수여도 키보드 핸들러가 최신 값을 쓰도록
+  const latest = useRef({ options, choose, cancel, dismiss, loading })
+  useEffect(() => {
+    latest.current = { options, choose, cancel, dismiss, loading }
   })
 
   // 바깥 클릭 · 포커스 이동 → "이날만" (사용자가 그냥 다른 일을 하러 가면 바꾼 대로 두는 게 자연스러워요)
@@ -142,10 +182,13 @@ export function ScopeChooser({
       target instanceof Node && !!dialogRef.current && !dialogRef.current.contains(target)
     const onPointerDown = (e: PointerEvent) => {
       // 다른 블록을 끌려고 누른 경우도 여기서 먼저 "이날만"으로 저장돼요
-      if (outside(e.target) && !latest.current.loading) latest.current.onDismiss?.()
+      if (!outside(e.target) || latest.current.loading) return
+      const onBlock =
+        e.target instanceof Element && !!e.target.closest('[data-task-id], [data-fixed-id], [data-resize-handle]')
+      latest.current.dismiss(onBlock ? 'next_drag' : 'outside_click')
     }
     const onFocusIn = (e: FocusEvent) => {
-      if (outside(e.target) && !latest.current.loading) latest.current.onDismiss?.()
+      if (outside(e.target) && !latest.current.loading) latest.current.dismiss('focus_out')
     }
     document.addEventListener('pointerdown', onPointerDown, true)
     document.addEventListener('focusin', onFocusIn)
@@ -158,14 +201,18 @@ export function ScopeChooser({
   useEffect(() => {
     firstRef.current?.focus()
     const onKey = (e: KeyboardEvent) => {
-      const { options: opts, onChoose: choose, onCancel: cancel, loading: busy } = latest.current
+      const { options: opts, choose, cancel, loading: busy } = latest.current
       if (busy) return
       if (e.key === 'Escape') {
         e.preventDefault()
-        cancel()
+        cancel('esc')
+      } else if (e.key === 'Enter') {
+        // 포커스된 버튼의 click 이 바로 이어져요 → 그 click 에서 'enter' 로 읽어요
+        enterRef.current = true
+        window.setTimeout(() => (enterRef.current = false), 0)
       } else if (['1', '2', '3', '4'].includes(e.key)) {
         const o = opts[Number(e.key) - 1]
-        if (o && !o.disabledReason) choose(o.scope)
+        if (o && !o.disabledReason) choose(o.scope, 'number_key')
       }
     }
     document.addEventListener('keydown', onKey)
@@ -189,7 +236,7 @@ export function ScopeChooser({
           </div>
           <button
             type="button"
-            onClick={onCancel}
+            onClick={() => cancel('x_button')}
             disabled={loading}
             aria-label="취소하고 원래대로"
             className="text-ink-3 hover:bg-subtle hover:text-ink -mt-1 -mr-1 rounded-lg p-1.5"
@@ -207,7 +254,11 @@ export function ScopeChooser({
                 type="button"
                 disabled={!!o.disabledReason || loading}
                 title={o.disabledReason}
-                onClick={() => onChoose(o.scope)}
+                onClick={() => {
+                  const method = enterRef.current ? 'enter' : 'button'
+                  enterRef.current = false
+                  choose(o.scope, method)
+                }}
                 className={cn(
                   'border-line-strong hover:border-brand hover:bg-brand-soft focus-visible:border-brand focus-visible:bg-brand-soft flex flex-col items-start gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors outline-none',
                   'disabled:hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent'

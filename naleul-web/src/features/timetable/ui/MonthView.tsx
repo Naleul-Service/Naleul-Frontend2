@@ -1,11 +1,13 @@
 'use client'
 
-import type { MouseEvent } from 'react'
+import { useEffect, useRef, type MouseEvent } from 'react'
 import { CalendarDays, Check, Flag } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { dateRelationOf, errorStatusOf } from '@/features/home/analytics'
 import { useMonthlyTimetable } from '../api'
 import { hexOf, shownTime } from '../layout'
 import { WEEKDAY_LABEL, dDay, dayOfMonth, formatMonthDay, hm, monthOf, monthWeeks, weekdayIndex, yearOf } from '../time'
@@ -47,11 +49,25 @@ export function MonthView({
 }: Props) {
   const year = yearOf(date)
   const month = monthOf(date)
-  const { data, isPending, isError, refetch } = useMonthlyTimetable(year, month)
+  const { data, isPending, isError, error, refetch } = useMonthlyTimetable(year, month)
   // placeholderData 로 이전 달 데이터가 잠깐 남아 있을 수 있어 해당 달인지 확인
   const current = data && data.year === year && data.month === month ? data : undefined
   const byDate = new Map((current?.days ?? []).map((d) => [d.date, d]))
   const weeks = monthWeeks(year, month)
+
+  // calendar_month.load_fail — '다시 시도'가 보이게 될 때 한 번
+  const loadFailed = isError && !current
+  const errorStatus = errorStatusOf(error)
+  const loadFailSent = useRef(false)
+  useEffect(() => {
+    if (!loadFailed) {
+      loadFailSent.current = false
+      return
+    }
+    if (loadFailSent.current) return
+    loadFailSent.current = true
+    track('calendar_month.load_fail', { view_date: date, error_status: errorStatus })
+  }, [loadFailed, date, errorStatus])
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -74,7 +90,14 @@ export function MonthView({
           <div className="grid min-h-[320px] place-items-center p-8 text-center">
             <div>
               <p className="font-bold">월간 TimeTable을 불러오지 못했어요</p>
-              <Button variant="secondary" className="mt-4" onClick={() => refetch()}>
+              <Button
+                variant="secondary"
+                className="mt-4"
+                onClick={() => {
+                  track('calendar_month.retry_click', { view_date: date })
+                  refetch()
+                }}
+              >
                 다시 시도
               </Button>
             </div>
@@ -96,7 +119,14 @@ export function MonthView({
                     day={byDate.get(d)}
                     today={today}
                     selected={d === date}
-                    onSelect={() => onSelectDate(d)}
+                    onSelect={() => {
+                      track('calendar_month.day_select', {
+                        view_date: d,
+                        date_relation: dateRelationOf(d, today),
+                        task_count: byDate.get(d)?.taskCount ?? 0,
+                      })
+                      onSelectDate(d)
+                    }}
                     onOpen={() => onOpenDay(d)}
                   />
                 ))}
@@ -272,7 +302,14 @@ function DayPanel({
           {formatMonthDay(date)}
           {date === today && <span className="text-brand ml-1.5 text-[13px]">오늘</span>}
         </h3>
-        <Button variant="secondary" size="sm" onClick={() => onOpenDay(date)}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            track('calendar_month.open_day_click', { view_date: date })
+            onOpenDay(date)
+          }}
+        >
           <CalendarDays className="size-3.5" />
           일간 보기
         </Button>
@@ -363,8 +400,18 @@ function DayPanel({
                 key={t.taskId}
                 task={t}
                 busy={togglingId === t.taskId}
-                onSelect={onSelectTask}
-                onToggle={onToggleComplete}
+                onSelect={(task, e) => {
+                  track('calendar_month.task_click', { task_id: task.taskId, task_status: task.taskStatus })
+                  onSelectTask(task, e)
+                }}
+                onToggle={(task) => {
+                  track('calendar_month.task_check', {
+                    task_id: task.taskId,
+                    check_action: task.taskStatus === 'COMPLETED' ? 'uncomplete' : 'complete',
+                    date_relation: dateRelationOf(date, today),
+                  })
+                  onToggleComplete(task)
+                }}
               />
             ))}
           </ul>

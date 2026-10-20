@@ -143,6 +143,8 @@ export function TaskBlock({
     <button
       type="button"
       data-task-id={t.taskId}
+      // 분석용: 실제로 한 시각에 그린 블록인지 (timetable.task_block_click drag_source)
+      data-actual={actual || undefined}
       onClick={(e) => onSelect(t, e)}
       onPointerDown={drag ? (e) => drag(e, 'move') : undefined}
       style={style}

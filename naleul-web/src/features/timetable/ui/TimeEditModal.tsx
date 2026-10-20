@@ -1,9 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { errorStatusOf } from '@/features/home/analytics'
+import { track } from '@/lib/client/analytics'
+import type { TimetableSurface } from '../analytics'
 import type { ChangeScope } from '../api'
+import type { FixedBlock } from '../types'
 import { WEEKDAY_LABEL, formatDuration, isYmd, minutesToTime, timeToMinutes, weekdayIndex } from '../time'
 import { ScopeChips, scopeOptions } from './ScopeChooser'
 
@@ -25,6 +30,10 @@ interface Props {
   scope?: { kind: 'routine' | 'fixed'; today: string }
   onSubmit: (v: TimeValue, scope: ChangeScope) => void
   onClose: () => void
+  /** Amplitude surface — 이 창을 띄운 화면 */
+  surface?: TimetableSurface
+  /** 고정 시간을 고칠 때 그 종류 (fixed_detail.time_save · result 에 실어요) */
+  patternType?: FixedBlock['patternType']
 }
 
 const inputClass =
@@ -35,7 +44,44 @@ const inputClass =
  * 종료가 시작보다 이르면 다음 날로 넘어가는 것으로 봐요 (예: 23:00 ~ 01:00).
  * 부모에서 key 를 바꿔 열 때마다 초기값으로 다시 그려요.
  */
-export function TimeEditModal({ title, description, initial, dateEditable, loading, scope, onSubmit, onClose }: Props) {
+export function TimeEditModal({
+  title,
+  description,
+  initial,
+  dateEditable,
+  loading,
+  scope,
+  onSubmit,
+  onClose,
+  surface,
+  patternType,
+}: Props) {
+  const qc = useQueryClient()
+  /** 고정 시간 저장을 눌러 요청을 기다리는 중인지 (끝나면 fixed_detail.result) */
+  const submittedRef = useRef(false)
+  const isFixed = scope?.kind === 'fixed'
+  // 요청은 훅(usePatternScopedChange)이 보내요 — 성공하면 창이 닫히므로 mutation cache 에서 결과를 바로 받아요
+  useEffect(() => {
+    if (!isFixed) return
+    return qc.getMutationCache().subscribe((ev) => {
+      if (ev.type !== 'updated' || !submittedRef.current) return
+      const v = ev.mutation.state.variables as { lifePatternId?: number; scope?: string } | undefined
+      if (v?.lifePatternId === undefined || !v.scope) return
+      if (ev.action.type === 'success') {
+        submittedRef.current = false
+        track('fixed_detail.result', { surface, fixed_action: 'time', result: 'success' })
+      } else if (ev.action.type === 'error') {
+        submittedRef.current = false
+        track('fixed_detail.result', {
+          surface,
+          fixed_action: 'time',
+          result: 'fail',
+          error_status: errorStatusOf(ev.action.error),
+        })
+      }
+    })
+  }, [qc, isFixed, surface])
+
   const [date, setDate] = useState(initial.date)
   const [chosen, setChosen] = useState<ChangeScope>('DAY')
   const [start, setStart] = useState(minutesToTime(initial.start))
@@ -57,7 +103,18 @@ export function TimeEditModal({ title, description, initial, dateEditable, loadi
     : null
   // 고를 수 없게 된 범위를 골라 둔 상태면 이날만으로
   const effectiveScope = options?.find((o) => o.scope === chosen && !o.disabledReason) ? chosen : 'DAY'
-  const submit = () => onSubmit({ date, start: s, end: e }, effectiveScope)
+  const submit = () => {
+    if (isFixed) {
+      track('fixed_detail.time_save', {
+        surface,
+        pattern_type: patternType,
+        change_scope: effectiveScope,
+        crosses_midnight: e > 1440,
+      })
+      submittedRef.current = true
+    }
+    onSubmit({ date, start: s, end: e }, effectiveScope)
+  }
 
   return (
     <Modal
@@ -82,7 +139,7 @@ export function TimeEditModal({ title, description, initial, dateEditable, loadi
         className="space-y-3"
         onSubmit={(ev) => {
           ev.preventDefault()
-          if (valid) submit()
+          if (valid && !loading) submit()
         }}
       >
         {dateEditable && (

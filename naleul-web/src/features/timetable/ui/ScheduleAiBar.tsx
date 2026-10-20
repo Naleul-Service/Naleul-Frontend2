@@ -5,7 +5,9 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle, CornerDownLeft, Repeat, Sparkles } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { api, isApiError } from '@/lib/client/api'
 import { cn } from '@/lib/cn'
 import { toast } from '@/stores/toastStore'
@@ -86,7 +88,16 @@ const EXAMPLES = ['겹치는 루틴 정리해줘', '이번 주 운동 루틴은 
  * 루틴 변경은 "앞으로 계속", Task 변경은 그날만 바뀌어요.
  * ?ai=문장 으로 들어오면(루틴 폼의 "AI로 한 번에 정리") 입력칸에 채워 둬요 (보내기는 사용자가).
  */
-export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDate: string }) {
+export function ScheduleAiBar({
+  startDate,
+  endDate,
+  viewMode,
+}: {
+  startDate: string
+  endDate: string
+  /** 캘린더 보기 (calendar_ai.submit 의 view_mode) */
+  viewMode?: 'day' | 'week' | 'month'
+}) {
   const params = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -96,6 +107,8 @@ export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDa
   const ask = useScheduleEditPreview()
   const apply = useScheduleEditApply()
   const inputRef = useRef<HTMLInputElement>(null)
+  // ?ai= 로 채워 둔 문장 (calendar_ai.submit 의 is_prefilled)
+  const prefilledRef = useRef<string | null>(null)
 
   const send = (value: string) => {
     const v = value.trim()
@@ -104,12 +117,30 @@ export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDa
       { instruction: v, startDate, endDate },
       {
         onSuccess: (res) => {
+          track('calendar_ai.preview_result', {
+            result: 'success',
+            change_count: res?.changes.length ?? 0,
+            overlap_count: res?.overlaps.length ?? 0,
+          })
           if (!res) return
           setPreview(res)
           setPicked(res.changes.map(() => true))
         },
+        onError: (e) => track('calendar_ai.preview_result', { result: 'fail', error_status: errorStatusOf(e) }),
       }
     )
+  }
+  // 입력칸 Enter · '조정하기' 버튼
+  const submit = (method: 'button' | 'enter') => {
+    const v = text.trim()
+    if (!v || ask.isPending) return
+    track('calendar_ai.submit', {
+      view_mode: viewMode,
+      text_length: v.length,
+      is_prefilled: prefilledRef.current != null && text === prefilledRef.current,
+      submit_method: method,
+    })
+    send(text)
   }
 
   // 루틴 폼에서 "캘린더에서 AI로 한 번에 정리"로 왔을 때 — 문장을 채우고 주소에서는 지워요
@@ -122,25 +153,35 @@ export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDa
     router.replace(`${pathname}?${q.toString()}`, { scroll: false })
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 주소로 받은 문장을 한 번만 옮겨 담아요
     setText(v)
+    prefilledRef.current = v
     inputRef.current?.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill])
 
-  const close = () => {
+  const close = (method: ModalCloseMethod | 'cancel_button') => {
     if (apply.isPending) return
+    if (preview) track('calendar_ai.cancel', { close_method: method, change_count: preview.changes.length })
     setPreview(null)
   }
   const chosen = preview ? preview.changes.filter((_, i) => picked[i]).map((c) => c.op) : []
-  const doApply = () =>
+  const doApply = () => {
+    track('calendar_ai.apply_click', { selected_count: chosen.length, change_count: preview?.changes.length ?? 0 })
     apply.mutate(
       { ops: chosen, startDate, endDate },
       {
-        onSuccess: () => {
+        onSuccess: (r) => {
+          track('calendar_ai.apply_result', {
+            result: 'success',
+            applied_count: r?.applied ?? 0,
+            skipped_count: r?.skipped?.length ?? 0,
+          })
           setPreview(null)
           setText('')
         },
+        onError: (e) => track('calendar_ai.apply_result', { result: 'fail', error_status: errorStatusOf(e) }),
       }
     )
+  }
 
   return (
     <section className="border-line bg-surface mb-3 rounded-[20px] border px-4 py-2.5 sm:px-5">
@@ -153,7 +194,7 @@ export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDa
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
               e.preventDefault()
-              send(text)
+              submit('enter')
             }
           }}
           disabled={ask.isPending}
@@ -161,18 +202,27 @@ export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDa
           aria-label="AI로 일정 조정"
           className="placeholder:text-ink-4 h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
         />
-        <Button size="sm" variant="brand" onClick={() => send(text)} loading={ask.isPending} disabled={!text.trim()}>
+        <Button
+          size="sm"
+          variant="brand"
+          onClick={() => submit('button')}
+          loading={ask.isPending}
+          disabled={!text.trim()}
+        >
           <CornerDownLeft className="size-3.5" />
           조정하기
         </Button>
       </div>
       {!text && (
         <div className="mt-1 mb-0.5 flex flex-wrap gap-1.5 pl-7">
-          {EXAMPLES.map((ex) => (
+          {EXAMPLES.map((ex, i) => (
             <button
               key={ex}
               type="button"
-              onClick={() => setText(ex)}
+              onClick={() => {
+                track('calendar_ai.example_click', { example_index: i })
+                setText(ex)
+              }}
               className="border-line text-ink-3 hover:border-line-strong hover:text-ink-2 h-6 rounded-full border px-2 text-[12px]"
             >
               {ex}
@@ -191,7 +241,7 @@ export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDa
         footer={
           preview?.changes.length ? (
             <>
-              <Button variant="secondary" onClick={close} disabled={apply.isPending}>
+              <Button variant="secondary" onClick={() => close('cancel_button')} disabled={apply.isPending}>
                 취소
               </Button>
               <Button onClick={doApply} loading={apply.isPending} disabled={!chosen.length}>
@@ -199,7 +249,7 @@ export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDa
               </Button>
             </>
           ) : (
-            <Button variant="secondary" onClick={close}>
+            <Button variant="secondary" onClick={() => close('cancel_button')}>
               다시 적기
             </Button>
           )
@@ -224,7 +274,11 @@ export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDa
                         <input
                           type="checkbox"
                           checked={!!picked[i]}
-                          onChange={(e) => setPicked((p) => p.map((v, j) => (j === i ? e.target.checked : v)))}
+                          onChange={(e) => {
+                            const checked = e.target.checked
+                            track('calendar_ai.item_toggle', { change_kind: c.kind, checked })
+                            setPicked((p) => p.map((v, j) => (j === i ? checked : v)))
+                          }}
                           className="mt-1 size-4 shrink-0"
                         />
                         <span className="min-w-0 flex-1">
@@ -268,6 +322,7 @@ export function ScheduleAiBar({ startDate, endDate }: { startDate: string; endDa
                   <button
                     type="button"
                     onClick={() => {
+                      track('calendar_ai.overlap_fix_click', { overlap_count: preview.overlaps.length })
                       setPreview(null)
                       send('겹치는 루틴 정리해줘')
                     }}

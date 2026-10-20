@@ -92,7 +92,8 @@ export function StepResult({
     proposals,
     focusIds,
     fadeOthers,
-  } = useTimetableInteractions(rawDays, start)
+    gridEvents,
+  } = useTimetableInteractions(rawDays, start, { surface: 'task_add_result' })
 
   // 확인 바에서 Esc 로 닫으면 final 이 비어 와요 → 마지막 점선 자리를 기억해 둬요 (dragged_count 용)
   const proposalsRef = useRef<Proposal[] | null>(null)
@@ -290,6 +291,7 @@ export function StepResult({
         </Card>
       ) : (
         <TimeGrid
+          {...gridEvents}
           days={days}
           startHour={startHour}
           endHour={endHour}

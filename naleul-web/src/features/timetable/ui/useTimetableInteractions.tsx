@@ -3,6 +3,9 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Link2, X } from 'lucide-react'
 import { Popover, rectOf, type AnchorRect } from '@/components/ui/Popover'
+import { dateRelationOf, errorStatusOf } from '@/features/home/analytics'
+import { track, type EventProps } from '@/lib/client/analytics'
+import type { TimetableSurface } from '../analytics'
 import {
   useCompleteWithActual,
   useDeletePatternOverride,
@@ -37,17 +40,17 @@ import {
   todayKst,
   weekdayIndex,
 } from '../time'
-import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
+import type { ActualActivity, FixedBlock, HabitBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityForm, draftOf, type ActivityDraft } from './ActivityForm'
 import { CarryProposalBar } from './CarryProposalBar'
 import { FillProposalBar } from './FillProposalBar'
 import { FixedDetail } from './FixedDetail'
-import { ScopeChooser, scopeOptions } from './ScopeChooser'
+import { ScopeChooser, scopeOptions, type ScopeAutoReason, type ScopeTarget } from './ScopeChooser'
 import { TaskDetail } from './TaskDetail'
 import { ActualTimeModal, type ActualSegment } from './ActualTimeModal'
 import { TimeEditModal, type TimeValue } from './TimeEditModal'
 import { canDragTask, fixedKey, type Selection } from './TimeGrid'
-import { groupMoves, type DragSource, type DropTarget } from './useGridDrag'
+import { groupMoves, type DragCancelReason, type DragMode, type DragSource, type DropTarget } from './useGridDrag'
 
 type Opened =
   | { kind: 'task'; task: TimeBlockTask; anchor: AnchorRect }
@@ -134,6 +137,35 @@ function fullFixedEnd(block: FixedBlock, days: TimetableDay[], patternEnd?: stri
   return end
 }
 
+// ── 분석 도우미 (timetable.* · scope_chooser.*) ──
+/** drag_source: task 계획 블록 / actual 실제로 한 시간 / fixed 고정 시간 / group 묶음 / proposal AI 배치 미리보기 */
+function dragSourceOf(s: DragSource) {
+  if (s.kind === 'task') return s.task.proposed ? 'proposal' : s.group?.length ? 'group' : 'task'
+  return s.kind
+}
+/** drag_mode: move / resize_start(위 끝) / resize_end(아래 끝) */
+const dragModeOf = (m?: DragMode) =>
+  m === undefined ? undefined : m === 'resize-top' ? 'resize_start' : m === 'resize' ? 'resize_end' : 'move'
+/** 놓을 수 없던 이유 문구 → cancel_reason (TimeGrid 의 validate 문구와 맞춰요) */
+function invalidReasonOf(message?: string) {
+  if (!message) return 'invalid'
+  if (message.includes('겹쳐 있어요')) return 'crowded'
+  if (message.includes('기상') || message.includes('취침')) return 'sleep_rule'
+  if (message.includes('나눠서')) return 'actual_overlap'
+  return 'invalid'
+}
+/** validation_error: 앱이 정한 문구만 — 묶음 겹침 문구 앞의 Task 이름("…" 자리에)은 빼요 */
+const validationErrorOf = (message?: string) => {
+  if (!message) return undefined
+  const i = message.indexOf('이미 Task')
+  return i > 0 ? message.slice(i) : message
+}
+/** 범위를 묻는 대상 */
+const scopeTargetOf = (a: ScopeAsk): ScopeTarget =>
+  a.kind === 'routine' ? 'routine' : a.edge === 'wake' ? 'sleep_wake' : a.edge === 'bed' ? 'sleep_bed' : 'fixed'
+/** 오늘부터 며칠 전 (YYYY-MM-DD) */
+const daysAgoOf = (date: string, today: string) => Math.round((Date.parse(today) - Date.parse(date)) / 86_400_000)
+
 /** 배치 미리보기를 연 쪽에 알려 주는 콜백 */
 export interface PreviewFillOptions {
   /** fill = "AI로 배치하기" · new = 방금 추가한 Task (확인 바 문구가 달라요) */
@@ -156,9 +188,20 @@ export function useTimetableInteractions(
   rawDays: TimetableDay[],
   // 시간 미정 Task 의 기본 날짜는 이제 상세 창이 직접 정해요 (호출부 호환용으로 남김)
   fallbackDate: string,
-  /** sidePanel: 오른쪽 Task 추가 패널이 열려 있음 → 확인 바를 그만큼 비켜서 띄워요 */
-  opts: { sidePanel?: boolean } = {}
+  /**
+   * sidePanel: 오른쪽 Task 추가 패널이 열려 있음 → 확인 바를 그만큼 비켜서 띄워요
+   * surface: 이 TimeTable 이 쓰인 화면 (분석). 없으면 'calendar' 로 봐요.
+   *          'home' 이면 격자 이벤트(timetable.*)는 보내지 않아요 — 홈은 home.calendar_* 로 따로 보내요.
+   */
+  opts: { sidePanel?: boolean; surface?: TimetableSurface } = {}
 ) {
+  const surface: TimetableSurface = opts.surface ?? 'calendar'
+  // 캘린더 보기: 격자는 일간(1일) · 주간(7일)에서만 그려요. 월간에서 Task 를 눌러도 격자 이벤트는 아니에요
+  const viewMode = surface === 'calendar' ? (rawDays.length > 1 ? 'week' : 'day') : undefined
+  /** timetable.* (격자 클릭·끌기·묶음) — 홈에서는 보내지 않아요 */
+  const trackGrid = (event: Parameters<typeof track>[0], props: EventProps = {}) => {
+    if (surface !== 'home') track(event, { surface, ...props })
+  }
   const [opened, setOpened] = useState<Opened>(null)
   const [editing, setEditing] = useState<Editing>(null)
   // "삭제할까요?"를 띄운 Task (상세 창 안에서 확인해요)
@@ -198,12 +241,19 @@ export function useTimetableInteractions(
   )
 
   // ── AI로 배치하기: 미리보기 → (끌어서 고치기) → 이대로 진행 / 취소 ──
+  const editedProposals = (proposals ?? []).filter((p) => p.start !== p.proposedStart || p.end !== p.proposedEnd).length
   const previewFill = (target: FillPreviewTarget, o: PreviewFillOptions = {}) =>
     fillPreview.mutate(target, {
       onSuccess: (r) => {
         if (!r) return
         resolveRef.current = o.onResolve
         setProposalKind(o.kind ?? 'fill')
+        track('fill_proposal.view', {
+          surface,
+          proposal_kind: o.kind ?? 'fill',
+          placed_count: r.proposals.length,
+          unscheduled_count: r.unscheduled.length,
+        })
         o.onPreview?.(r)
         setProposals(
           r.proposals.map((p) => ({
@@ -219,13 +269,26 @@ export function useTimetableInteractions(
       },
       onError: () => o.onError?.(),
     })
-  const cancelProposals = () => {
+  const cancelProposals = (method: 'cancel_button') => {
+    track('fill_proposal.cancel', {
+      surface,
+      proposal_kind: proposalKind,
+      close_method: method,
+      dragged_count: editedProposals,
+    })
     resolveRef.current?.(false, proposals ?? [])
     resolveRef.current = undefined
     setProposals(null)
   }
   const applyProposalsNow = () => {
     if (!proposals?.length) return
+    track('fill_proposal.apply_click', {
+      surface,
+      proposal_kind: proposalKind,
+      placed_count: proposals.length,
+      dragged_count: editedProposals,
+    })
+    const kind = proposalKind
     fillApply.mutate(
       {
         items: proposals.map((p) => ({
@@ -239,21 +302,33 @@ export function useTimetableInteractions(
       },
       {
         onSuccess: () => {
+          track('fill_proposal.result', { surface, proposal_kind: kind, result: 'success' })
           resolveRef.current?.(true, proposals)
           resolveRef.current = undefined
           setProposals(null)
         },
+        onError: (e) =>
+          track('fill_proposal.result', {
+            surface,
+            proposal_kind: kind,
+            result: 'fail',
+            error_status: errorStatusOf(e),
+          }),
       }
     )
   }
-  const editedProposals = (proposals ?? []).filter((p) => p.start !== p.proposedStart || p.end !== p.proposedEnd).length
-
   // 미리보기 중 Esc → 취소 (상세 창·범위 고르기가 떠 있으면 그쪽이 먼저)
   const proposing = proposals !== null
   useEffect(() => {
     if (!proposing) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !e.defaultPrevented && !opened && !editing) {
+        track('fill_proposal.cancel', {
+          surface,
+          proposal_kind: proposalKind,
+          close_method: 'esc',
+          dragged_count: editedProposals,
+        })
         resolveRef.current?.(false, [])
         resolveRef.current = undefined
         setProposals(null)
@@ -261,7 +336,7 @@ export function useTimetableInteractions(
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [proposing, opened, editing])
+  }, [proposing, opened, editing, surface, proposalKind, editedProposals])
 
   // 묶음 중 지금도 옮길 수 있는 Task 만 (완료했거나 시간 미정이 된 Task 는 빠져요)
   const groupIds = useMemo(() => {
@@ -273,7 +348,10 @@ export function useTimetableInteractions(
     )
     return new Set(group.filter((id) => live.has(id))) as ReadonlySet<number>
   }, [days, group])
-  const clearGroup = () => setGroup([])
+  const clearGroup = () => {
+    trackGrid('timetable.group_clear', { group_size: groupIds.size, close_method: 'cancel_button' })
+    setGroup([])
+  }
 
   // 22시 이월 제안 (아직 확인 안 한 것) — 오늘 이후, 시간순
   const carryProposals = useMemo(() => {
@@ -322,27 +400,48 @@ export function useTimetableInteractions(
       e.preventDefault()
       const date = blockDay(task)
       const all = days.flatMap((d) => d.tasks)
-      setGroup((g) => {
-        // 묶음은 같은 날 Task 끼리만 — 다른 날 Task 를 고르면 새로 시작해요
-        const sameDay = g.filter((id) => blockDay(all.find((x) => x.taskId === id) ?? task) === date)
-        // 처음 묶을 때 상세 창이 열려 있던 같은 날 Task 도 같이 넣어요
-        const seed =
-          !sameDay.length && opened?.kind === 'task' && opened.task.taskId !== task.taskId
-            ? [opened.task].filter((o) => groupable(o) && blockDay(o) === date).map((o) => o.taskId)
-            : []
-        const base = [...seed, ...sameDay]
-        return base.includes(task.taskId) ? base.filter((id) => id !== task.taskId) : [...base, task.taskId]
+      // 묶음은 같은 날 Task 끼리만 — 다른 날 Task 를 고르면 새로 시작해요
+      const sameDay = group.filter((id) => blockDay(all.find((x) => x.taskId === id) ?? task) === date)
+      // 처음 묶을 때 상세 창이 열려 있던 같은 날 Task 도 같이 넣어요
+      const seed =
+        !sameDay.length && opened?.kind === 'task' && opened.task.taskId !== task.taskId
+          ? [opened.task].filter((o) => groupable(o) && blockDay(o) === date).map((o) => o.taskId)
+          : []
+      const base = [...seed, ...sameDay]
+      const removing = base.includes(task.taskId)
+      const next = removing ? base.filter((id) => id !== task.taskId) : [...base, task.taskId]
+      trackGrid('timetable.group_select', {
+        task_id: task.taskId,
+        group_action: removing ? 'remove' : 'add',
+        group_size: next.length,
       })
+      setGroup(next)
       setOpened(null)
       setConfirmDeleteId(null)
       return
     }
     const anchor = rectOf(e.currentTarget)
+    // 격자(시간 미정 칸 포함)에서 눌렀을 때만 — 월간·할 일 목록에서 연 건 그쪽 이벤트가 있어요. 같은 블록을 다시 눌러 닫을 땐 빼요
+    const fromGrid = !!e.currentTarget.closest('[data-testid="time-grid"]')
+    if (fromGrid && !(opened?.kind === 'task' && opened.task.taskId === task.taskId)) {
+      trackGrid('timetable.task_block_click', {
+        view_mode: viewMode,
+        task_id: task.taskId,
+        source_type: task.sourceType,
+        task_status: task.taskStatus,
+        is_scheduled: !!task.plannedStartAt,
+        is_locked: !!task.locked,
+        drag_source: task.proposed ? 'proposal' : e.currentTarget.dataset.actual ? 'actual' : 'task',
+      })
+    }
     setConfirmDeleteId(null)
     setOpened((o) => (o?.kind === 'task' && o.task.taskId === task.taskId ? null : { kind: 'task', task, anchor }))
   }
   const onSelectFixed = (block: FixedBlock, e: MouseEvent<HTMLElement>) => {
     const anchor = rectOf(e.currentTarget)
+    if (!(opened?.kind === 'fixed' && fixedKey(opened.block) === fixedKey(block))) {
+      trackGrid('timetable.fixed_block_click', { pattern_type: block.patternType, is_overridden: !!block.overridden })
+    }
     setOpened((o) =>
       o?.kind === 'fixed' && fixedKey(o.block) === fixedKey(block) ? null : { kind: 'fixed', block, anchor }
     )
@@ -351,6 +450,9 @@ export function useTimetableInteractions(
   // ── 실제로 한 일 ──
   const onSelectActivity = (a: ActualActivity, e: MouseEvent<HTMLElement>) => {
     const anchor = rectOf(e.currentTarget)
+    if (!(opened?.kind === 'activity' && opened.draft.activity?.activityId === a.activityId)) {
+      trackGrid('timetable.activity_block_click', { days_ago: daysAgoOf(a.startAt.slice(0, 10), today) })
+    }
     setConfirmDeleteId(null)
     setOpened((o) =>
       o?.kind === 'activity' && o.draft.activity?.activityId === a.activityId
@@ -368,11 +470,17 @@ export function useTimetableInteractions(
     setOpened({ kind: 'activity', draft: { ...draft, start: Math.max(start, 0), end }, anchor })
   }
   /** 빈 칸 클릭 → 그 시각부터 1시간 */
-  const onEmptyClick = (date: string, minutes: number, e: MouseEvent<HTMLElement>) =>
+  const onEmptyClick = (date: string, minutes: number, e: MouseEvent<HTMLElement>) => {
+    trackGrid('timetable.empty_slot_click', {
+      view_date: date,
+      date_relation: dateRelationOf(date, today),
+      slot_minutes: minutes,
+    })
     openActivity(
       { date, start: minutes, end: minutes + 60 },
       { top: e.clientY, bottom: e.clientY, left: e.clientX, right: e.clientX }
     )
+  }
 
   // ── Task 작업 ──
   const taskActions = {
@@ -433,11 +541,14 @@ export function useTimetableInteractions(
       }
       if (!task || task.sourceType === 'MISSION') return
       e.preventDefault()
+      if (surface !== 'home') {
+        track('timetable.delete_key', { surface, task_id: task.taskId, source_type: task.sourceType })
+      }
       setConfirmDeleteId(task.taskId)
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [opened, days])
+  }, [opened, days, surface])
 
   const confirmDeleteTask = () => {
     if (confirmDeleteId === null) return
@@ -505,8 +616,14 @@ export function useTimetableInteractions(
 
   const chooseScope = (scope: ChangeScope) => {
     if (!ask) return
+    const result = { surface, scope_target: scopeTargetOf(ask), change_scope: scope }
     // 성공·실패 모두 TimeTable 을 다시 불러온 뒤 임시 표시를 지워요
-    const opts = { onSettled: () => dropPending(ask.pending) }
+    const opts = {
+      onSettled: () => dropPending(ask.pending),
+      onSuccess: () => track('scope_chooser.result', { ...result, result: 'success' }),
+      onError: (e: unknown) =>
+        track('scope_chooser.result', { ...result, result: 'fail', error_status: errorStatusOf(e) }),
+    }
     if (ask.kind === 'routine') saveRoutine(ask.task, ask.date, ask.start, ask.end, scope, opts)
     else saveFixed(ask.block, ask.date, ask.start, ask.end, scope, opts)
     setAsk(null)
@@ -517,29 +634,71 @@ export function useTimetableInteractions(
   }
 
   // 범위를 고르지 않고 떠나면(화면 이동 등) "이날만"으로 저장해요
-  const askRef = useRef<{ ask: ScopeAsk | null; save: (scope: ChangeScope) => void }>({ ask: null, save: () => {} })
+  const autoDay = (reason: ScopeAutoReason) => {
+    if (ask) track('scope_chooser.auto_day', { surface, scope_target: scopeTargetOf(ask), auto_reason: reason })
+  }
+  const askRef = useRef<{
+    ask: ScopeAsk | null
+    save: (scope: ChangeScope) => void
+    autoDay: (reason: ScopeAutoReason) => void
+  }>({ ask: null, save: () => {}, autoDay: () => {} })
   useEffect(() => {
-    askRef.current = { ask, save: chooseScope }
+    askRef.current = { ask, save: chooseScope, autoDay }
   })
   useEffect(
     () => () => {
-      if (askRef.current.ask) askRef.current.save('DAY')
+      if (!askRef.current.ask) return
+      askRef.current.autoDay('leave_page')
+      askRef.current.save('DAY')
     },
     []
   )
 
   // 묶음: Esc 로 풀기 (상세 창·범위 고르기가 떠 있을 땐 그쪽이 Esc 를 받아요)
+  const groupSize = groupIds.size
   useEffect(() => {
     if (!group.length) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !opened && !ask && !editing) setGroup([])
+      if (e.key === 'Escape' && !opened && !ask && !editing) {
+        if (surface !== 'home') {
+          track('timetable.group_clear', { surface, group_size: groupSize, close_method: 'esc' })
+        }
+        setGroup([])
+      }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [group.length, opened, ask, editing])
+  }, [group.length, opened, ask, editing, surface, groupSize])
 
   // ── 드래그 앤 드롭 (명세 3-4) ──
-  const onDrop = (source: DragSource, target: DropTarget) => {
+  /** @param mode 끌기 종류 (분석용 — TimeGrid 가 넘겨줘요) */
+  const onDrop = (source: DragSource, target: DropTarget, mode?: DragMode) => {
+    const dragged = source.kind === 'fixed' ? null : source.task
+    const groupSizeOf = source.kind === 'task' && source.group?.length ? source.group.length + 1 : undefined
+    trackGrid('timetable.drag_drop', {
+      view_mode: viewMode,
+      drag_source: dragSourceOf(source),
+      drag_mode: dragModeOf(mode),
+      drop_target: target.type,
+      task_id: dragged?.taskId,
+      source_type: dragged?.sourceType,
+      // 같은 날 루틴 · 고정 시간은 놓은 뒤 "어디까지 바꿀까요?"를 물어요 (아래 분기와 같은 조건)
+      needs_scope:
+        target.type === 'grid' &&
+        !dragged?.proposed &&
+        (source.kind === 'fixed' ||
+          (source.kind === 'task' &&
+            !source.group?.length &&
+            source.task.sourceType === 'ROUTINE' &&
+            routineDay(source.task) === target.date)),
+      group_size: groupSizeOf,
+    })
+    /** timetable.move_result — 저장 요청이 끝난 직후 */
+    const moveResult = (props: EventProps) => ({
+      onSuccess: () => trackGrid('timetable.move_result', { ...props, result: 'success' }),
+      onError: (e: unknown) =>
+        trackGrid('timetable.move_result', { ...props, result: 'fail', error_status: errorStatusOf(e) }),
+    })
     // 미리보기 제안 블록: 저장하지 않고 제안 자리만 바꿔요 (시간 미정 칸으로 끌면 이번 배치에서 빼요)
     if (source.kind === 'task' && source.task.proposed) {
       setProposals((list) =>
@@ -554,7 +713,10 @@ export function useTimetableInteractions(
       return
     }
     // 범위를 고르지 않고 다음 드래그를 하면 앞의 변경은 "이날만"으로 저장해요
-    if (ask) chooseScope('DAY')
+    if (ask) {
+      autoDay('next_drag')
+      chooseScope('DAY')
+    }
 
     // 실제로 한 시간 블록: 끌어 놓은 자리로 실제 시간을 바로 고쳐요 (나눠서 했으면 그 구간만)
     if (source.kind === 'actual') {
@@ -569,12 +731,15 @@ export function useTimetableInteractions(
             )
           : [{ start: toDateTime(target.date, target.start), end: toDateTime(target.date, target.end) }]
       ranges.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0))
-      completeWithActual.mutate({
-        taskId: source.task.taskId,
-        actualStartAt: ranges[0].start,
-        actualEndAt: ranges[ranges.length - 1].end,
-        segments: ranges.length > 1 ? ranges : undefined,
-      })
+      completeWithActual.mutate(
+        {
+          taskId: source.task.taskId,
+          actualStartAt: ranges[0].start,
+          actualEndAt: ranges[ranges.length - 1].end,
+          segments: ranges.length > 1 ? ranges : undefined,
+        },
+        moveResult({ drag_source: 'actual', drop_target: 'grid' })
+      )
       return
     }
 
@@ -597,7 +762,10 @@ export function useTimetableInteractions(
             plannedEndAt: toDateTime(m.date, m.end),
           })),
         },
-        { onSettled: () => setPending((list) => list.filter((x) => !ps.includes(x))) }
+        {
+          onSettled: () => setPending((list) => list.filter((x) => !ps.includes(x))),
+          ...moveResult({ drag_source: 'group', drop_target: 'grid', group_size: moves.length }),
+        }
       )
       return
     }
@@ -642,7 +810,10 @@ export function useTimetableInteractions(
       return
     }
 
-    const done = { onSettled: () => dropPending(p) }
+    const done = {
+      onSettled: () => dropPending(p),
+      ...moveResult({ drag_source: 'task', drop_target: target.type }),
+    }
     if (source.kind === 'task' && target.type === 'grid') {
       reschedule.mutate(
         {
@@ -704,6 +875,7 @@ export function useTimetableInteractions(
             deleting={deleteTask.isPending}
             onConfirmDelete={confirmDeleteTask}
             onCancelDelete={() => setConfirmDeleteId(null)}
+            surface={surface}
           />
         </Popover>
       )}
@@ -713,12 +885,13 @@ export function useTimetableInteractions(
             key={`${opened.draft.activity?.activityId ?? 'new'}-${opened.draft.date}-${opened.draft.start}`}
             draft={opened.draft}
             onDone={close}
+            surface={surface}
           />
         </Popover>
       )}
       {opened?.kind === 'fixed' && (
         <Popover anchor={opened.anchor} onClose={close} label="고정 시간 상세">
-          <FixedDetail block={opened.block} busy={busyFixed} actions={fixedActions} />
+          <FixedDetail block={opened.block} busy={busyFixed} actions={fixedActions} surface={surface} />
         </Popover>
       )}
 
@@ -732,6 +905,7 @@ export function useTimetableInteractions(
           loading={completeWithActual.isPending}
           onSubmit={submitActual}
           onClose={() => setEditing(null)}
+          surface={surface}
         />
       )}
 
@@ -747,12 +921,18 @@ export function useTimetableInteractions(
           loading={reschedule.isPending || patternScoped.isPending || routineScoped.isPending}
           onSubmit={submitEdit}
           onClose={() => setEditing(null)}
+          surface={surface}
+          patternType={editing.block.patternType}
         />
       )}
 
       {/* 드래그 후 범위 고르기 */}
       {ask && (
         <ScopeChooser
+          // 다른 변경으로 바뀌면 새로 떠요 (scope_chooser.view 한 번씩)
+          key={`${ask.kind}-${ask.date}-${ask.start}-${ask.end}-${ask.kind === 'routine' ? ask.task.taskId : fixedKey(ask.block)}`}
+          surface={surface}
+          scopeTarget={scopeTargetOf(ask)}
           title={
             ask.kind === 'routine'
               ? `'${ask.task.taskName}' → ${formatMinutes(ask.start)}–${formatMinutes(ask.end)}`
@@ -793,7 +973,9 @@ export function useTimetableInteractions(
       )}
 
       {/* 22시 이월 제안 — 다른 안내 바가 없을 때만 (범위 고르기·묶음·AI 배치 확인이 먼저) */}
-      {!ask && !proposals && groupIds.size === 0 && <CarryProposalBar tasks={carryProposals} today={today} />}
+      {!ask && !proposals && groupIds.size === 0 && (
+        <CarryProposalBar tasks={carryProposals} today={today} surface={surface} />
+      )}
 
       {/* 묶음 드래그 안내 */}
       {groupIds.size > 0 && !ask && !proposals && (
@@ -854,5 +1036,26 @@ export function useTimetableInteractions(
      */
     focusIds,
     fadeOthers: proposing,
+    /**
+     * 격자 분석 콜백 (timetable.drag_cancel · unscheduled_more_click · habit_block_toggle).
+     * TimeGrid 에 그대로 펼쳐 넘겨요: <TimeGrid {...gridEvents} … />. 홈(surface='home')에서는 아무것도 안 보내요.
+     */
+    gridEvents: {
+      onDragCancel: (source: DragSource, mode: DragMode, reason: DragCancelReason, invalid?: string) =>
+        trackGrid('timetable.drag_cancel', {
+          drag_source: dragSourceOf(source),
+          drag_mode: dragModeOf(mode),
+          cancel_reason: reason === 'invalid' ? invalidReasonOf(invalid) : reason,
+          validation_error: validationErrorOf(invalid),
+        }),
+      onUnscheduledMore: (date: string, remaining: number) =>
+        trackGrid('timetable.unscheduled_more_click', { view_date: date, remaining_count: remaining }),
+      onHabitToggle: (habit: HabitBlock, date: string) =>
+        trackGrid('timetable.habit_block_toggle', {
+          habit_id: habit.habitId,
+          check_action: habit.checked ? 'uncomplete' : 'complete',
+          date_relation: dateRelationOf(date, today),
+        }),
+    },
   }
 }

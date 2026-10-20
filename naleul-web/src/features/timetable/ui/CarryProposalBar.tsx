@@ -1,7 +1,11 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { ArrowRight, CalendarClock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { errorStatusOf } from '@/features/home/analytics'
+import { track } from '@/lib/client/analytics'
+import type { TimetableSurface } from '../analytics'
 import { useAcceptAllCarry, useAcceptCarry, useDeclineCarry } from '../api'
 import { addDays, formatMonthDay, hm } from '../time'
 import type { TimeBlockTask } from '../types'
@@ -30,13 +34,50 @@ const eulReul = (word: string) => {
  *  - 여러 개면 하나씩 묻고, "모두 옮기기"로 한 번에
  * 블록을 직접 끌어 옮기거나 완료하면 답한 것으로 봐요.
  */
-export function CarryProposalBar({ tasks, today }: { tasks: TimeBlockTask[]; today: string }) {
+export function CarryProposalBar({
+  tasks,
+  today,
+  surface,
+}: {
+  tasks: TimeBlockTask[]
+  today: string
+  /** 분석: 이 바가 쓰인 화면 */
+  surface?: TimetableSurface
+}) {
   const accept = useAcceptCarry()
   const decline = useDeclineCarry()
   const acceptAll = useAcceptAllCarry()
   const busy = accept.isPending || decline.isPending || acceptAll.isPending
   const t = tasks[0]
+  const surf = surface ?? 'calendar'
+
+  // 분석: 제안이 하나씩 뜰 때마다 한 번 (같은 제안을 다시 그려도 한 번만)
+  const shownId = t?.taskId
+  const fromDate = t?.carriedFromDate ?? null
+  const remaining = tasks.length
+  const viewedId = useRef<number | null>(null)
+  useEffect(() => {
+    if (shownId === undefined || viewedId.current === shownId) return
+    viewedId.current = shownId
+    track('carry_proposal.view', {
+      surface: surf,
+      item_count: remaining,
+      days_ago: fromDate ? Math.round((Date.parse(today) - Date.parse(fromDate)) / 86_400_000) : undefined,
+    })
+  }, [shownId, fromDate, remaining, today, surf])
+
   if (!t) return null
+
+  const result = (action: 'accept' | 'decline' | 'accept_all') => ({
+    onSuccess: () => track('carry_proposal.result', { surface: surf, carry_action: action, result: 'success' }),
+    onError: (e: unknown) =>
+      track('carry_proposal.result', {
+        surface: surf,
+        carry_action: action,
+        result: 'fail',
+        error_status: errorStatusOf(e),
+      }),
+  })
 
   const date = t.plannedStartAt?.slice(0, 10) ?? t.date ?? today
   const from = t.carriedFromDate ? relDay(t.carriedFromDate, today) : '전날'
@@ -74,7 +115,10 @@ export function CarryProposalBar({ tasks, today }: { tasks: TimeBlockTask[]; tod
             variant="brand"
             disabled={busy}
             loading={accept.isPending}
-            onClick={() => accept.mutate(t.taskId)}
+            onClick={() => {
+              track('carry_proposal.accept_click', { surface: surf, task_id: t.taskId, item_count: tasks.length })
+              accept.mutate(t.taskId, result('accept'))
+            }}
           >
             옮기기
           </Button>
@@ -83,7 +127,10 @@ export function CarryProposalBar({ tasks, today }: { tasks: TimeBlockTask[]; tod
             variant="secondary"
             disabled={busy}
             loading={decline.isPending}
-            onClick={() => decline.mutate(t.taskId)}
+            onClick={() => {
+              track('carry_proposal.decline_click', { surface: surf, task_id: t.taskId, item_count: tasks.length })
+              decline.mutate(t.taskId, result('decline'))
+            }}
           >
             안 옮기기
           </Button>
@@ -94,7 +141,10 @@ export function CarryProposalBar({ tasks, today }: { tasks: TimeBlockTask[]; tod
               className="ml-auto"
               disabled={busy}
               loading={acceptAll.isPending}
-              onClick={() => acceptAll.mutate(date)}
+              onClick={() => {
+                track('carry_proposal.accept_all_click', { surface: surf, item_count: sameDay.length })
+                acceptAll.mutate(date, result('accept_all'))
+              }}
             >
               {to} {sameDay.length}개 모두 옮기기
             </Button>

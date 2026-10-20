@@ -15,7 +15,7 @@ import {
   type Placed,
 } from '../layout'
 import { WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, hm, minutesFrom, nowKst, weekdayIndex } from '../time'
-import type { ActualActivity, FixedBlock, TimeBlockTask, TimetableDay } from '../types'
+import type { ActualActivity, FixedBlock, HabitBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityBlock, FixedBlockView, HATCH, SleepBlockView, TaskBlock, taskColors } from './Blocks'
 import {
   canUnschedule,
@@ -93,6 +93,10 @@ interface Props {
   planVsActual?: boolean
   /** 빈 칸(지난 시간)을 눌렀을 때 — 그 시각으로 "실제로 한 일" 기록 열기 */
   onEmptyClick?: (date: string, minutes: number, e: MouseEvent<HTMLElement>) => void
+  /** 시간 미정 '+N개 더보기'를 눌렀을 때 (분석용) — remaining = 아직 안 보인 개수 */
+  onUnscheduledMore?: (date: string, remaining: number) => void
+  /** 습관 블록을 눌러 체크·해제할 때 (분석용) — habit.checked 는 누르기 전 상태 */
+  onHabitToggle?: (habit: HabitBlock, date: string) => void
 }
 
 /** 기상은 취침보다, 취침은 기상보다 30분 이상 떨어져야 해요 (같은 날 칸 기준) */
@@ -168,6 +172,8 @@ export function TimeGrid({
   onSelectActivity,
   onEmptyClick,
   planVsActual = false,
+  onUnscheduledMore,
+  onHabitToggle,
 }: Props) {
   const now = useNowKst()
   const from = startHour * 60
@@ -392,6 +398,7 @@ export function TimeGrid({
                 selection={selection}
                 onSelect={selectTask}
                 drag={drag}
+                onMore={onUnscheduledMore}
                 onDragDown={
                   enabled
                     ? (e, t) => startDrag(e, { kind: 'task', task: t, date: d.date, start: null, end: null })
@@ -483,7 +490,7 @@ export function TimeGrid({
                   }
                 />
               ))}
-              <HabitBlocks day={d} from={from} to={to} right={split ? '40%' : '0'} />
+              <HabitBlocks day={d} from={from} to={to} right={split ? '40%' : '0'} onToggle={onHabitToggle} />
               <div
                 className={cn(
                   'pointer-events-none absolute inset-y-0 left-0 *:pointer-events-auto',
@@ -648,6 +655,7 @@ function UnscheduledCell({
   onSelect,
   drag,
   onDragDown,
+  onMore,
 }: {
   date: string
   tasks: TimeBlockTask[]
@@ -655,6 +663,7 @@ function UnscheduledCell({
   onSelect: (t: TimeBlockTask, e: MouseEvent<HTMLElement>) => void
   drag: DragState | null
   onDragDown?: (e: PointerEvent<HTMLElement>, t: TimeBlockTask) => void
+  onMore?: (date: string, remaining: number) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const shown = expanded ? tasks : tasks.slice(0, UNSCHEDULED_VISIBLE)
@@ -695,7 +704,10 @@ function UnscheduledCell({
       {more > 0 && (
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          onClick={() => {
+            onMore?.(date, more)
+            setExpanded(true)
+          }}
           className="text-ink-3 hover:text-ink px-1 text-left text-[11px]"
         >
           +{more}개 더보기
@@ -784,7 +796,19 @@ function DragGhost({
  * 시간대를 정한 습관 (V56) — 캘린더의 그 시간에 연한 블록으로. 누르면 체크 · 체크 풀기.
  * Task 블록보다 아래 층이라 겹치면 Task 가 위에 보여요 (자동 배치는 이 시간을 비워 둬요).
  */
-function HabitBlocks({ day, from, to, right }: { day: TimetableDay; from: number; to: number; right: string }) {
+function HabitBlocks({
+  day,
+  from,
+  to,
+  right,
+  onToggle,
+}: {
+  day: TimetableDay
+  from: number
+  to: number
+  right: string
+  onToggle?: (habit: HabitBlock, date: string) => void
+}) {
   const toggle = useToggleHabitBlock()
   const list = day.habits ?? []
   if (!list.length) return null
@@ -801,6 +825,7 @@ function HabitBlocks({ day, from, to, right }: { day: TimetableDay; from: number
             type="button"
             onClick={(ev) => {
               ev.stopPropagation()
+              onToggle?.(h, day.date)
               toggle.mutate({ habitId: h.habitId, date: day.date, checked: h.checked })
             }}
             disabled={toggle.isPending}

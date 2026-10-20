@@ -28,7 +28,8 @@ export function FillProposalBar({
   unscheduled: number
   loading: boolean
   onApply: () => void
-  onCancel: () => void
+  /** method: 버튼('취소'·'아니요'·'닫기') 으로 닫았는지 (Esc 는 부모가 따로 처리) */
+  onCancel: (method: 'cancel_button') => void
 }) {
   const isNew = kind === 'new'
   return (
@@ -71,7 +72,7 @@ export function FillProposalBar({
               이대로 진행
             </Button>
           )}
-          <Button size="sm" variant="secondary" disabled={loading} onClick={onCancel}>
+          <Button size="sm" variant="secondary" disabled={loading} onClick={() => onCancel('cancel_button')}>
             {count === 0 ? '닫기' : isNew ? '아니요 (시간 미정으로 두기)' : '취소 (반영 안 함)'}
           </Button>
           <span className="text-ink-4 ml-auto hidden text-[11px] sm:inline">Esc 취소</span>

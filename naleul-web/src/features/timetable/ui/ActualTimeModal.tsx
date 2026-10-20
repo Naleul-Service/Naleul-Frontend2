@@ -1,9 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
+import { errorStatusOf } from '@/features/home/analytics'
+import { track } from '@/lib/client/analytics'
+import type { TimetableSurface } from '../analytics'
 import { formatDuration, minutesFrom, minutesToTime, timeToMinutes } from '../time'
 import type { TimeBlockTask } from '../types'
 import type { TimeValue } from './TimeEditModal'
@@ -49,6 +53,7 @@ export function ActualTimeModal({
   loading,
   onSubmit,
   onClose,
+  surface,
 }: {
   task: TimeBlockTask
   date: string
@@ -56,7 +61,13 @@ export function ActualTimeModal({
   loading?: boolean
   onSubmit: (segments: ActualSegment[]) => void
   onClose: () => void
+  /** Amplitude surface — 이 창을 띄운 화면 */
+  surface?: TimetableSurface
 }) {
+  const qc = useQueryClient()
+  /** 저장을 눌러 요청을 기다리는 중인지 (actual_time.result 는 이 창에서 보낸 요청만) */
+  const submittedRef = useRef(false)
+  const lastErrorRef = useRef<string | null>(null)
   const saved = (task.actualSegments ?? []).map((g) => ({
     start: minutesToTime(minutesFrom(date, g.start)),
     end: minutesToTime(minutesFrom(date, g.end)),
@@ -79,9 +90,40 @@ export function ActualTimeModal({
   })()
   const total = error ? 0 : parsed.reduce((sum, p) => sum + p.end - p.start, 0)
 
+  // 입력 오류 문구가 뜰 때마다 한 번
+  useEffect(() => {
+    if (error && error !== lastErrorRef.current) track('actual_time.error_view', { surface, validation_error: error })
+    lastErrorRef.current = error
+  }, [error, surface])
+
+  // 저장 요청(훅의 completeWithActual)이 끝나면 결과 — 성공하면 창이 닫히므로 mutation cache 에서 바로 받아요
+  const taskId = task.taskId
+  useEffect(
+    () =>
+      qc.getMutationCache().subscribe((ev) => {
+        if (ev.type !== 'updated' || !submittedRef.current) return
+        const v = ev.mutation.state.variables as { taskId?: number; actualStartAt?: string } | undefined
+        if (v?.taskId !== taskId || !v.actualStartAt) return
+        if (ev.action.type === 'success') {
+          submittedRef.current = false
+          track('actual_time.result', { surface, result: 'success' })
+        } else if (ev.action.type === 'error') {
+          submittedRef.current = false
+          track('actual_time.result', { surface, result: 'fail', error_status: errorStatusOf(ev.action.error) })
+        }
+      }),
+    [qc, taskId, surface]
+  )
+
+  const close = (method: ModalCloseMethod | 'cancel_button') => {
+    track('actual_time.close', { surface, close_method: method })
+    onClose()
+  }
+
   const update = (i: number, key: 'start' | 'end', v: string) =>
     setRows((prev) => prev.map((r, j) => (j === i ? { ...r, [key]: v } : r)))
-  const addRow = () =>
+  const addRow = () => {
+    track('actual_time.segment_add_click', { surface, segment_count: rows.length + 1 })
     setRows((prev) => {
       const last = prev[prev.length - 1]
       // 직전 구간이 끝나고 30분 뒤부터 1시간으로 제안
@@ -89,23 +131,35 @@ export function ActualTimeModal({
       const s = Math.min(base, 1440 - 60)
       return [...prev, { start: minutesToTime(s), end: minutesToTime(s + 60) }]
     })
-  const removeRow = (i: number) => setRows((prev) => prev.filter((_, j) => j !== i))
+  }
+  const removeRow = (i: number) => {
+    track('actual_time.segment_remove_click', { surface, segment_count: rows.length - 1 })
+    setRows((prev) => prev.filter((_, j) => j !== i))
+  }
   const submit = () => {
-    if (error) return
+    if (error || loading) return
+    track('actual_time.save_click', {
+      surface,
+      segment_count: parsed.length,
+      duration_minutes: total,
+      crosses_midnight: parsed.some((p) => p.end > 1440),
+      is_edit: task.taskStatus === 'COMPLETED' && !!task.actualStartAt && !!task.actualEndAt,
+    })
+    submittedRef.current = true
     onSubmit([...parsed].sort((a, b) => a.start - b.start))
   }
 
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={close}
       title="실제로 한 시간"
       description="실제로 시작하고 끝낸 시각을 남기면 완료로 표시되고, 나의 패턴이 더 정확해져요. 중간에 쉬었다가 이어서 했으면 나눠서 적어 주세요."
       size="sm"
       dismissible={!loading}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={loading}>
+          <Button variant="secondary" onClick={() => close('cancel_button')} disabled={loading}>
             취소
           </Button>
           <Button onClick={submit} disabled={!!error} loading={loading}>

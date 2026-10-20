@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { rectOf } from '@/components/ui/Popover'
@@ -11,6 +11,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { TaskAddPanel } from '@/features/brain-dump/ui/TaskAddPanel'
 import { track } from '@/lib/client/analytics'
+import { dateRelationOf, errorStatusOf } from '@/features/home/analytics'
 import { useActivities, useTimetable } from '../api'
 import { visibleHours } from '../layout'
 import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst } from '../time'
@@ -85,17 +86,53 @@ export function CalendarView() {
     proposing,
     focusIds,
     fadeOthers,
-  } = useTimetableInteractions(rawDays, date, { sidePanel: !!add })
+    gridEvents,
+  } = useTimetableInteractions(rawDays, date, { sidePanel: !!add, surface: 'calendar' })
   const { startHour, endHour } = useMemo(() => visibleHours(days, acts), [days, acts])
 
   // ── 이동 ──
   const move = (n: number) => {
     close()
-    go({ date: view === 'month' ? addMonths(date, n) : addDays(date, n * (view === 'week' ? 7 : 1)) })
+    const next = view === 'month' ? addMonths(date, n) : addDays(date, n * (view === 'week' ? 7 : 1))
+    track('calendar.date_nav_click', {
+      view_mode: view,
+      date_action: n < 0 ? 'prev' : 'next',
+      view_date: next,
+      date_relation: dateRelationOf(next),
+    })
+    go({ date: next })
   }
   const unit = view === 'month' ? '달' : view === 'week' ? '주' : '날'
 
   const today = todayKst()
+
+  // calendar.pageview — 처음 그려진 직후 한 번만 (보기·날짜가 바뀌어도 다시 안 보냄)
+  const pageviewSent = useRef(false)
+  useEffect(() => {
+    if (pageviewSent.current) return
+    pageviewSent.current = true
+    track('calendar.pageview', {
+      view_mode: view,
+      view_date: date,
+      date_relation: dateRelationOf(date),
+      add_mode: add ?? undefined,
+    })
+  }, [view, date, add])
+
+  // calendar.load_fail — 일간·주간에서 실패 카드가 보이게 될 때 한 번
+  const loadFailed = view !== 'month' && !isPending && isError && !days.length
+  const errorStatus = errorStatusOf(error)
+  const loadFailSent = useRef(false)
+  useEffect(() => {
+    if (!loadFailed) {
+      loadFailSent.current = false
+      return
+    }
+    if (loadFailSent.current) return
+    loadFailSent.current = true
+    track('calendar.load_fail', { view_mode: view, view_date: date, error_status: errorStatus })
+  }, [loadFailed, view, date, errorStatus])
+
   return (
     // 패널이 열려 있으면 xl 이상에서는 캘린더가 패널 폭만큼 비켜서 나란히 보여요
     <div className={cn(add && 'xl:pr-[420px]')}>
@@ -105,7 +142,13 @@ export function CalendarView() {
         actions={
           <div className="flex items-center gap-2">
             {!add && (
-              <Button size="sm" onClick={() => go({ add: 'ai', view: view === 'month' ? 'week' : view })}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  track('calendar.task_add_click', { view_mode: view, view_date: date })
+                  go({ add: 'ai', view: view === 'month' ? 'week' : view })
+                }}
+              >
                 <Plus className="size-4" />
                 Task 추가
               </Button>
@@ -124,6 +167,7 @@ export function CalendarView() {
                   role="tab"
                   aria-selected={view === v}
                   onClick={() => {
+                    if (v !== view) track('calendar.view_change', { view_mode: v, from_view: view, view_date: date })
                     close()
                     go({ view: v })
                   }}
@@ -145,7 +189,15 @@ export function CalendarView() {
         <Button
           variant="secondary"
           size="sm"
-          onClick={() => go({ date: today })}
+          onClick={() => {
+            track('calendar.date_nav_click', {
+              view_mode: view,
+              date_action: 'today',
+              view_date: today,
+              date_relation: 'today',
+            })
+            go({ date: today })
+          }}
           disabled={view === 'month' ? date === today : start <= today && today <= end}
         >
           오늘
@@ -187,6 +239,7 @@ export function CalendarView() {
               const now = nowKst()
               const day = view === 'day' && date < today ? date : today
               const endMin = day === today ? Math.floor(now.minutes / 10) * 10 : 13 * 60
+              track('calendar.activity_add_click', { view_mode: view, date_relation: dateRelationOf(day) })
               openActivity({ date: day, start: Math.max(endMin - 60, 0), end: endMin }, rectOf(e.currentTarget))
             }}
           >
@@ -223,7 +276,14 @@ export function CalendarView() {
           <div>
             <p className="font-bold">TimeTable을 불러오지 못했어요</p>
             <p className="text-ink-3 mt-1 text-sm">{error instanceof Error ? error.message : ''}</p>
-            <Button variant="secondary" className="mt-4" onClick={() => refetch()}>
+            <Button
+              variant="secondary"
+              className="mt-4"
+              onClick={() => {
+                track('calendar.retry_click', { view_mode: view, error_status: errorStatus })
+                refetch()
+              }}
+            >
               다시 시도
             </Button>
           </div>
@@ -231,17 +291,19 @@ export function CalendarView() {
       ) : (
         <>
           {/* 여러 목표의 루틴 · 일정을 한 문장으로 옮기기 (보고 있는 주/날 기준) */}
-          <ScheduleAiBar startDate={start} endDate={end} />
+          <ScheduleAiBar startDate={start} endDate={end} viewMode={view} />
           <AutoPlaceBar
             days={rawDays}
             today={today}
             onPreview={previewFill}
             loading={fillPreviewing}
             proposing={proposing}
+            viewMode={view}
           />
           {/* 일간: TimeTable(계획 | 실제) 오른쪽에 그날 할 일 목록 — Task 추가 패널이 열려 있으면 자리가 좁아 숨겨요 */}
           <div className={cn(view === 'day' && !add && 'grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_300px]')}>
             <TimeGrid
+              {...gridEvents}
               days={days}
               startHour={startHour}
               endHour={endHour}
@@ -258,6 +320,7 @@ export function CalendarView() {
               focusIds={focusIds}
               fadeOthers={fadeOthers}
               onDayClick={(d) => {
+                track('calendar.day_header_click', { view_date: d, date_relation: dateRelationOf(d) })
                 close()
                 go({ view: 'day', date: d })
               }}

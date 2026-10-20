@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   CalendarClock,
   Check,
@@ -21,6 +22,8 @@ import {
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { useGoalCategory } from '@/features/goal/api'
 import { InlineConfirm } from '@/features/goal/edit/inline'
 import { useUpdateGoalTask, type GoalTaskInput } from '@/features/goal/edit/mutations'
@@ -37,6 +40,7 @@ import {
   todayKst,
 } from '../time'
 import type { TimeBlockTask } from '../types'
+import type { TimetableSurface } from '../analytics'
 import { ScopeChips, scopeOptions } from './ScopeChooser'
 
 export interface TaskActions {
@@ -112,15 +116,18 @@ function currentInput(t: TimeBlockTask): GoalTaskInput {
   }
 }
 
+/** 상세 항목 고치기를 닫은 방법 (task_detail.field_cancel) */
+type FieldCloseMethod = 'esc' | 'cancel_button' | 'blur' | 'enter' | 'other_open'
+
 /** Enter = 저장, Esc = 취소 (창은 닫지 않음). 한글 조합 중 Enter 는 무시 */
-const editKeys = (save: () => void, cancel: () => void) => (e: KeyboardEvent<HTMLElement>) => {
+const editKeys = (save: () => void, cancel: (method: 'esc') => void) => (e: KeyboardEvent<HTMLElement>) => {
   if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
     e.preventDefault()
     save()
   } else if (e.key === 'Escape') {
     e.preventDefault()
     e.stopPropagation()
-    cancel()
+    cancel('esc')
   }
 }
 
@@ -174,7 +181,7 @@ function TimeEditor({
   task: TimeBlockTask
   saving: boolean
   onSave: (date: string, start: number, end: number, scope: ChangeScope) => void
-  onCancel: () => void
+  onCancel: (method: FieldCloseMethod) => void
 }) {
   const today = todayKst()
   const day = t.plannedStartAt?.slice(0, 10) ?? t.date ?? t.scheduledDate ?? today
@@ -229,7 +236,7 @@ function TimeEditor({
             ? `${formatDuration(e - s)}${e >= 1440 ? ' · 다음 날까지' : ''} · Enter 저장 · Esc 취소`
             : '시간을 확인해 주세요'}
         </span>
-        <Button size="sm" variant="ghost" onClick={onCancel} disabled={saving}>
+        <Button size="sm" variant="ghost" onClick={() => onCancel('cancel_button')} disabled={saving}>
           취소
         </Button>
         <Button size="sm" onClick={save} disabled={!valid} loading={saving}>
@@ -248,6 +255,7 @@ export function TaskDetail({
   deleting,
   onConfirmDelete,
   onCancelDelete,
+  surface,
 }: {
   task: TimeBlockTask
   busy?: boolean
@@ -257,6 +265,8 @@ export function TaskDetail({
   deleting?: boolean
   onConfirmDelete?: () => void
   onCancelDelete?: () => void
+  /** 이 상세 창이 쓰인 화면 (task_detail.* 의 surface) */
+  surface?: TimetableSurface
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState<EditKey>(null)
@@ -276,32 +286,169 @@ export function TaskDetail({
   const subs = (goal.data?.generalCategories ?? []).filter((s) => s.generalCategoryStatus !== 'DELETED')
   const milestones = [...(goal.data?.milestones ?? [])].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
 
+  // ── 분석 이벤트 (task_detail.*) ──
+  const taskId = t.taskId
+  const base = { surface, task_id: taskId }
+  const qc = useQueryClient()
+  const rootRef = useRef<HTMLDivElement>(null)
+  /** 저장 요청을 보낸 뒤 목록 칸이 비활성화되며 생기는 blur 를 '취소'로 세지 않도록 */
+  const savingFieldRef = useRef(false)
+  /** 삭제 확인을 Enter 로 눌렀는지 */
+  const deleteEnterRef = useRef(false)
+  /** 삭제 확인을 … 메뉴로 띄웠는지 (아니면 Delete 키) */
+  const menuDeleteRef = useRef(false)
+  const deleteViewTrackedRef = useRef(false)
+  const reasonTrackedRef = useRef(false)
+  /** 창을 닫게 될 마지막 입력 (X · 바깥 · Esc · 같은 블록) */
+  const closeMethodRef = useRef<'x_button' | 'backdrop' | 'esc' | 'toggle' | null>(null)
+
+  /**
+   * 완료·고정 풀기·시간 미정·삭제 요청은 훅(useTimetableInteractions)이 보내요.
+   * 방금 시작된 요청을 MutationCache 에서 찾아 결과를 기다려요 (성공하면 이 창은 곧 닫혀요).
+   */
+  const runAction = (action: 'complete' | 'uncomplete' | 'unlock' | 'unschedule' | 'delete', fn: () => void) => {
+    const cache = qc.getMutationCache()
+    const before = new Set(cache.getAll())
+    fn()
+    const m = cache.getAll().find((x) => !before.has(x))
+    if (!m) return
+    const unsub = cache.subscribe((ev) => {
+      if (ev.type !== 'updated' || ev.mutation !== m) return
+      if (ev.action.type === 'success') {
+        unsub()
+        track('task_detail.action_result', { surface, task_action: action, result: 'success' })
+      } else if (ev.action.type === 'error') {
+        unsub()
+        track('task_detail.action_result', {
+          surface,
+          task_action: action,
+          result: 'fail',
+          error_status: errorStatusOf(ev.action.error),
+        })
+      }
+    })
+  }
+
+  // 배치 이유가 보일 때 한 번
+  const showReason = !!t.placementReason && !t.locked
+  const reasonCodes = (t.placementReasonCodes ?? []).join(',')
+  useEffect(() => {
+    if (!showReason || reasonTrackedRef.current) return
+    reasonTrackedRef.current = true
+    track('task_detail.reason_view', { surface, task_id: taskId, reason_codes: reasonCodes })
+  }, [showReason, surface, taskId, reasonCodes])
+
+  // '삭제할까요?'가 뜰 때 한 번 (… 메뉴 또는 Delete 키 — Delete 키는 훅이 띄워요)
+  useEffect(() => {
+    if (!confirmingDelete) {
+      deleteViewTrackedRef.current = false
+      return
+    }
+    if (deleteViewTrackedRef.current) return
+    deleteViewTrackedRef.current = true
+    track('task_detail.delete_click', {
+      surface,
+      task_id: taskId,
+      source_type: t.sourceType,
+      entry_point: menuDeleteRef.current ? 'menu' : 'delete_key',
+    })
+    menuDeleteRef.current = false
+  }, [confirmingDelete, surface, taskId, t.sourceType])
+
+  // 창 닫기: 닫는 건 Popover(훅)가 하지만, 무엇으로 닫혔는지는 여기서 입력을 지켜보다가 사라질 때 보내요.
+  // 작업 성공·다른 창으로 넘어가며 닫힌 경우엔 보내지 않아요.
+  useEffect(() => {
+    const dialog = rootRef.current?.closest('[role="dialog"]')
+    if (!dialog) return
+    const onDown = (e: PointerEvent) => {
+      if (e.target instanceof Node && dialog.contains(e.target)) return
+      const block = e.target instanceof Element ? e.target.closest<HTMLElement>('[data-task-id]') : null
+      closeMethodRef.current = Number(block?.dataset.taskId) === taskId ? 'toggle' : 'backdrop'
+    }
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape' && !e.defaultPrevented) closeMethodRef.current = 'esc'
+    }
+    const onClick = (e: Event) => {
+      const btn = e.target instanceof Element ? e.target.closest('button') : null
+      if (btn && btn.parentElement === dialog && btn.getAttribute('aria-label') === '닫기')
+        closeMethodRef.current = 'x_button'
+    }
+    const methodRef = closeMethodRef
+    document.addEventListener('pointerdown', onDown, true)
+    document.addEventListener('keydown', onKey)
+    dialog.addEventListener('click', onClick, true)
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true)
+      document.removeEventListener('keydown', onKey)
+      dialog.removeEventListener('click', onClick, true)
+      const method = methodRef.current
+      methodRef.current = null
+      if (method) track('task_detail.close', { surface, task_id: taskId, close_method: method })
+    }
+  }, [surface, taskId])
+
   const stop = () => setEditing(null)
-  const saveContent = (patch: Partial<GoalTaskInput>) =>
-    updateTask.mutate({ taskId: t.taskId, ...currentInput(t), ...patch }, { onSuccess: stop })
+  const openField = (k: Exclude<EditKey, null>) => {
+    if (editing && editing !== k)
+      track('task_detail.field_cancel', { surface, edit_field: editing, close_method: 'other_open' })
+    track('task_detail.field_edit_open', { ...base, edit_field: k, source_type: t.sourceType })
+    setEditing(k)
+  }
+  const cancelField = (method: FieldCloseMethod) => {
+    if (editing && !savingFieldRef.current)
+      track('task_detail.field_cancel', { surface, edit_field: editing, close_method: method })
+    stop()
+  }
+  const fieldResult = (f: Exclude<EditKey, null>) => ({
+    onSuccess: () => {
+      savingFieldRef.current = false
+      track('task_detail.field_result', { surface, edit_field: f, result: 'success' })
+      stop()
+    },
+    onError: (e: unknown) => {
+      savingFieldRef.current = false
+      track('task_detail.field_result', { surface, edit_field: f, result: 'fail', error_status: errorStatusOf(e) })
+    },
+  })
+  const saveContent = (f: 'title' | 'sub' | 'milestone' | 'due', patch: Partial<GoalTaskInput>) => {
+    savingFieldRef.current = true
+    track('task_detail.field_save', { ...base, edit_field: f, source_type: t.sourceType })
+    updateTask.mutate({ taskId: t.taskId, ...currentInput(t), ...patch }, fieldResult(f))
+  }
 
   const startTitle = () => {
     setDraft({ emoji: t.emoji ?? '', name: t.taskName })
-    setEditing('title')
+    openField('title')
   }
   const saveTitle = () => {
     if (updateTask.isPending) return // Enter 로 저장한 직후 blur 가 한 번 더 부르는 것 방지
     const name = draft.name.trim()
-    if (!name) return stop()
+    if (!name) {
+      track('task_detail.title_empty_cancel', base)
+      return stop()
+    }
     if (name === t.taskName && (draft.emoji.trim() || null) === (t.emoji ?? null)) return stop()
-    saveContent({ taskName: name, emoji: draft.emoji.trim() || null })
+    saveContent('title', { taskName: name, emoji: draft.emoji.trim() || null })
   }
 
   const saveTime = (date: string, s: number, e: number, scope: ChangeScope) => {
     const body = { taskId: t.taskId, plannedStartAt: toDateTime(date, s), plannedEndAt: toDateTime(date, e) }
-    if (t.sourceType === 'ROUTINE') routineScoped.mutate({ ...body, scope }, { onSuccess: stop })
-    else reschedule.mutate(body, { onSuccess: stop })
+    const routine = t.sourceType === 'ROUTINE'
+    savingFieldRef.current = true
+    track('task_detail.field_save', {
+      ...base,
+      edit_field: 'time',
+      ...(routine ? { change_scope: scope } : {}),
+      source_type: t.sourceType,
+    })
+    if (routine) routineScoped.mutate({ ...body, scope }, fieldResult('time'))
+    else reschedule.mutate(body, fieldResult('time'))
   }
 
   const empty = (label: string) => <span className="text-ink-4">{label}</span>
 
   return (
-    <div className="p-5">
+    <div ref={rootRef} className="p-5">
       {/* 상태 표시 */}
       <div className="flex flex-wrap items-center gap-1.5 pr-8">
         {done && <Badge tone="success">완료</Badge>}
@@ -331,7 +478,7 @@ export function TaskDetail({
 
       {/* 제목 — 누르면 바로 수정 */}
       {editing === 'title' ? (
-        <div className="mt-2 flex gap-1.5" onKeyDown={editKeys(saveTitle, stop)}>
+        <div className="mt-2 flex gap-1.5" onKeyDown={(e) => editKeys(saveTitle, cancelField)(e)}>
           <input
             value={draft.emoji}
             onChange={(e) => setDraft((d) => ({ ...d, emoji: e.target.value }))}
@@ -388,14 +535,14 @@ export function TaskDetail({
             task={t}
             saving={reschedule.isPending || routineScoped.isPending}
             onSave={saveTime}
-            onCancel={stop}
+            onCancel={cancelField}
           />
         ) : (
           <Prop
             icon={<Clock className="text-ink-3 size-4" />}
             label="시간"
             editable={perm.editTime}
-            onEdit={() => setEditing('time')}
+            onEdit={() => openField('time')}
           >
             {actual && <span className="text-ink-3 mr-1">계획</span>}
             <span className={actual ? 'text-ink-3' : undefined}>{timeLine(t)}</span>
@@ -409,9 +556,9 @@ export function TaskDetail({
               autoFocus
               value={t.generalCategoryId ?? ''}
               disabled={goal.isPending || updateTask.isPending}
-              onChange={(e) => saveContent({ generalCategoryId: Number(e.target.value) })}
-              onBlur={stop}
-              onKeyDown={editKeys(stop, stop)}
+              onChange={(e) => saveContent('sub', { generalCategoryId: Number(e.target.value) })}
+              onBlur={() => cancelField('blur')}
+              onKeyDown={(e) => editKeys(() => cancelField('enter'), cancelField)(e)}
               className={field}
               aria-label="세부 목표"
             >
@@ -427,7 +574,7 @@ export function TaskDetail({
               icon={<span className="mt-0.5 block size-3 rounded-full" style={{ backgroundColor: color }} />}
               label="세부 목표"
               editable={perm.editContent}
-              onEdit={() => setEditing('sub')}
+              onEdit={() => openField('sub')}
             >
               {t.goalEmoji ? `${t.goalEmoji} ` : ''}
               {t.goalCategoryName}
@@ -443,9 +590,11 @@ export function TaskDetail({
               autoFocus
               value={t.milestoneId ?? ''}
               disabled={goal.isPending || updateTask.isPending}
-              onChange={(e) => saveContent({ milestoneId: e.target.value ? Number(e.target.value) : null })}
-              onBlur={stop}
-              onKeyDown={editKeys(stop, stop)}
+              onChange={(e) =>
+                saveContent('milestone', { milestoneId: e.target.value ? Number(e.target.value) : null })
+              }
+              onBlur={() => cancelField('blur')}
+              onKeyDown={(e) => editKeys(() => cancelField('enter'), cancelField)(e)}
               className={field}
               aria-label="마일스톤"
             >
@@ -461,7 +610,7 @@ export function TaskDetail({
               icon={<Flag className="text-ink-3 size-4" />}
               label="마일스톤"
               editable={perm.editContent}
-              onEdit={() => setEditing('milestone')}
+              onEdit={() => openField('milestone')}
             >
               {t.milestoneTitle ?? empty('마일스톤 없음')}
             </Prop>
@@ -470,13 +619,16 @@ export function TaskDetail({
         {/* 마감일 */}
         {(t.dueDate || perm.editContent) &&
           (editing === 'due' ? (
-            <div className="flex items-center gap-1.5" onKeyDown={editKeys(stop, stop)}>
+            <div
+              className="flex items-center gap-1.5"
+              onKeyDown={(e) => editKeys(() => cancelField('enter'), cancelField)(e)}
+            >
               <input
                 type="date"
                 autoFocus
                 defaultValue={t.dueDate ?? ''}
                 disabled={updateTask.isPending}
-                onChange={(e) => e.target.value && saveContent({ dueDate: e.target.value })}
+                onChange={(e) => e.target.value && saveContent('due', { dueDate: e.target.value })}
                 className={field}
                 aria-label="마감일"
               />
@@ -484,14 +636,14 @@ export function TaskDetail({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => saveContent({ dueDate: null })}
+                  onClick={() => saveContent('due', { dueDate: null })}
                   disabled={updateTask.isPending}
                 >
                   <X className="size-3.5" />
                   지우기
                 </Button>
               )}
-              <Button size="sm" variant="ghost" onClick={stop}>
+              <Button size="sm" variant="ghost" onClick={() => cancelField('cancel_button')}>
                 닫기
               </Button>
             </div>
@@ -500,7 +652,7 @@ export function TaskDetail({
               icon={<CalendarClock className="text-ink-3 size-4" />}
               label="마감일"
               editable={perm.editContent}
-              onEdit={() => setEditing('due')}
+              onEdit={() => openField('due')}
             >
               {t.dueDate ? `${formatMonthDay(t.dueDate)}까지` : empty('마감일 없음')}
             </Prop>
@@ -519,7 +671,7 @@ export function TaskDetail({
       </div>
 
       {/* 배치 이유 (명세: 항상 설명) */}
-      {t.placementReason && !t.locked && (
+      {showReason && t.placementReason && (
         <div className="bg-brand-soft mt-4 rounded-xl px-3.5 py-3">
           <p className="text-brand flex items-center gap-1 text-xs font-bold">
             <Sparkles className="size-3.5" />이 시간에 놓은 이유
@@ -535,7 +687,12 @@ export function TaskDetail({
 
       {/* 삭제 확인 (Delete 키 · 삭제 메뉴) */}
       {confirmingDelete ? (
-        <div className="mt-5">
+        <div
+          className="mt-5"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') deleteEnterRef.current = true
+          }}
+        >
           <InlineConfirm
             message={`'${t.taskName}'을 삭제할까요?`}
             detail={
@@ -544,8 +701,20 @@ export function TaskDetail({
                 : '되돌릴 수 없어요. Enter 삭제 · Esc 취소'
             }
             loading={deleting}
-            onConfirm={() => onConfirmDelete?.()}
-            onCancel={() => onCancelDelete?.()}
+            onConfirm={() => {
+              track('task_detail.delete_confirm', {
+                ...base,
+                source_type: t.sourceType,
+                submit_method: deleteEnterRef.current ? 'enter' : 'button',
+              })
+              deleteEnterRef.current = false
+              runAction('delete', () => onConfirmDelete?.())
+            }}
+            onCancel={(method) => {
+              deleteEnterRef.current = false
+              track('task_detail.delete_cancel', { ...base, close_method: method })
+              onCancelDelete?.()
+            }}
           />
         </div>
       ) : (
@@ -554,7 +723,16 @@ export function TaskDetail({
             variant={done ? 'secondary' : 'brand'}
             className="flex-1"
             loading={busy}
-            onClick={() => actions.onToggleComplete(t)}
+            onClick={() => {
+              track('task_detail.complete_click', {
+                ...base,
+                source_type: t.sourceType,
+                check_action: done ? 'uncomplete' : 'complete',
+                is_missed: !!t.missed,
+                is_scheduled: !!t.plannedStartAt,
+              })
+              runAction(done ? 'uncomplete' : 'complete', () => actions.onToggleComplete(t))
+            }}
           >
             {!done && <Check className="size-4" strokeWidth={2.6} />}
             {done ? '완료 취소' : '완료'}
@@ -566,7 +744,10 @@ export function TaskDetail({
                 className="w-10 px-0"
                 aria-label="다른 작업"
                 aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((v) => !v)}
+                onClick={() => {
+                  if (!menuOpen) track('task_detail.menu_open', { ...base, source_type: t.sourceType })
+                  setMenuOpen((v) => !v)
+                }}
               >
                 <Ellipsis className="size-4" />
               </Button>
@@ -579,6 +760,7 @@ export function TaskDetail({
                     <MenuItem
                       onClick={() => {
                         setMenuOpen(false)
+                        track('task_detail.chain_select_click', { ...base, group_size: chain })
                         actions.onSelectChain?.(t)
                       }}
                     >
@@ -587,13 +769,23 @@ export function TaskDetail({
                     </MenuItem>
                   )}
                   {perm.unlock && (
-                    <MenuItem onClick={() => actions.onUnlock(t)}>
+                    <MenuItem
+                      onClick={() => {
+                        track('task_detail.unlock_click', base)
+                        runAction('unlock', () => actions.onUnlock(t))
+                      }}
+                    >
                       <PinOff className="size-4" />
                       고정 풀기
                     </MenuItem>
                   )}
                   {perm.unschedule && (
-                    <MenuItem onClick={() => actions.onUnschedule(t)}>
+                    <MenuItem
+                      onClick={() => {
+                        track('task_detail.unschedule_click', base)
+                        runAction('unschedule', () => actions.onUnschedule(t))
+                      }}
+                    >
                       <Clock className="size-4" />
                       시간 미정으로
                     </MenuItem>
@@ -603,6 +795,7 @@ export function TaskDetail({
                       danger
                       onClick={() => {
                         setMenuOpen(false)
+                        menuDeleteRef.current = true
                         actions.onDelete(t)
                       }}
                     >
@@ -620,7 +813,10 @@ export function TaskDetail({
       {!confirmingDelete && t.plannedStartAt && t.sourceType !== 'MISSION' && actions.onCompleteWithTime && (
         <button
           type="button"
-          onClick={() => actions.onCompleteWithTime?.(t)}
+          onClick={() => {
+            track('task_detail.actual_time_click', { ...base, task_status: t.taskStatus })
+            actions.onCompleteWithTime?.(t)
+          }}
           className="text-ink-3 hover:text-ink mt-2.5 w-full text-center text-[13px] underline-offset-2 hover:underline"
         >
           {done ? '실제로 한 시간 고치기 (나눠서 했어요)' : '계획과 다른 시간에 · 나눠서 했어요'}
@@ -634,7 +830,10 @@ export function TaskDetail({
         actions.onRecordInstead && (
           <button
             type="button"
-            onClick={() => actions.onRecordInstead?.(t)}
+            onClick={() => {
+              track('task_detail.record_instead_click', { ...base, source_type: t.sourceType })
+              actions.onRecordInstead?.(t)
+            }}
             className="text-success hover:bg-success-soft mt-1 w-full rounded-lg py-1.5 text-center text-[13px] font-semibold"
           >
             이 시간에 다른 일을 했어요

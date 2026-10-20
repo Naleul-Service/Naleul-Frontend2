@@ -3,6 +3,8 @@
 import { type MouseEvent } from 'react'
 import { Check, Repeat } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { dateRelationOf } from '@/features/home/analytics'
 import { hexOf } from '../layout'
 import { formatMonthDay, hm, minutesFrom } from '../time'
 import type { TimeBlockTask, TimetableDay } from '../types'
@@ -22,14 +24,38 @@ export function DayTaskList({
   onSelect,
   onToggle,
   togglingId,
+  analytics = true,
 }: {
   day: TimetableDay | undefined
   today: string
   onSelect: (t: TimeBlockTask, e: MouseEvent<HTMLElement>) => void
   onToggle: (t: TimeBlockTask) => void
   togglingId: number | null
+  /** calendar_day_list.* 를 보낼지 — 캘린더 밖에서 쓰면 false */
+  analytics?: boolean
 }) {
   if (!day) return null
+  const dayDate = day.date
+  // calendar_day_list.* — 누르기 전 상태 기준
+  const select = (t: TimeBlockTask, e: MouseEvent<HTMLElement>) => {
+    if (analytics)
+      track('calendar_day_list.row_click', {
+        task_id: t.taskId,
+        task_status: t.taskStatus,
+        is_scheduled: !!t.plannedStartAt,
+      })
+    onSelect(t, e)
+  }
+  const toggle = (t: TimeBlockTask) => {
+    if (analytics)
+      track('calendar_day_list.check_click', {
+        task_id: t.taskId,
+        check_action: t.taskStatus === 'COMPLETED' ? 'uncomplete' : 'complete',
+        is_scheduled: !!t.plannedStartAt,
+        date_relation: dateRelationOf(dayDate, today),
+      })
+    onToggle(t)
+  }
   // 전날 밤부터 이어진 블록은 그날 칸에도 보이지만, 목록은 "이날 하기로 한 일"만 (계획 시작일 또는 시간 미정 날짜)
   const seen = new Set<number>()
   const all = [...day.tasks, ...day.unscheduledTasks].filter((t) => {
@@ -69,7 +95,7 @@ export function DayTaskList({
           <>
             <ul>
               {todo.map((t) => (
-                <Row key={t.taskId} t={t} onSelect={onSelect} onToggle={onToggle} busy={togglingId === t.taskId} />
+                <Row key={t.taskId} t={t} onSelect={select} onToggle={toggle} busy={togglingId === t.taskId} />
               ))}
             </ul>
             {todo.length === 0 && <p className="text-success px-2 py-3 text-[13px] font-semibold">모두 끝냈어요 🎉</p>}
@@ -78,7 +104,7 @@ export function DayTaskList({
                 <p className="text-ink-3 mt-3 px-2 pb-1 text-[12px] font-semibold">완료 {done.length}</p>
                 <ul>
                   {done.map((t) => (
-                    <Row key={t.taskId} t={t} onSelect={onSelect} onToggle={onToggle} busy={togglingId === t.taskId} />
+                    <Row key={t.taskId} t={t} onSelect={select} onToggle={toggle} busy={togglingId === t.taskId} />
                   ))}
                 </ul>
               </>

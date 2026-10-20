@@ -3,6 +3,7 @@
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
 import type { TimetableDay } from '../types'
 
 /** 배치 대상: 오늘 이후 날짜의 "시간 미정" 미완료 Task (미션은 방장이 시간을 정하므로 제외) */
@@ -27,6 +28,7 @@ export function AutoPlaceBar({
   onPreview,
   loading,
   proposing,
+  viewMode,
 }: {
   days: TimetableDay[]
   today: string
@@ -34,6 +36,8 @@ export function AutoPlaceBar({
   loading?: boolean
   /** 미리보기 확인 중 */
   proposing?: boolean
+  /** 캘린더 보기 (calendar.auto_place_click 의 view_mode) */
+  viewMode?: 'day' | 'week' | 'month'
 }) {
   const targets = unplacedOf(days, today)
   const total = targets.reduce((n, d) => n + d.count, 0)
@@ -74,7 +78,14 @@ export function AutoPlaceBar({
         disabled={!active}
         loading={loading}
         title={proposing ? '아래에서 진행 여부를 골라 주세요' : active ? undefined : '배치할 시간 미정 Task가 없어요'}
-        onClick={() => onPreview({ startDate: targets[0].date, endDate: targets[targets.length - 1].date })}
+        onClick={() => {
+          track('calendar.auto_place_click', {
+            view_mode: viewMode,
+            unscheduled_count: total,
+            day_count: targets.length,
+          })
+          onPreview({ startDate: targets[0].date, endDate: targets[targets.length - 1].date })
+        }}
       >
         <Sparkles className="size-3.5" />
         {onlyToday || !active ? 'AI로 오늘 TimeTable 배치하기' : `AI로 TimeTable 배치하기 (${targets.length}일)`}

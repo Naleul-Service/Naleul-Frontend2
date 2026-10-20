@@ -47,7 +47,7 @@ export function HomeDayCalendar({
     groupIds,
     focusIds,
     fadeOthers,
-  } = useTimetableInteractions(rawDays, day.date)
+  } = useTimetableInteractions(rawDays, day.date, { surface: 'home' })
   const { startHour, endHour } = useMemo(() => visibleHours(days, acts), [days, acts])
   const { trackHome, once } = useHomeAnalytics()
 

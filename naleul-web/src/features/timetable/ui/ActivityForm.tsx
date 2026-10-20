@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Link2, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 import { useGoalCategories } from '@/features/goal/api'
 import { isOngoing } from '@/features/goal/format'
+import { errorStatusOf } from '@/features/home/analytics'
+import { track } from '@/lib/client/analytics'
+import type { TimetableSurface } from '../analytics'
 import { useDeleteActivity, useSaveActivity } from '../api'
 import { formatMinutes, minutesFrom, nowKst, timeToMinutes, toDateTime } from '../time'
 import type { ActualActivity } from '../types'
@@ -38,12 +41,24 @@ const input =
   'border-line-strong bg-surface placeholder:text-ink-4 focus:border-ink-3 h-10 w-full min-w-0 rounded-xl border px-3 text-[14px] outline-none'
 const label = 'text-ink-3 mb-1 block text-[12px] font-medium'
 
+/** 오늘(KST)부터 며칠 전인지 (오늘 0) */
+const daysAgo = (ymd: string) => Math.round((Date.parse(nowKst().date) - Date.parse(ymd)) / 86_400_000)
+
 /**
  * 실제로 한 일 기록 · 수정 (팝오버 안에서 바로).
  * Enter 저장(메모 칸은 Shift+Enter 줄바꿈), Esc 닫기. 삭제는 같은 자리에서 한 번 더 확인.
  * 끝 시각이 시작보다 이르면 다음 날로 봐요 (예: 23:30 ~ 00:30).
  */
-export function ActivityForm({ draft, onDone }: { draft: ActivityDraft; onDone: () => void }) {
+export function ActivityForm({
+  draft,
+  onDone,
+  surface,
+}: {
+  draft: ActivityDraft
+  onDone: () => void
+  /** Amplitude surface — 이 폼을 띄운 화면 */
+  surface?: TimetableSurface
+}) {
   const save = useSaveActivity()
   const remove = useDeleteActivity()
   const goals = useGoalCategories()
@@ -58,6 +73,14 @@ export function ActivityForm({ draft, onDone }: { draft: ActivityDraft; onDone: 
   const [replaced, setReplaced] = useState(draft.replaced ?? null)
   const [memo, setMemo] = useState(a?.memo ?? '')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const formRef = useRef<HTMLFormElement>(null)
+  /** 닫기(activity_form.close) 판단용 — 마지막 닫는 동작 · 저장/삭제로 닫혔는지 · 고친 내용 */
+  const closeRef = useRef<{ method: 'x_button' | 'backdrop' | 'esc' | null; done: boolean; dirty: boolean }>({
+    method: null,
+    done: false,
+    dirty: false,
+  })
+  const lastErrorRef = useRef<string | null>(null)
 
   const now = nowKst()
   const s = timeToMinutes(start)
@@ -76,10 +99,69 @@ export function ActivityForm({ draft, onDone }: { draft: ActivityDraft; onDone: 
         ? '24시간까지만 기록할 수 있어요.'
         : null
   const valid = !!title.trim() && !error && !!date && !!start && !!end
+  const isDirty =
+    title !== (a?.title ?? '') ||
+    emoji !== (a?.emoji ?? '') ||
+    date !== draft.date ||
+    start !== formatMinutes(draft.start) ||
+    end !== formatMinutes(draft.end) ||
+    goalId !== (a?.goalCategoryId ?? null) ||
+    (replaced?.id ?? null) !== (draft.replaced?.id ?? null) ||
+    memo !== (a?.memo ?? '')
+
+  useEffect(() => {
+    closeRef.current.dirty = isDirty
+  }, [isDirty])
+
+  // 입력 오류 문구가 뜰 때마다 한 번
+  useEffect(() => {
+    if (error && error !== lastErrorRef.current) track('activity_form.error_view', { surface, validation_error: error })
+    lastErrorRef.current = error
+  }, [error, surface])
+
+  // 팝오버(X · 바깥 · Esc)로 닫히면 activity_form.close — 닫는 동작을 여기서 보고, 사라질 때 보내요
+  useEffect(() => {
+    const st = closeRef.current
+    const dialog = () => formRef.current?.closest('[role="dialog"]') ?? formRef.current
+    const onDown = (ev: PointerEvent) => {
+      const box = dialog()
+      if (!(ev.target instanceof Node) || !box) return
+      if (!box.contains(ev.target)) st.method = 'backdrop'
+      else if (ev.target instanceof Element && ev.target.closest('button[aria-label="닫기"]')?.parentElement === box)
+        st.method = 'x_button'
+    }
+    const onKey = (ev: globalThis.KeyboardEvent) => {
+      if (ev.key === 'Escape' && !ev.defaultPrevented) st.method = 'esc'
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onDown, true)
+      document.removeEventListener('keydown', onKey)
+      if (st.method && !st.done)
+        track('activity_form.close', { surface, is_new: !a, close_method: st.method, is_dirty: st.dirty })
+    }
+  }, [surface, a])
+
+  const finish = () => {
+    closeRef.current.done = true
+    onDone()
+  }
 
   const submit = (ev?: FormEvent) => {
     ev?.preventDefault()
     if (!valid || save.isPending) return
+    track('activity_form.save_click', {
+      surface,
+      is_new: !a,
+      duration_minutes: minutes,
+      crosses_midnight: e > 1440,
+      has_goal: goalId != null,
+      memo_length: memo.trim().length,
+      is_replacement: !!replaced,
+      days_ago: daysAgo(date),
+    })
+    const activity_action = a ? 'update' : 'create'
     save.mutate(
       {
         activityId: a?.activityId,
@@ -91,8 +173,38 @@ export function ActivityForm({ draft, onDone }: { draft: ActivityDraft; onDone: 
         replacedTaskId: replaced?.id ?? null,
         memo: memo.trim() || null,
       },
-      { onSuccess: onDone }
+      {
+        onSuccess: () => {
+          track('activity_form.result', { surface, activity_action, result: 'success' })
+          finish()
+        },
+        onError: (err) =>
+          track('activity_form.result', {
+            surface,
+            activity_action,
+            result: 'fail',
+            error_status: errorStatusOf(err),
+          }),
+      }
     )
+  }
+
+  const confirmRemove = () => {
+    if (!a) return
+    track('activity_form.delete_confirm', { surface, days_ago: daysAgo(draft.date) })
+    remove.mutate(a.activityId, {
+      onSuccess: () => {
+        track('activity_form.result', { surface, activity_action: 'delete', result: 'success' })
+        finish()
+      },
+      onError: (err) =>
+        track('activity_form.result', {
+          surface,
+          activity_action: 'delete',
+          result: 'fail',
+          error_status: errorStatusOf(err),
+        }),
+    })
   }
 
   const onKeyDown = (ev: KeyboardEvent<HTMLFormElement>) => {
@@ -108,7 +220,7 @@ export function ActivityForm({ draft, onDone }: { draft: ActivityDraft; onDone: 
   const activeGoals = (goals.data ?? []).filter((g) => isOngoing(g.goalCategoryStatus) || g.goalCategoryId === goalId)
 
   return (
-    <form onSubmit={submit} onKeyDown={onKeyDown} className="space-y-3 p-5">
+    <form ref={formRef} onSubmit={submit} onKeyDown={onKeyDown} className="space-y-3 p-5">
       {/* 오른쪽 위 닫기(X) 버튼 자리 비워 두기 */}
       <div className="pr-8">
         <p className="text-success text-[12px] font-bold">✓ 실제로 한 일</p>
@@ -123,7 +235,10 @@ export function ActivityForm({ draft, onDone }: { draft: ActivityDraft; onDone: 
           <span className="text-ink-3 shrink-0">대신</span>
           <button
             type="button"
-            onClick={() => setReplaced(null)}
+            onClick={() => {
+              track('activity_form.unlink_click', { surface })
+              setReplaced(null)
+            }}
             aria-label="계획 연결 끊기"
             className="text-ink-3 hover:text-ink rounded p-0.5"
           >
@@ -215,17 +330,18 @@ export function ActivityForm({ draft, onDone }: { draft: ActivityDraft; onDone: 
       {confirmDelete ? (
         <div className="border-danger/30 bg-danger-soft/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2.5">
           <p className="min-w-0 flex-1 text-[14px] font-semibold">이 기록을 지울까요?</p>
-          <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
-            취소
-          </Button>
           <Button
             type="button"
-            variant="danger"
+            variant="ghost"
             size="sm"
-            autoFocus
-            loading={remove.isPending}
-            onClick={() => remove.mutate(a!.activityId, { onSuccess: onDone })}
+            onClick={() => {
+              track('activity_form.delete_cancel', { surface })
+              setConfirmDelete(false)
+            }}
           >
+            취소
+          </Button>
+          <Button type="button" variant="danger" size="sm" autoFocus loading={remove.isPending} onClick={confirmRemove}>
             삭제
           </Button>
         </div>
@@ -237,7 +353,10 @@ export function ActivityForm({ draft, onDone }: { draft: ActivityDraft; onDone: 
               variant="ghost"
               size="sm"
               className="text-danger hover:bg-danger-soft"
-              onClick={() => setConfirmDelete(true)}
+              onClick={() => {
+                track('activity_form.delete_click', { surface, days_ago: daysAgo(draft.date) })
+                setConfirmDelete(true)
+              }}
             >
               <Trash2 className="size-4" />
               삭제
