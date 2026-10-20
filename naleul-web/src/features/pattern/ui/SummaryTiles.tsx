@@ -20,14 +20,14 @@ function Tile({
 }) {
   const onClick = useDeadClick('summary_tile')
   return (
-    <Card className="flex min-h-[132px] flex-col justify-between p-5" onClick={onClick}>
+    <Card className="flex min-h-[124px] flex-col justify-between p-5" onClick={onClick}>
       <p className="text-caption-md text-text-secondary">{label}</p>
       <div>
         <p className="text-h2 text-text-primary leading-none font-semibold">{value}</p>
         {sub && (
           <p
             className={cn(
-              'mt-2 text-[13px] font-semibold',
+              'mt-1 text-[13px] font-semibold',
               subTone === 'up' ? 'text-success' : subTone === 'down' ? 'text-danger' : 'text-ink-3'
             )}
           >
