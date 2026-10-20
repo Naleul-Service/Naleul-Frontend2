@@ -17,7 +17,7 @@ export function Section({
   return (
     <Card className={cn('p-5 sm:p-6', className)}>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[17px] font-bold">{title}</h2>
+        <h2 className="text-h4">{title}</h2>
         {aside && <span className="text-ink-3 text-[13px] whitespace-nowrap">{aside}</span>}
       </div>
       {children}

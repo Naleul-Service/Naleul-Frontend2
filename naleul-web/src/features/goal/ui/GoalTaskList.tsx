@@ -182,8 +182,8 @@ function TaskRow({
         aria-label={done ? `${t.taskName} 완료 취소` : `${t.taskName} 완료`}
         aria-pressed={done}
         className={cn(
-          'grid size-6 shrink-0 place-items-center rounded-full border-2 transition-colors disabled:opacity-50',
-          done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-ink-4'
+          'grid size-6 shrink-0 place-items-center rounded-full border-[1.5px] transition-colors disabled:opacity-50',
+          done ? 'border-success bg-success text-on-ink' : 'border-border-control hover:border-success'
         )}
       >
         {toggling ? <Spinner className="size-3" /> : done && <Check className="size-3.5" />}
@@ -384,7 +384,7 @@ export function GoalTaskList({
   return (
     <Card className="p-5 sm:p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[17px] font-bold">{title}</h2>
+        <h2 className="text-h4">{title}</h2>
         {data && (
           <span className="text-ink-3 text-[13px]">
             {data.completedCount} / {data.totalCount} 완료

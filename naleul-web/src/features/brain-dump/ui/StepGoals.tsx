@@ -221,7 +221,7 @@ export function StepGoals({
 
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="text-[17px] font-bold">목표에 연결했어요</h2>
+      <h2 className="text-h4">목표에 연결했어요</h2>
       <p className="text-ink-3 mt-1 text-sm">
         잘못 연결됐거나 날짜·시간이 다르면 &quot;변경&quot;을 눌러 고쳐 주세요. 관련 목표가 없는 일은 임시 목표로
         묶었어요.

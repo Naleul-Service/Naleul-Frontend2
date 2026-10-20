@@ -18,7 +18,7 @@ const MAX_MONTHS_BACK = 12
 
 const STATE_CLASS: Record<HabitDayState, string> = {
   DONE: 'bg-brand',
-  MISSED: 'bg-line-strong',
+  MISSED: 'bg-heat-empty ring-line ring-1 ring-inset', // 명세 8.1 — 안 한 날은 연하게
   TODO: 'bg-surface ring-brand ring-[1.5px] ring-inset',
   OFF: 'bg-subtle',
   PAUSED: 'bg-hatch ring-hatch-line ring-1 ring-inset',
@@ -103,7 +103,7 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
   return (
     <Card className="p-5 sm:p-6">
       <div className="mb-4 flex items-center gap-2">
-        <h2 className="text-[17px] font-bold">습관별 잔디</h2>
+        <h2 className="text-h4">습관별 잔디</h2>
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
@@ -159,7 +159,7 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
       )}
       <p className="text-ink-3 mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
         <Legend className="bg-brand">했어요</Legend>
-        <Legend className="bg-line-strong">놓쳤어요</Legend>
+        <Legend className="bg-heat-empty ring-line ring-1 ring-inset">놓쳤어요</Legend>
         <Legend className="bg-subtle">안 하는 날</Legend>
         <Legend className="bg-hatch ring-hatch-line ring-1 ring-inset">쉬는 중</Legend>
       </p>

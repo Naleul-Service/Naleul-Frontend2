@@ -184,7 +184,7 @@ function ReflectionsPanel({ goal, hint }: { goal: GoalCategory; hint: string }) 
   return (
     <section id="goal-panel-reflections" role="tabpanel" aria-labelledby="goal-tab-reflections" className="mt-5">
       <div className="mb-4 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-        <h2 className="text-[17px] font-bold">이 목표의 회고</h2>
+        <h2 className="text-h4">이 목표의 회고</h2>
         <p className="text-ink-3 text-[13px]">{hint}</p>
         <Link
           href="/reflections?from=goal_detail"

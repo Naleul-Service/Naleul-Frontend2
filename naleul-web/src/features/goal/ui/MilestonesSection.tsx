@@ -226,10 +226,10 @@ function MilestoneItem({
         className={cn(
           'absolute top-0.5 -left-7 grid size-5 place-items-center rounded-full border-[3px] transition-colors',
           done
-            ? 'border-success bg-success text-white'
+            ? 'border-success bg-success text-on-ink'
             : current
               ? 'border-brand bg-surface hover:bg-brand-soft'
-              : 'border-line-strong bg-surface hover:border-success'
+              : 'border-border-subtle bg-surface hover:border-success'
         )}
       >
         {done && <Check className="size-2.5" />}

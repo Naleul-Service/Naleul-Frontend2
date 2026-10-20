@@ -133,8 +133,8 @@ function Row({
         disabled={busy || mission}
         aria-label={done ? `${t.taskName} 완료 취소` : `${t.taskName} 완료`}
         className={cn(
-          'grid size-5 shrink-0 place-items-center rounded-full border-2 transition-colors disabled:opacity-50',
-          done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-success'
+          'grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] transition-colors disabled:opacity-50',
+          done ? 'border-success bg-success text-on-ink' : 'border-border-control hover:border-success'
         )}
       >
         {done && <Check className="size-3" />}

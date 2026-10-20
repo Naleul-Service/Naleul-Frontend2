@@ -205,7 +205,7 @@ export function StepResult({
           <div>
             {proposing ? (
               <>
-                <h2 className="text-[17px] font-bold">
+                <h2 className="text-h4">
                   {proposals ? '점선 자리에 놓을까요?' : '놓을 자리를 찾고 있어요…'}
                 </h2>
                 <p className="text-ink-3 mt-1 text-sm">
@@ -215,14 +215,14 @@ export function StepResult({
               </>
             ) : phase === 'declined' ? (
               <>
-                <h2 className="text-[17px] font-bold">Task를 추가했어요</h2>
+                <h2 className="text-h4">Task를 추가했어요</h2>
                 <p className="text-ink-3 mt-1 text-sm">
                   시간은 정하지 않았어요. 격자의 &quot;시간 미정&quot;에서 원하는 시간으로 끌어다 놓을 수 있어요.
                 </p>
               </>
             ) : (
               <>
-                <h2 className="text-[17px] font-bold">TimeBlock을 만들었어요</h2>
+                <h2 className="text-h4">TimeBlock을 만들었어요</h2>
                 <p className="text-ink-3 mt-1 text-sm">
                   {result.placements.length + finalProposals.length}개를 배치했어요
                   {result.movedToOtherDays.length > 0 && ` · 다른 날로 ${result.movedToOtherDays.length}개`}

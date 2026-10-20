@@ -261,7 +261,7 @@ export function ScopeChooser({
                   choose(o.scope, method)
                 }}
                 className={cn(
-                  'border-line-strong hover:border-brand hover:bg-brand-soft focus-visible:border-border-focus focus-visible:bg-brand-soft flex flex-col items-start gap-1 rounded-input border px-3 py-2.5 text-left transition-colors outline-none',
+                  'border-border-subtle hover:border-brand hover:bg-brand-soft focus-visible:border-border-focus focus-visible:bg-brand-soft flex flex-col items-start gap-1 rounded-input border px-3 py-2.5 text-left transition-colors outline-none',
                   'disabled:hover:border-line-strong disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent'
                 )}
               >

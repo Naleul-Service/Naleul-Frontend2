@@ -221,7 +221,7 @@ export function LogDoneView({ goals, surface = 'page' }: { goals: GoalCategory[]
     return (
       <Card className="p-5 sm:p-6">
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-[17px] font-bold">이렇게 기록할게요</h2>
+          <h2 className="text-h4">이렇게 기록할게요</h2>
           <button
             type="button"
             onClick={() => {
@@ -279,7 +279,7 @@ export function LogDoneView({ goals, surface = 'page' }: { goals: GoalCategory[]
                   }}
                   aria-label="연결할 목표"
                   className={cn(
-                    'border-line-strong bg-surface ml-auto h-8 max-w-[220px] rounded-lg border px-2 text-[13px]',
+                    'border-border-subtle bg-surface ml-auto h-8 max-w-[220px] rounded-lg border px-2 text-[13px]',
                     !r.link && 'text-ink-3'
                   )}
                 >
@@ -312,7 +312,7 @@ export function LogDoneView({ goals, surface = 'page' }: { goals: GoalCategory[]
   // ── 1. 적기 ──
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="text-[17px] font-bold">오늘 한 일을 한 줄씩 적어 주세요</h2>
+      <h2 className="text-h4">오늘 한 일을 한 줄씩 적어 주세요</h2>
       <p className="text-ink-3 mt-1 text-[13px]">
         시각(오후 2시)·걸린 시간(30분)·날짜(어제)를 같이 적으면 그대로 기록해요. 목표는 AI가 알아서 연결해요.
       </p>
@@ -321,7 +321,7 @@ export function LogDoneView({ goals, surface = 'page' }: { goals: GoalCategory[]
         onChange={(e) => setText(e.target.value)}
         rows={6}
         placeholder={PLACEHOLDER}
-        className="border-line-strong bg-surface placeholder:text-text-placeholder focus:border-border-focus mt-4 w-full resize-none rounded-2xl border px-4 py-3 text-[15px] leading-relaxed outline-none"
+        className="border-border-subtle bg-surface placeholder:text-text-placeholder focus:border-border-focus mt-4 w-full resize-none rounded-2xl border px-4 py-3 text-[15px] leading-relaxed outline-none"
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault()

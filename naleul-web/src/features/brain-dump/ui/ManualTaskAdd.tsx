@@ -30,7 +30,7 @@ const formHasInput = (root: HTMLElement | null) =>
   ].some((i) => i.value.trim() !== '')
 
 const field =
-  'border-line-strong bg-surface focus:border-border-focus h-10 w-full min-w-0 rounded-input border px-3 text-[14px] outline-none'
+  'border-border-subtle bg-surface focus:border-border-focus h-10 w-full min-w-0 rounded-input border px-3 text-[14px] outline-none'
 
 /**
  * Task 직접 추가 — 목표를 고르고, 이름·날짜·시간(선택)·영역(선택)을 정해 Enter.
@@ -99,7 +99,7 @@ export function ManualTaskAdd({
 
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="text-[17px] font-bold">직접 추가하기</h2>
+      <h2 className="text-h4">직접 추가하기</h2>
       <p className="text-ink-3 mt-1 text-sm">
         이름과 날짜만 넣고 Enter. 시간을 비워 두면 그날 빈 시간에 AI가 배치할 수 있어요.
       </p>

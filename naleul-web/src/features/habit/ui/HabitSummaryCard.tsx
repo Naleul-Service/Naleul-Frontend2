@@ -69,7 +69,8 @@ export function HabitSummaryCard({ className }: { className?: string }) {
                 key={h.habitId}
                 className={cn(
                   'inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium',
-                  h.checked ? 'bg-success-soft text-success' : 'bg-subtle text-ink-2'
+                  // 명세 8.6 — 연한 칩 (bg/sunken · 1px border/soft · text/secondary)
+                  h.checked ? 'bg-success-soft text-success' : 'bg-bg-sunken border-border-soft text-text-secondary border'
                 )}
               >
                 {h.checked && <Check className="size-3" />}

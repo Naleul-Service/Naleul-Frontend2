@@ -13,14 +13,14 @@
 
   /* ── 기존 토큰 (이름 유지 · 새 값으로 다시 연결 — web/iOS/Android 공통 매핑표) ── */
   --color-ink: #121820;
-  --color-ink-2: #566273;
-  --color-ink-3: #7d8898;
-  --color-ink-4: #a3aebd;
+  --color-ink-2: #6b7685;
+  --color-ink-3: #98a2b0;
+  --color-ink-4: #c3cad3;
   --color-canvas: #f8fafc;
   --color-surface: #ffffff;
-  --color-subtle: #e8edf3;
-  --color-line: #d8dfe8;
-  --color-line-strong: #a3aebd;
+  --color-subtle: #f1f4f8;
+  --color-line: #e7ecf2;
+  --color-line-strong: #d5dce4;
   --color-brand: #0f7a9c;
   --color-brand-strong: #0d6b89;
   --color-brand-soft: #e8f4f5;
@@ -34,8 +34,8 @@
   --color-inverse: #121820;
   --color-warning-ink: #805a12;
   --color-warning-ink-strong: #6b4a0e;
-  --color-hatch: #f2f5f9;
-  --color-hatch-line: #e1e7ee;
+  --color-hatch: #f6f8fb;
+  --color-hatch-line: #ebeff4;
   --color-sleep: #efeafd;
   --color-sleep-line: #ded5fa;
   --color-sleep-ink: #5c49a8;
@@ -49,19 +49,19 @@
   --color-bg-canvas: #f8fafc;
   --color-bg-surface: #ffffff;
   --color-bg-elevated: #ffffff;
-  --color-bg-subtle: #e8edf3;
-  --color-bg-sunken: #f2f5f9;
+  --color-bg-subtle: #f1f4f8;
+  --color-bg-sunken: #f6f8fb;
   --color-bg-inverse: #121820;
   --color-bg-overlay: #00000066;
   --color-text-primary: #121820;
-  --color-text-secondary: #566273;
-  --color-text-tertiary: #7d8898;
-  --color-text-placeholder: #667184;
+  --color-text-secondary: #6b7685;
+  --color-text-tertiary: #98a2b0;
+  --color-text-placeholder: #a3acb9;
   --color-text-brand: #0d6b89;
   --color-text-inverse: #ffffff;
-  --color-border-subtle: #d8dfe8;
-  --color-border-soft: #e1e7eeb2;
-  --color-border-control: #566273;
+  --color-border-subtle: #e7ecf2;
+  --color-border-soft: #eef2f6;
+  --color-border-control: #b9c2cd;
   --color-border-focus: #0f7a9c;
   --color-action-primary-bg: #0f7a9c;
   --color-action-primary-bg-hover: #0d6b89;
@@ -79,9 +79,9 @@
   --color-action-danger-bg-hover: #b83740;
   --color-action-danger-bg-pressed: #9f3037;
   --color-action-danger-fg: #ffffff;
-  --color-disabled-bg: #e8edf3;
-  --color-disabled-fg: #7d8898;
-  --color-selection-bg: #e8edf3;
+  --color-disabled-bg: #f1f4f8;
+  --color-disabled-fg: #a3acb9;
+  --color-selection-bg: #f1f4f8;
   --color-selection-fg: #121820;
   --color-status-success-bg: #edf7f0;
   --color-status-success-fg: #246b42;
@@ -89,14 +89,16 @@
   --color-status-warning-fg: #805a12;
   --color-status-error-bg: #fbf0f0;
   --color-status-error-fg: #bc3942;
-  --color-status-info-bg: #e8edf3;
+  --color-status-info-bg: #f1f4f8;
   --color-status-info-fg: #3f4a5a;
   --color-accent-mint: #00cba8;
   --color-accent-on-mint: #121820;
-  --color-progress-track: #d8dfe8;
+  --color-progress-track: #e3f1f4;
+  /* 히트맵 빈 칸 · 안 한 날 */
+  --color-heat-empty: #f1f4f8;
   --color-progress-fill: #00cba8;
-  --color-calendar-today-bg: #00cba8;
-  --color-calendar-today-fg: #121820;
+  --color-calendar-today-bg: #0f7a9c;
+  --color-calendar-today-fg: #ffffff;
   --color-calendar-holiday: #bc3942;
   --color-calendar-saturday: #3c5ea8;
   --color-ai-tint: #d9f7f2;
@@ -123,7 +125,7 @@
   --color-brand-logo: #0b4f65;
   --color-brand-logo-base: #0b4f65;
   --color-brand-logo-accent: #4a90e2;
-  --color-neutral-400: #a3aebd;
+  --color-neutral-400: #c3cad3;
 
   /* ── 목표 색 21종 (bg 연한 바탕 · fg 글자 · accent 선/점) — 서버 hex 는 lib/goalTone.ts 가 가장 가까운 색으로 맞춰요 ── */
   --color-goal-coral-bg: #fdecec;
@@ -408,10 +410,11 @@
   --color-status-info-fg: #a3aebd;
   --color-accent-mint: #00cba8;
   --color-accent-on-mint: #121820;
-  --color-progress-track: #2f3845;
+  --color-progress-track: #22343d;
+  --color-heat-empty: #252d38;
   --color-progress-fill: #00cba8;
-  --color-calendar-today-bg: #00cba8;
-  --color-calendar-today-fg: #121820;
+  --color-calendar-today-bg: #167a9c;
+  --color-calendar-today-fg: #ffffff;
   --color-calendar-holiday: #e2888e;
   --color-calendar-saturday: #6f98f2;
   --color-ai-tint: #1c2b3d;

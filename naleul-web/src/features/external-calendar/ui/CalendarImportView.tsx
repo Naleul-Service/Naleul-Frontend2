@@ -78,7 +78,7 @@ export function CalendarImportView() {
               }}
               className={cn(
                 'flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-colors',
-                source === s.value ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
+                source === s.value ? 'border-brand bg-brand-soft' : 'border-border-subtle hover:border-line-strong'
               )}
             >
               <span className="bg-subtle text-ink grid size-9 place-items-center rounded-xl text-[15px] font-bold">
@@ -309,7 +309,7 @@ function GoogleImport() {
                       }}
                       className={cn(
                         'flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors',
-                        on ? 'border-text-brand bg-ai-tint-soft text-text-brand' : 'border-line-strong text-ink-3 hover:text-ink'
+                        on ? 'border-text-brand bg-ai-tint-soft text-text-brand' : 'border-border-subtle text-ink-3 hover:text-ink'
                       )}
                     >
                       <span className="size-2.5 rounded-full" style={{ backgroundColor: c.color }} />

@@ -25,7 +25,7 @@ function membershipStateOf(b: BillingStatus) {
   return b.otherPremium ? 'other_premium' : 'free'
 }
 
-const field = 'border-line-strong focus:border-border-focus w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
+const field = 'border-border-subtle focus:border-border-focus w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
 
 /** /settings/withdraw — iOS WithdrawView(회원 탈퇴)를 옮긴 것 */
 export function WithdrawView() {
@@ -114,7 +114,7 @@ export function WithdrawView() {
       <PageHeader breadcrumb={<Link href="/settings">설정</Link>} title="회원 탈퇴" />
 
       <Card className="mt-6 max-w-2xl p-5 sm:p-6">
-        <h2 className="text-[18px] font-bold">정말 탈퇴하실건가요?</h2>
+        <h2 className="text-h4">정말 탈퇴하실건가요?</h2>
         <p className="text-ink-3 mt-3 text-[13px] font-medium">탈퇴 시 유의사항</p>
         <ul className="text-ink-3 mt-1 list-disc space-y-1 pl-5 text-[13px] leading-relaxed">
           <li>
@@ -174,7 +174,7 @@ export function WithdrawView() {
             className={cn(
               'grid size-5 shrink-0 place-items-center rounded-md border transition-colors',
               'peer-focus-visible:outline-brand peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
-              agreed ? 'border-brand bg-brand text-white' : 'border-line-strong bg-surface'
+              agreed ? 'border-brand bg-brand text-white' : 'border-border-subtle bg-surface'
             )}
             aria-hidden
           >

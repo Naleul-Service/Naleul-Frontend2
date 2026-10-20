@@ -76,7 +76,7 @@ export function PanelCard({
       )}
     >
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-[17px] font-bold">{title}</h2>
+        <h2 className="text-h4">{title}</h2>
         {aside && <span className="text-ink-3 text-[13px]">{aside}</span>}
       </div>
       {messages && (
@@ -98,7 +98,7 @@ function AddButton({ label, onClick, disabled }: { label: string; onClick: () =>
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="border-line-strong text-ink-2 hover:border-ink-4 hover:text-ink mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40"
+      className="border-border-subtle text-ink-2 hover:border-line-strong hover:text-ink mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-dashed text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-40"
     >
       <Plus className="size-4" />
       {label}
@@ -160,7 +160,7 @@ export function GoalHeroCard({
             onClick={() => onEdit({ kind: 'goal' })}
             className="group hover:bg-canvas w-full rounded-2xl px-2 py-1 text-left"
           >
-            <h2 className="flex items-center gap-2 text-[26px] leading-tight font-bold tracking-tight sm:text-[30px]">
+            <h2 className="flex items-center gap-2 text-h2 sm:text-h1">
               {goal.emoji && <span>{goal.emoji}</span>}
               {goal.title}
               <Pencil className="text-ink-4 group-hover:text-ink-2 size-4 shrink-0" />
@@ -195,7 +195,7 @@ export function GoalHeroCard({
             onClick={() => onColor(null)}
             className={cn(
               'h-8 rounded-full border px-3 text-xs font-semibold',
-              colorId === null ? 'border-text-brand bg-ai-tint-soft text-text-brand' : 'border-line-strong text-ink-2'
+              colorId === null ? 'border-text-brand bg-ai-tint-soft text-text-brand' : 'border-border-subtle text-ink-2'
             )}
           >
             자동
@@ -243,7 +243,7 @@ export function MilestoneTimeline({
   return (
     <div data-vkey="milestones" className="mt-7 scroll-mt-28">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-[17px] font-bold">마일스톤</h3>
+        <h3 className="text-h4">마일스톤</h3>
         <span className="text-ink-3 text-[13px]">
           {milestones.length}단계{goal.metric ? ' · 수치는 자동 계산' : ''}
         </span>
@@ -272,7 +272,7 @@ export function MilestoneTimeline({
                         ? 'border-brand bg-brand-soft'
                         : last
                           ? 'border-success bg-success'
-                          : 'border-line-strong bg-surface'
+                          : 'border-border-subtle bg-surface'
                     )}
                   />
                   {!last && <span className="bg-line-strong h-0.5 flex-1" />}

@@ -281,8 +281,8 @@ const NODE_CLASS: Record<TopicStatus, string> = {
   DONE: 'border-brand bg-brand text-white',
   NEXT: 'border-brand bg-surface text-transparent ring-4 ring-brand/15',
   OVERDUE: 'border-danger bg-danger-soft text-danger',
-  UPCOMING: 'border-line-strong bg-surface text-transparent',
-  NO_DUE: 'border-line-strong border-dashed bg-surface text-transparent',
+  UPCOMING: 'border-border-subtle bg-surface text-transparent',
+  NO_DUE: 'border-border-subtle border-dashed bg-surface text-transparent',
 }
 
 function TopicEditor({
@@ -355,7 +355,7 @@ function TopicEditor({
           value={due}
           onChange={(e) => setDue(e.target.value)}
           aria-label="주제 마감"
-          className="border-line-strong bg-surface h-8 rounded-lg border px-2 text-[13px]"
+          className="border-border-subtle bg-surface h-8 rounded-lg border px-2 text-[13px]"
         />
         {due && (
           <button
@@ -591,7 +591,7 @@ function RoadmapItem({
             autoDone ? `${t.name}: Task를 모두 끝냈어요` : `${t.name} ${t.completed ? '다시 열기' : '끝냈어요'}`
           }
           className={cn(
-            'relative z-[1] grid size-7 shrink-0 place-items-center rounded-full border-2 transition-colors',
+            'relative z-[1] grid size-7 shrink-0 place-items-center rounded-full border-[1.5px] transition-colors',
             NODE_CLASS[t.status],
             !done && 'hover:border-brand hover:text-text-brand/60',
             autoDone && 'pointer-events-none'
@@ -690,7 +690,7 @@ function NoTopicItem({ children, count }: { children: React.ReactNode; count: nu
   return (
     <li className="relative flex gap-3 pb-5">
       <span aria-hidden className="bg-line absolute top-7 bottom-0 left-[13px] w-0.5" />
-      <span className="border-line-strong bg-surface relative z-[1] size-7 shrink-0 rounded-full border-2 border-dotted" />
+      <span className="border-border-subtle bg-surface relative z-[1] size-7 shrink-0 rounded-full border-2 border-dotted" />
       <div className="min-w-0 flex-1 pt-0.5">
         <p className="text-ink-2 text-[15px] leading-snug font-bold">주제 없음</p>
         <p className="text-ink-3 mt-0.5 text-[12px]">아직 주제를 정하지 않은 할 일 {count}개</p>
@@ -736,7 +736,7 @@ function AddTopic({
           track('work_roadmap.add_topic_click', { goal_category_id: goalId, topic_count: topicCount })
           setOpen(true)
         }}
-        className="text-ink-3 hover:text-ink border-line-strong mt-1 flex h-9 w-full items-center justify-center gap-1 rounded-xl border border-dashed text-[13px] font-semibold"
+        className="text-ink-3 hover:text-ink border-border-subtle mt-1 flex h-9 w-full items-center justify-center gap-1 rounded-xl border border-dashed text-[13px] font-semibold"
       >
         <Plus className="size-3.5" />
         주제 추가
@@ -792,7 +792,7 @@ function AddTopic({
         else if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.target instanceof HTMLInputElement)
           enterRef.current = true
       }}
-      className="border-brand/40 mt-1 space-y-2 rounded-xl border p-3"
+      className="border-border-subtle mt-1 space-y-2 rounded-xl border p-3"
     >
       <input
         autoFocus
@@ -810,7 +810,7 @@ function AddTopic({
             type="date"
             value={due}
             onChange={(e) => setDue(e.target.value)}
-            className="border-line-strong bg-surface text-ink h-8 rounded-lg border px-2 text-[13px]"
+            className="border-border-subtle bg-surface text-ink h-8 rounded-lg border px-2 text-[13px]"
           />
         </label>
         <button
@@ -949,9 +949,9 @@ function CheckButton({ task, onToggle, small = false }: { task: WorkTask; onTogg
       aria-pressed={done}
       aria-label={`${task.taskName} ${done ? '완료 취소' : '완료'}`}
       className={cn(
-        'grid shrink-0 place-items-center rounded-full border-2 transition-colors',
+        'grid shrink-0 place-items-center rounded-full border-[1.5px] transition-colors',
         small ? 'size-5' : 'size-6',
-        done ? 'border-brand bg-brand text-white' : 'border-line-strong hover:border-brand text-transparent'
+        done ? 'border-brand bg-brand text-white' : 'border-border-control hover:border-brand text-transparent'
       )}
     >
       <Check className={small ? 'size-3' : 'size-3.5'} />
@@ -1076,7 +1076,7 @@ function TaskCompose({
           onTopic(id)
         }}
         aria-label="주제"
-        className="border-line-strong bg-surface h-9 w-full rounded-xl border px-2.5 text-[14px] font-semibold"
+        className="border-border-subtle bg-surface h-9 w-full rounded-xl border px-2.5 text-[14px] font-semibold"
       >
         <option value="">주제 없음</option>
         {realTopics.map((t) => (
@@ -1128,7 +1128,7 @@ function TaskCompose({
             value={date}
             onChange={(e) => setDate(e.target.value)}
             aria-label="하는 날"
-            className="border-line-strong bg-surface h-8 rounded-lg border px-2 text-[13px]"
+            className="border-border-subtle bg-surface h-8 rounded-lg border px-2 text-[13px]"
           />
         )}
         <label className="text-ink-3 flex items-center gap-1 text-[12px]">
@@ -1137,7 +1137,7 @@ function TaskCompose({
             type="date"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
-            className="border-line-strong bg-surface text-ink h-8 rounded-lg border px-2 text-[13px]"
+            className="border-border-subtle bg-surface text-ink h-8 rounded-lg border px-2 text-[13px]"
           />
         </label>
       </div>
@@ -1288,7 +1288,7 @@ function ComposePanel({
 }) {
   return (
     <Card id="work-compose" className="scroll-mt-4 p-4 sm:p-5">
-      <h2 className="flex items-center gap-1.5 text-[17px] font-bold">
+      <h2 className="flex items-center gap-1.5 text-h4">
         <PencilLine className="size-4" />
         적기
       </h2>
@@ -1413,7 +1413,7 @@ function BoardCard({
       onDragEnd={onDragEnd}
       className={cn(
         'border-line bg-surface hover:border-line-strong group cursor-grab rounded-xl border p-3 shadow-card active:cursor-grabbing',
-        task.overdue && 'border-danger/40'
+        task.overdue && 'border-border-subtle'
       )}
     >
       <div className="flex items-start gap-2">
@@ -1770,7 +1770,7 @@ export function WorkBoardView({ goal }: { goal: GoalCategory }) {
 
           <Card id="work-board" className="scroll-mt-4 p-4 sm:p-5">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-[17px] font-bold">보드</h2>
+              <h2 className="text-h4">보드</h2>
               <span className="text-ink-3 text-[12px]">카드를 끌어서 칸을 옮기거나, 눌러서 자세히 고쳐요</span>
             </div>
             <TopicBar topics={board.topics} filter={filter} onFilter={changeFilter} />

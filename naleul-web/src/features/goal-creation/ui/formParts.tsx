@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
 export const inputClass =
-  'border-line-strong bg-surface placeholder:text-text-placeholder focus:border-border-focus h-11 w-full rounded-input border px-3.5 text-[15px] outline-none transition-colors'
+  'border-border-subtle bg-surface placeholder:text-text-placeholder focus:border-border-focus h-11 w-full rounded-input border px-3.5 text-[15px] outline-none transition-colors'
 
 export const textareaClass = cn(inputClass, 'h-auto resize-none py-3 leading-relaxed')
 

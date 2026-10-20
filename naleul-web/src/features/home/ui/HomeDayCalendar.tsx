@@ -126,7 +126,7 @@ export function HomeDayCalendar({
   return (
     <Card data-home-section="calendar" className={cn('flex min-h-0 flex-col overflow-hidden p-0', className)}>
       <div className="flex shrink-0 flex-wrap items-center gap-1 px-4 pt-4 pb-2 sm:px-5">
-        <h2 className="text-[17px] font-bold">{dayLabel} 일정</h2>
+        <h2 className="text-h4">{dayLabel} 일정</h2>
         <div className="ml-auto flex items-center gap-1">
           <Button
             variant="ghost"

@@ -18,7 +18,7 @@ type CellState = 'none' | 'done' | 'missed' | 'today' | 'future'
 const CELL_CLASS: Record<CellState, string> = {
   none: 'bg-transparent',
   done: 'bg-brand',
-  missed: 'bg-line-strong',
+  missed: 'bg-heat-empty ring-line ring-1 ring-inset', // 명세 8.1 — 안 한 날은 연하게
   today: 'bg-surface ring-brand ring-[1.5px] ring-inset',
   future: 'bg-subtle',
 }

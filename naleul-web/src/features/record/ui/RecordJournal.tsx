@@ -135,7 +135,7 @@ export function RecordJournal({ goalId, goalName }: { goalId: number; goalName: 
   return (
     <Card className="p-5 sm:p-6">
       <div className="mb-1 flex items-center justify-between gap-3">
-        <h2 className="text-[17px] font-bold">업무 일지</h2>
+        <h2 className="text-h4">업무 일지</h2>
         <Button variant="secondary" size="sm" onClick={copyWeek} disabled={!days.length}>
           <Copy className="size-3.5" />
           이번 주 복사

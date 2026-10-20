@@ -72,7 +72,7 @@ export function TaskRateSection({ goal }: { goal: GoalCategory }) {
     <Section title="Task 실천률" aside={rate !== null ? `${done} / ${due}개` : undefined}>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-ink-3 text-[13px]">지금까지 하기로 한 Task 중</p>
+          <p className="text-text-secondary text-[13px]">지금까지 하기로 한 Task 중</p>
           <p className="mt-0.5 text-[32px] leading-none font-bold tracking-tight">
             {rate ?? '-'}
             <span className="text-ink-3 ml-0.5 text-[16px] font-semibold">%</span>
@@ -103,20 +103,20 @@ export function TaskRateSection({ goal }: { goal: GoalCategory }) {
               const r = b.due ? b.done / b.due : 0
               return (
                 <div key={b.week} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
-                  <span className="text-ink-3 text-[10px] tabular-nums">{b.due ? `${b.done}/${b.due}` : ''}</span>
-                  <div className="bg-subtle relative w-full max-w-[28px] flex-1 overflow-hidden rounded-md">
+                  <span className="text-text-secondary text-[10px] tabular-nums">{b.due ? `${b.done}/${b.due}` : ''}</span>
+                  <div className="bg-progress-track relative w-full max-w-[28px] flex-1 overflow-hidden rounded-md">
                     {b.due > 0 && (
                       <div
                         className={cn(
                           'absolute inset-x-0 bottom-0 rounded-md transition-all',
-                          r >= 0.8 ? 'bg-brand' : r >= 0.5 ? 'bg-brand/60' : 'bg-brand/30'
+                          r >= 0.8 ? 'bg-progress-fill' : r >= 0.5 ? 'bg-progress-fill/70' : 'bg-progress-fill/40'
                         )}
                         style={{ height: `${Math.max(r * 100, 4)}%` }}
                         title={`${b.week} 주 · ${Math.round(r * 100)}%`}
                       />
                     )}
                   </div>
-                  <span className={cn('text-[10px] tabular-nums', b.current ? 'text-text-brand font-bold' : 'text-ink-3')}>
+                  <span className={cn('text-[10px] tabular-nums', b.current ? 'text-text-brand font-bold' : 'text-text-secondary')}>
                     {b.current ? '이번 주' : `${Number(b.week.slice(5, 7))}/${Number(b.week.slice(8, 10))}`}
                   </span>
                 </div>

@@ -61,7 +61,7 @@ function OutcomePicker({
             onClick={() => onChange(o.value)}
             className={cn(
               'rounded-2xl border px-2 py-3 text-center transition-colors disabled:opacity-60',
-              selected ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
+              selected ? 'border-brand bg-brand-soft' : 'border-border-subtle hover:border-line-strong'
             )}
           >
             <span className="block text-xl">{o.emoji}</span>
@@ -375,7 +375,7 @@ export function GoalAdjustmentBanner({ goal }: { goal: GoalCategory }) {
     <div
       className={cn(
         'relative rounded-2xl border px-5 py-4',
-        down ? 'border-warning/40 bg-warning-soft' : 'border-brand/30 bg-brand-soft'
+        down ? 'border-border-subtle bg-warning-soft' : 'border-border-subtle bg-brand-soft'
       )}
     >
       <button

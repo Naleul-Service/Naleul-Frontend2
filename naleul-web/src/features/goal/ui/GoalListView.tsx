@@ -29,7 +29,7 @@ function TempGoalCard({ goal, position }: { goal: GoalCategory; position: number
   return (
     <div
       onClick={onCardClick}
-      className="border-warning/40 bg-warning-soft/40 flex flex-col rounded-card border border-dashed p-5"
+      className="border-border-subtle bg-warning-soft/40 flex flex-col rounded-card border border-dashed p-5"
     >
       <div className="flex items-center gap-2">
         <span className="size-2.5 rounded-full" style={{ backgroundColor: goalColor(goal.colorCode) }} />

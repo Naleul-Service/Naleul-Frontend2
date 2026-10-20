@@ -133,7 +133,7 @@ export function InlineForm({
       onSubmit={submit}
       onKeyDown={onKeyDown}
       className={cn(
-        'border-brand/40 bg-brand-soft/40 animate-[fade-in_120ms_ease-out] rounded-2xl border p-3.5 sm:p-4',
+        'border-border-subtle bg-brand-soft/40 animate-[fade-in_120ms_ease-out] rounded-2xl border p-3.5 sm:p-4',
         className
       )}
     >
@@ -183,7 +183,7 @@ export function InlineConfirm({
           onCancel('esc')
         }
       }}
-      className="border-danger/30 bg-danger-soft/60 flex flex-wrap items-center gap-2 rounded-2xl border px-3.5 py-3"
+      className="border-border-subtle bg-danger-soft/60 flex flex-wrap items-center gap-2 rounded-2xl border px-3.5 py-3"
     >
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-semibold">{message}</p>
@@ -258,7 +258,7 @@ export function AddButton({
       type="button"
       onClick={onClick}
       className={cn(
-        'border-line-strong text-ink-3 hover:border-ink-4 hover:text-ink-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed py-2.5 text-sm font-semibold transition-colors',
+        'border-border-subtle text-ink-3 hover:border-line-strong hover:text-ink-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed py-2.5 text-sm font-semibold transition-colors',
         className
       )}
     >

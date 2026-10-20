@@ -81,12 +81,12 @@ export function RecordQuickLog({ goal, bare = false }: { goal: GoalCategory; bar
   const Wrap = bare ? 'div' : Card
   return (
     <Wrap className={bare ? undefined : 'p-5 sm:p-6'}>
-      {!bare && <h2 className="text-[17px] font-bold">오늘 한 일 기록하기</h2>}
+      {!bare && <h2 className="text-h4">오늘 한 일 기록하기</h2>}
       <p className={bare ? 'text-ink-3 text-[13px]' : 'text-ink-3 mt-1 text-[13px]'}>
         한 줄로 적으면 시각·걸린 시간을 알아서 읽어요. 시각이 없으면 방금 끝낸 일로 기록돼요.
       </p>
 
-      <div className="border-line-strong bg-surface focus-within:border-border-focus mt-4 flex items-center gap-2 rounded-2xl border px-3 py-2">
+      <div className="border-border-subtle bg-surface focus-within:border-border-focus mt-4 flex items-center gap-2 rounded-2xl border px-3 py-2">
         <input
           value={text}
           onChange={(e) => setText(e.target.value)}

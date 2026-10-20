@@ -54,7 +54,7 @@ export function DailyCheckInCard({ goal }: { goal: GoalCategory }) {
   const { data: p, isPending } = useGoalProgress(goal.goalCategoryId)
   if (isPending) {
     return (
-      <section className="border-brand/30 bg-surface grid h-32 place-items-center rounded-card border-2">
+      <section className="border-border-subtle bg-surface grid h-32 place-items-center rounded-card border">
         <Spinner className="text-ink-3 size-5" />
       </section>
     )
@@ -138,8 +138,8 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
     <section
       aria-labelledby="checkin-title"
       className={cn(
-        'rounded-card border-2 px-4 py-4 sm:px-5',
-        editing ? 'border-brand bg-brand-soft/40' : 'border-line bg-surface'
+        'rounded-card border px-4 py-4 sm:px-5',
+        editing ? 'border-border-focus bg-brand-soft/40' : 'border-border-subtle bg-surface'
       )}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -230,7 +230,7 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
                     'flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors',
                     mood === o.value
                       ? 'border-brand bg-brand text-white'
-                      : 'border-line-strong bg-surface text-ink-2 hover:border-brand'
+                      : 'border-border-subtle bg-surface text-ink-2 hover:border-brand'
                   )}
                 >
                   <span aria-hidden>{o.emoji}</span>

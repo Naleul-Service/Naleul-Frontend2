@@ -219,7 +219,7 @@ export function CalendarView() {
             <ChevronRight className="size-5" />
           </button>
         </div>
-        <h2 className="text-[17px] font-bold" aria-live="polite">
+        <h2 className="text-h4" aria-live="polite">
           {view === 'month'
             ? `${date.slice(0, 4)}년 ${Number(date.slice(5, 7))}월`
             : view === 'week'
@@ -412,7 +412,7 @@ function Legend() {
         루틴
       </li>
       <li className={item}>
-        <span className="border-line-strong size-2.5 rounded-sm border" style={HATCH} />
+        <span className="border-border-subtle size-2.5 rounded-sm border" style={HATCH} />
         고정 시간
       </li>
       <li className={item}>📌 직접 정한 시간</li>

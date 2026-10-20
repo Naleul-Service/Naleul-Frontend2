@@ -428,7 +428,7 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
         <>
           <div className="group mt-1 flex flex-wrap items-center gap-3">
             <span className="size-3 rounded-full" style={{ backgroundColor: goalColor(goal.colorCode) }} />
-            <h1 className="text-2xl font-bold tracking-tight sm:text-[30px]">
+            <h1 className="text-h2 sm:text-h1">
               {goal.emoji ? `${goal.emoji} ` : ''}
               {goal.goalCategoryName}
             </h1>

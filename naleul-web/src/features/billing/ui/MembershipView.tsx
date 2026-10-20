@@ -181,7 +181,7 @@ function PlanPicker({ data, state }: { data: BillingStatus; state: MembershipSta
               }}
               className={cn(
                 'relative rounded-2xl border p-4 text-left transition-colors',
-                plan === p.plan ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
+                plan === p.plan ? 'border-brand bg-brand-soft' : 'border-border-subtle hover:border-line-strong'
               )}
             >
               <div className="flex items-center gap-2">

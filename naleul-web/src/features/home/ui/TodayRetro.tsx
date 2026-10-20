@@ -245,7 +245,7 @@ export function RetroPanel({
     <Wrap id="home-retro" className={bare ? undefined : 'p-4 sm:p-5'}>
       <div className="flex items-baseline gap-2">
         {!bare && (
-          <h2 className="flex items-center gap-1.5 text-[17px] font-bold">
+          <h2 className="flex items-center gap-1.5 text-h4">
             <PencilLine className="size-4" />
             오늘 회고
           </h2>

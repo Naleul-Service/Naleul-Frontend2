@@ -187,7 +187,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
             <AIBadge size="sm" className="-ml-2 rounded-full" />
             정리 확인
           </Badge>
-          <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-[28px]">이렇게 정리했어요</h1>
+          <h1 className="mt-3 text-h2 sm:text-h1">이렇게 정리했어요</h1>
           <p className="text-ink-3 mt-1.5 text-[15px]">항목을 눌러 고칠 수 있어요. 확인되면 계획을 만들어 드릴게요.</p>
 
           <Section title="목표 정보">
@@ -258,7 +258,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
                     onClick={() => chooseStyle(value)}
                     className={cn(
                       'rounded-2xl border p-4 text-left transition-colors',
-                      selected ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
+                      selected ? 'border-brand bg-brand-soft' : 'border-border-subtle hover:border-line-strong'
                     )}
                   >
                     <span className={cn('block text-[15px] font-bold', selected && 'text-text-brand')}>
@@ -290,7 +290,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
                     }}
                     className={cn(
                       'rounded-2xl border p-4 text-left transition-colors',
-                      selected ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
+                      selected ? 'border-brand bg-brand-soft' : 'border-border-subtle hover:border-line-strong'
                     )}
                   >
                     <span className={cn('block text-[15px] font-bold', selected && 'text-text-brand')}>

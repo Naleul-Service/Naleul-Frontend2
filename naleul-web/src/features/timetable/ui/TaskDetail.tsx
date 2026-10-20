@@ -118,7 +118,7 @@ const editKeys = (save: () => void, cancel: (method: 'esc') => void) => (e: Keyb
 }
 
 const field =
-  'border-line-strong bg-surface focus:border-border-focus h-9 w-full min-w-0 rounded-lg border px-2.5 text-[14px] outline-none'
+  'border-border-subtle bg-surface focus:border-border-focus h-9 w-full min-w-0 rounded-lg border px-2.5 text-[14px] outline-none'
 
 /** 한 줄 속성 — 누르면 그 자리에서 수정 (노션처럼) */
 function Prop({
@@ -191,7 +191,7 @@ function TimeEditor({
 
   return (
     <div
-      className="border-brand/40 bg-brand-soft/40 -mx-1.5 space-y-2 rounded-xl border p-2.5"
+      className="border-border-subtle bg-brand-soft/40 -mx-1.5 space-y-2 rounded-xl border p-2.5"
       onKeyDown={editKeys(save, onCancel)}
     >
       <input type="date" value={date} onChange={(ev) => setDate(ev.target.value)} className={field} aria-label="날짜" />

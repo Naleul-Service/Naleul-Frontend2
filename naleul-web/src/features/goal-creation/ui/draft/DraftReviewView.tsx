@@ -460,7 +460,7 @@ export function DraftReviewView({ session, draft }: Props) {
     setIntensityOpen(true)
   }
   const chipClass =
-    'border-line-strong text-ink-2 hover:border-ink-4 inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-xs font-semibold'
+    'border-border-subtle text-ink-2 hover:border-line-strong inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-xs font-semibold'
   const styleChip = (
     <>
       <button
@@ -497,7 +497,7 @@ export function DraftReviewView({ session, draft }: Props) {
           {/* 머리말 */}
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight sm:text-[28px]">
+              <h1 className="flex items-center gap-2 text-h2 sm:text-h1">
                 <AIBadge />
                 AI 목표 설계
               </h1>
@@ -551,7 +551,7 @@ export function DraftReviewView({ session, draft }: Props) {
 
           {/* SOFT 경고 */}
           {plan.warnings.length > 0 && (
-            <div className="border-warning/40 bg-warning-soft mt-4 rounded-2xl border px-5 py-4">
+            <div className="border-border-subtle bg-warning-soft mt-4 rounded-2xl border px-5 py-4">
               <p className="text-warning-ink flex items-center gap-1.5 text-sm font-bold">
                 <AlertTriangle className="size-4" />
                 확인해 보면 좋은 점
@@ -566,7 +566,7 @@ export function DraftReviewView({ session, draft }: Props) {
 
           {/* 검증 실패 요약 */}
           {shownIssues.length > 0 && (
-            <div role="alert" className="border-danger/30 bg-danger-soft mt-4 rounded-2xl border px-5 py-4">
+            <div role="alert" className="border-border-subtle bg-danger-soft mt-4 rounded-2xl border px-5 py-4">
               <p className="text-danger text-sm font-bold">수정이 필요한 항목이 {issueMap.size}곳 있어요</p>
               <button
                 type="button"
@@ -822,7 +822,7 @@ export function DraftReviewView({ session, draft }: Props) {
                 }}
                 className={cn(
                   'w-full rounded-2xl border px-4 py-3.5 text-left text-[15px] font-semibold',
-                  current ? 'border-brand bg-brand-soft text-text-brand' : 'border-line-strong hover:border-ink-4'
+                  current ? 'border-brand bg-brand-soft text-text-brand' : 'border-border-subtle hover:border-line-strong'
                 )}
               >
                 {PLANNING_STYLE_LABEL[value]}
@@ -856,7 +856,7 @@ export function DraftReviewView({ session, draft }: Props) {
                 }}
                 className={cn(
                   'w-full rounded-2xl border px-4 py-3.5 text-left',
-                  current ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
+                  current ? 'border-brand bg-brand-soft' : 'border-border-subtle hover:border-line-strong'
                 )}
               >
                 <span className={cn('block text-[15px] font-semibold', current && 'text-text-brand')}>

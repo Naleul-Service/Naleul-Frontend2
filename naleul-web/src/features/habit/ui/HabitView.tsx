@@ -74,7 +74,7 @@ function trackHabitResult(p: Promise<unknown>, habitAction: 'create' | 'update' 
 
 const DOT: Record<HabitDayState, string> = {
   DONE: 'bg-brand',
-  MISSED: 'bg-line-strong',
+  MISSED: 'bg-heat-empty ring-line ring-1 ring-inset',
   TODO: 'ring-brand bg-surface ring-[1.5px] ring-inset',
   OFF: 'bg-subtle',
   PAUSED: 'bg-hatch ring-hatch-line ring-1 ring-inset',
@@ -172,14 +172,15 @@ function HabitRow({ habit, day, isToday, daysAgo }: { habit: Habit; day: string;
         aria-pressed={habit.checked}
         aria-label={`${habit.name} ${habit.checked ? '체크 풀기' : '했어요'}`}
         className={cn(
-          'grid size-10 shrink-0 place-items-center rounded-full border-2 transition-all active:scale-95',
+          // 명세 8.6 — 둥근 체크 22 · 아이콘 14
+          'grid size-[22px] shrink-0 place-items-center rounded-full border-[1.5px] transition-all active:scale-95',
           habit.checked
             ? 'border-brand bg-brand text-white'
-            : 'border-line-strong hover:border-brand hover:text-text-brand/40 text-transparent',
+            : 'border-border-control hover:border-brand hover:text-text-brand/40 text-transparent',
           paused && 'cursor-not-allowed'
         )}
       >
-        <Check className="size-5" />
+        <Check className="size-3.5" />
       </button>
 
       <div className="min-w-0 flex-1">
@@ -299,7 +300,7 @@ function AddHabit({ existing, dueCount }: { existing: Habit[]; dueCount: number 
             track('habit.add_click', { habit_count: dueCount })
             setOpen(true)
           }}
-          className="border-line-strong text-ink-3 hover:border-ink-4 hover:text-ink-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed py-2.5 text-sm font-semibold transition-colors"
+          className="border-border-subtle text-ink-3 hover:border-line-strong hover:text-ink-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed py-2.5 text-sm font-semibold transition-colors"
         >
           <Plus className="size-4" />
           습관 추가
@@ -408,7 +409,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
         </Link>{' '}
         › {goal.goalCategoryName}
       </p>
-      <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-[30px]">
+      <h1 className="mt-1 text-h2 sm:text-h1">
         {goal.emoji ? `${goal.emoji} ` : ''}
         {goal.goalCategoryName}
       </h1>
@@ -428,7 +429,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
             >
               <ChevronLeft className="size-5" />
             </button>
-            <h2 className="min-w-[96px] text-center text-[17px] font-bold">{dayTitle(day, today)}</h2>
+            <h2 className="min-w-[96px] text-center text-h4">{dayTitle(day, today)}</h2>
             <button
               type="button"
               onClick={() => changeDay(addDays(day, 1), 'next')}

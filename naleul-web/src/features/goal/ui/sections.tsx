@@ -8,7 +8,7 @@ export function Section({ title, aside, children }: { title: string; aside?: Rea
   return (
     <Card className="p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h2 className="text-[17px] font-bold">{title}</h2>
+        <h2 className="text-h4">{title}</h2>
         {aside && <span className="text-ink-3 text-[13px]">{aside}</span>}
       </div>
       {children}

@@ -247,7 +247,7 @@ function Header({
   return (
     <div className="mb-3">
       <div className="flex items-center gap-2">
-        <h2 className="text-[17px] font-bold">{title}</h2>
+        <h2 className="text-h4">{title}</h2>
         {total > 0 && (
           <span className="text-ink-3 text-[13px] tabular-nums">
             {done} / {total}

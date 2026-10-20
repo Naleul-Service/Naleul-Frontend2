@@ -29,7 +29,7 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
       </aside>
 
       {/* 디자인 시스템 MobileHeader — h48 · 위에 고정 · 왼쪽 워드마크 / 오른쪽 알림 · 설정 */}
-      <header className="border-border-subtle bg-glass-bg sticky top-0 z-20 flex h-12 items-center gap-2 border-b px-5 backdrop-blur-[16px] lg:hidden">
+      <header className="border-border-soft bg-bg-surface sticky top-0 z-20 flex h-12 items-center gap-2 border-b px-5 lg:hidden">
         {/* 위쪽 바 로고는 링크가 아니에요 (사이드바 로고는 홈으로 감) → 눌러 보는지 확인 */}
         <span onClick={() => track(CE.mobileHeaderDeadClick, { dead_target: 'logo', current_path: currentPath() })}>
           <Logo />

@@ -193,7 +193,7 @@ export function RoutineWeekMap({
   return (
     <div className="space-y-2">
       {conflicts.length > 0 && (
-        <div className="bg-warning-soft border-warning/30 rounded-xl border px-3 py-2.5 text-[13px]">
+        <div className="bg-warning-soft border-border-subtle rounded-xl border px-3 py-2.5 text-[13px]">
           <p className="flex items-start gap-1.5 font-semibold">
             <AlertTriangle className="text-warning mt-0.5 size-4 shrink-0" />
             같은 시간에 이미 루틴이 있어요
@@ -297,7 +297,7 @@ export function RoutineWeekMap({
                     {Array.from({ length: (to - from) / 60 }, (_, i) => (
                       <span
                         key={i}
-                        className="border-line/60 pointer-events-none absolute inset-x-0 border-t"
+                        className="border-border-soft pointer-events-none absolute inset-x-0 border-t"
                         style={{ top: i * HOUR_PX }}
                       />
                     ))}

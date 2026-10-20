@@ -19,7 +19,7 @@ export interface ActualSegment {
 }
 
 const inputClass =
-  'border-line-strong focus:border-border-focus h-11 w-full rounded-input border bg-surface px-3 text-[15px] outline-none'
+  'border-border-subtle focus:border-border-focus h-11 w-full rounded-input border bg-surface px-3 text-[15px] outline-none'
 
 const MAX_SEGMENTS = 10
 

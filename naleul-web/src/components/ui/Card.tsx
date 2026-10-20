@@ -17,7 +17,7 @@ export function CardHeader({
 }) {
   return (
     <div className={cn('flex items-center justify-between gap-3', className)}>
-      <h2 className="text-h3 text-text-primary">{title}</h2>
+      <h2 className="text-h4 text-text-primary">{title}</h2>
       {aside && <div className="text-caption-md text-text-secondary">{aside}</div>}
     </div>
   )

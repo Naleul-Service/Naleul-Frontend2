@@ -39,7 +39,7 @@ export function draftOf(a: ActualActivity): ActivityDraft {
 }
 
 const input =
-  'border-line-strong bg-surface placeholder:text-text-placeholder focus:border-border-focus h-10 w-full min-w-0 rounded-input border px-3 text-[14px] outline-none'
+  'border-border-subtle bg-surface placeholder:text-text-placeholder focus:border-border-focus h-10 w-full min-w-0 rounded-input border px-3 text-[14px] outline-none'
 const label = 'text-ink-3 mb-1 block text-[12px] font-medium'
 
 /** 오늘(KST)부터 며칠 전인지 (오늘 0) */
@@ -329,7 +329,7 @@ export function ActivityForm({
       )}
 
       {confirmDelete ? (
-        <div className="border-danger/30 bg-danger-soft/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2.5">
+        <div className="border-border-subtle bg-danger-soft/60 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2.5">
           <p className="min-w-0 flex-1 text-[14px] font-semibold">이 기록을 지울까요?</p>
           <Button
             type="button"

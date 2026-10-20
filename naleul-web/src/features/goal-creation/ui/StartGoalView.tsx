@@ -146,7 +146,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
           <AIBadge size="sm" className="-ml-2 rounded-full" />
           AI 목표 설계
         </Badge>
-        <h1 className="mt-4 text-[28px] leading-tight font-bold tracking-tight sm:text-[32px]">
+        <h1 className="mt-4 text-h2 sm:text-h1">
           어떤 목표를 이루고 싶으세요?
         </h1>
         <p className="text-ink-3 mt-2 text-[15px] leading-relaxed">
@@ -225,7 +225,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             disabled={busy || !kindReady}
             placeholder={placeholder}
             aria-label="이루고 싶은 목표"
-            className="border-line-strong bg-surface placeholder:text-text-placeholder focus:border-border-focus disabled:bg-subtle h-12 w-full rounded-2xl border px-4 text-[15px] outline-none"
+            className="border-border-subtle bg-surface placeholder:text-text-placeholder focus:border-border-focus disabled:bg-subtle h-12 w-full rounded-2xl border px-4 text-[15px] outline-none"
           />
           <div className="mt-3 flex flex-wrap gap-2">
             {examples.map((goal, i) => (

@@ -98,7 +98,7 @@ export function ProfileEditModal({
             aria-invalid={!!error}
             className={cn(
               'h-11 w-full rounded-input border bg-surface px-3 text-[15px] outline-none',
-              error ? 'border-danger' : 'border-line-strong focus:border-border-focus'
+              error ? 'border-danger' : 'border-border-subtle focus:border-border-focus'
             )}
           />
         </label>

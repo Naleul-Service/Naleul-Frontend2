@@ -29,9 +29,6 @@ interface Props {
   togglingId?: number | null
 }
 
-/** 실행률 막대 색: 80% 이상 초록 · 50% 이상 파랑 · 그 아래 주황 */
-const rateColor = (rate: number) => (rate >= 80 ? 'bg-success' : rate >= 50 ? 'bg-brand' : 'bg-warning')
-
 /**
  * 월간 보기 (명세 3-5, 8)
  *  - 날짜 칸: 실행률 막대, Task 칩 3개 + "+n개 더보기", 마일스톤 🏁
@@ -74,13 +71,14 @@ export function MonthView({
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
       <Card className="overflow-hidden p-0">
-        <div className="border-line grid grid-cols-7 border-b">
+        {/* 디자인 시스템 Calendar/MonthGrid (명세 8.5) — 요일 줄 h28 · Caption/MD · 아래 1px border/soft */}
+        <div className="border-border-soft grid grid-cols-7 border-b">
           {WEEKDAY_LABEL.map((w, i) => (
             <div
               key={w}
               className={cn(
-                'py-2.5 text-center text-xs font-semibold',
-                i === 6 ? 'text-calendar-holiday' : i === 5 ? 'text-calendar-saturday' : 'text-ink-3'
+                'text-caption-md flex h-7 items-center justify-center',
+                i === 6 ? 'text-calendar-holiday' : i === 5 ? 'text-calendar-saturday' : 'text-text-secondary'
               )}
             >
               {w}
@@ -112,7 +110,7 @@ export function MonthView({
               </div>
             )}
             {weeks.map((week) => (
-              <div key={week[0]} className="border-line grid grid-cols-7 border-b last:border-b-0">
+              <div key={week[0]} className="border-border-soft grid grid-cols-7 border-b last:border-b-0">
                 {week.map((d) => (
                   <DayCell
                     key={d}
@@ -185,24 +183,27 @@ function DayCell({
       aria-pressed={selected}
       aria-label={`${formatMonthDay(date)}${day?.taskCount ? ` Task ${day.taskCount}개` : ''}${rate != null && past ? ` 실행률 ${rate}%` : ''}`}
       className={cn(
-        'border-line relative flex min-h-[76px] min-w-0 flex-col gap-1 border-l p-1.5 text-left transition-colors first:border-l-0 sm:min-h-[118px] sm:p-2',
-        inMonth ? 'hover:bg-subtle/60' : 'bg-canvas/60',
-        selected && 'bg-brand-soft/60 hover:bg-brand-soft/60 ring-brand ring-2 ring-inset'
+        // 칸: 같은 너비 · h56 · 모서리/바탕 없음 · 오른쪽 1px border/soft (마지막 열 없음) · 안쪽 5 · 간격 4
+        'border-border-soft relative flex min-h-14 min-w-0 flex-col gap-1 border-r p-[5px] text-left transition-colors last:border-r-0 sm:min-h-[118px] sm:p-2',
+        inMonth && !isToday && 'hover:bg-bg-sunken',
+        // 오늘: ai/tint-soft 60% + 2px text/brand 안쪽 테두리
+        isToday && 'bg-ai-tint-soft/60 ring-text-brand ring-2 ring-inset',
+        selected && !isToday && 'ring-border-focus ring-1 ring-inset'
       )}
     >
       <div className="flex items-center justify-between gap-1">
         <span
           className={cn(
-            'grid size-6 shrink-0 place-items-center rounded-full text-[13px] font-bold',
+            'text-body-sm grid size-[22px] shrink-0 place-items-center rounded-full font-medium',
             isToday
               ? 'bg-calendar-today-bg text-calendar-today-fg'
               : !inMonth
-                ? 'text-ink-4'
+                ? 'text-text-placeholder'
                 : wd === 6
                   ? 'text-calendar-holiday'
                   : wd === 5
                     ? 'text-calendar-saturday'
-                    : 'text-ink'
+                    : 'text-text-primary'
           )}
         >
           {dayOfMonth(date)}
@@ -215,12 +216,10 @@ function DayCell({
         )}
       </div>
 
-      {inMonth && day && past && rate != null && (
-        <span className="bg-progress-track block h-1 w-full overflow-hidden rounded-full" aria-hidden>
-          <span
-            className={cn('block h-full rounded-full', rateColor(rate))}
-            style={{ width: `${Math.max(rate, 4)}%` }}
-          />
+      {/* 실행률 막대 h3 · 트랙 teal tint · 채움 민트 (Task 없는 날은 없음) */}
+      {inMonth && day && day.taskCount > 0 && past && rate != null && (
+        <span className="bg-progress-track block h-[3px] w-full overflow-hidden rounded-[2px]" aria-hidden>
+          <span className="bg-progress-fill block h-full rounded-[2px]" style={{ width: `${Math.max(rate, 4)}%` }} />
         </span>
       )}
 
@@ -247,12 +246,13 @@ function DayCell({
             ))}
             {day.moreCount > 0 && <span className="text-ink-3 text-[11px]">+{day.moreCount}개 더보기</span>}
           </span>
-          <span className="flex flex-wrap gap-0.5 sm:hidden" aria-hidden>
+          {/* 좁은 화면: 목표 색 점 5px · 간격 3 · 최대 4개 */}
+          <span className="flex flex-wrap items-center gap-[3px] sm:hidden" aria-hidden>
             {day.milestones.length > 0 && <span className="text-[9px] leading-none">🏁</span>}
-            {day.chips.map((c) => (
+            {day.chips.slice(0, 4).map((c) => (
               <span
                 key={c.taskId}
-                className={cn('size-1.5 rounded-full', c.completed && 'opacity-40')}
+                className={cn('size-[5px] rounded-full', c.completed && 'opacity-40')}
                 style={{ backgroundColor: goalAccent(c.colorCode) }}
               />
             ))}
@@ -300,7 +300,7 @@ function DayPanel({
       aria-label="선택한 날짜"
     >
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-[17px] font-bold">
+        <h3 className="text-h4">
           {formatMonthDay(date)}
           {date === today && <span className="text-text-brand ml-1.5 text-[13px]">오늘</span>}
         </h3>
@@ -318,16 +318,16 @@ function DayPanel({
       </div>
 
       {/* 실행률 */}
-      <div className="bg-subtle rounded-2xl p-4">
+      <div className="bg-bg-sunken rounded-2xl p-4">
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-ink-3 text-xs font-medium">{date > today ? '계획된 Task' : '실행률'}</p>
+            <p className="text-caption-md text-text-secondary">{date > today ? '계획된 Task' : '실행률'}</p>
             <p className="mt-0.5 text-[26px] leading-none font-bold tabular-nums">
               {date > today ? `${stats?.total ?? summary?.taskCount ?? 0}개` : rate != null ? `${rate}%` : '–'}
             </p>
           </div>
           {stats && stats.total > 0 && (
-            <p className="text-ink-3 text-xs tabular-nums">
+            <p className="text-caption-md text-text-secondary tabular-nums">
               완료 {stats.completed} / 전체 {stats.total}
               {stats.missed > 0 && <span className="text-danger"> · 놓침 {stats.missed}</span>}
               {!!stats.carriedOver && <span className="text-ink-4"> (다음 날로 넘김 {stats.carriedOver} 포함)</span>}
@@ -335,11 +335,8 @@ function DayPanel({
           )}
         </div>
         {date <= today && rate != null && (
-          <span className="bg-surface mt-3 block h-1.5 overflow-hidden rounded-full">
-            <span
-              className={cn('block h-full rounded-full', rateColor(rate))}
-              style={{ width: `${Math.max(rate, 3)}%` }}
-            />
+          <span className="bg-progress-track mt-3 block h-1.5 overflow-hidden rounded-full">
+            <span className="bg-progress-fill block h-full rounded-full" style={{ width: `${Math.max(rate, 3)}%` }} />
           </span>
         )}
       </div>
@@ -445,8 +442,8 @@ function TaskRow({
         disabled={busy}
         onClick={() => onToggle(t)}
         className={cn(
-          'grid size-5 shrink-0 place-items-center rounded-md border-2 transition-colors disabled:opacity-50',
-          done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-ink-4 bg-surface'
+          'grid size-5 shrink-0 place-items-center rounded-[6px] border-[1.5px] transition-colors disabled:opacity-50',
+          done ? 'border-success bg-success text-on-ink' : 'border-border-control hover:border-success bg-surface'
         )}
       >
         {done && <Check className="size-3" />}

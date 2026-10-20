@@ -43,7 +43,7 @@ export function UpcomingSchedule({
   return (
     <Card data-home-section="upcoming" className={cn(FILL, className)}>
       <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
-        <h2 className="text-[17px] font-bold">다가오는 일정</h2>
+        <h2 className="text-h4">다가오는 일정</h2>
         <span className="text-ink-3 text-[13px]">앞으로 6일</span>
       </div>
       <div className={BODY}>
@@ -168,7 +168,7 @@ export function DeadlineRoadmap({
   return (
     <Card data-home-section="deadlines" className={cn(FILL, className)}>
       <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
-        <h2 className="text-[17px] font-bold">마감 로드맵</h2>
+        <h2 className="text-h4">마감 로드맵</h2>
         {list.length > 0 && (
           <span className="text-ink-3 text-[13px]">{list.filter((d) => !d.overdue).length}개 남음</span>
         )}

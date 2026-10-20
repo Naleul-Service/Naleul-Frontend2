@@ -28,9 +28,9 @@ export function TaskCheck({
       aria-pressed={done}
       aria-label={`${label} ${done ? '완료 취소' : '완료'}`}
       className={cn(
-        'grid shrink-0 place-items-center rounded-full border-2 transition-colors disabled:opacity-50',
+        'grid shrink-0 place-items-center rounded-full border-[1.5px] transition-colors disabled:opacity-50',
         size === 'sm' ? 'size-5' : 'size-6',
-        done ? 'border-success bg-success text-white' : 'border-line-strong hover:border-success text-transparent'
+        done ? 'border-success bg-success text-on-ink' : 'border-border-control hover:border-success text-transparent'
       )}
     >
       <Check className={size === 'sm' ? 'size-3' : 'size-3.5'} />

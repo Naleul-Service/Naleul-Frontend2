@@ -69,7 +69,7 @@ export function PlaceAfterCreateCard({ goal, className }: { goal: GoalCategory; 
       className={cn(
         'flex flex-col gap-4 rounded-card p-5 sm:flex-row sm:items-center sm:p-6',
         // 배치 전 = AI 제안 상자 (명세 6B) · 배치 후 = 성공 카드
-        result ? 'border-success/25 bg-success-soft/50 border' : 'ai-border',
+        result ? 'border-border-subtle bg-success-soft/50 border' : 'ai-border',
         className
       )}
     >

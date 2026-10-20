@@ -583,7 +583,7 @@ export function TimeGrid({
               {split && (
                 <div
                   className={cn(
-                    'border-line/70 pointer-events-none absolute inset-y-0 right-0 w-[40%] border-l border-dashed *:pointer-events-auto',
+                    'border-border-soft pointer-events-none absolute inset-y-0 right-0 w-[40%] border-l border-dashed *:pointer-events-auto',
                     fadeOthers && !!focusIds?.size && 'opacity-55'
                   )}
                 >

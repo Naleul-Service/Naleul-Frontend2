@@ -137,7 +137,7 @@ export function HomeCheckInForm({
   }
 
   return (
-    <form onSubmit={(e) => submit('button', e)} className="border-brand/40 bg-brand-soft/30 mt-3 space-y-3 rounded-2xl border p-3">
+    <form onSubmit={(e) => submit('button', e)} className="border-border-subtle bg-brand-soft/30 mt-3 space-y-3 rounded-2xl border p-3">
       {checkIn.hasMetric && (
         <label className="block">
           <span className="text-ink-2 mb-1 block text-[13px] font-semibold">{josa(name, '은', '는')} 얼마예요?</span>
@@ -182,7 +182,7 @@ export function HomeCheckInForm({
                 'flex h-8 items-center gap-1 rounded-full border px-2.5 text-[12px] font-semibold transition-colors',
                 mood === o.value
                   ? 'border-brand bg-brand text-white'
-                  : 'border-line-strong bg-surface text-ink-2 hover:border-brand'
+                  : 'border-border-subtle bg-surface text-ink-2 hover:border-brand'
               )}
             >
               <span aria-hidden>{o.emoji}</span>

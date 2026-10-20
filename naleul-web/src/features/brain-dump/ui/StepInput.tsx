@@ -185,7 +185,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
     <Card className="p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-[17px] font-bold">머릿속에 있는 일을 한 줄씩 적어 주세요</h2>
+          <h2 className="text-h4">머릿속에 있는 일을 한 줄씩 적어 주세요</h2>
           <p className="text-ink-3 mt-1 text-sm">
             Enter를 누를 때마다 추가돼요. &quot;저녁 8시 정기 회의&quot;, &quot;인강 듣기 3시간&quot;처럼 적으면 시각과
             걸리는 시간을 바로 알아채요. 아래 칩으로 고쳐도 돼요.
@@ -233,7 +233,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
       {/* 입력창 */}
       <div className="mt-4">
         {full ? (
-          <div className="border-line-strong bg-subtle flex items-center gap-2 rounded-2xl border border-dashed px-4 py-3.5 text-sm">
+          <div className="border-border-subtle bg-subtle flex items-center gap-2 rounded-2xl border border-dashed px-4 py-3.5 text-sm">
             <Lock className="text-ink-3 size-4 shrink-0" />
             {freeLimited ? (
               <span className="text-ink-2">
@@ -255,7 +255,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
             )}
           </div>
         ) : (
-          <label className="border-line-strong focus-within:border-border-focus flex items-center gap-2 rounded-2xl border bg-surface px-4 py-1.5">
+          <label className="border-border-subtle focus-within:border-border-focus flex items-center gap-2 rounded-2xl border bg-surface px-4 py-1.5">
             <span className="text-ink-4 w-5 shrink-0 text-right text-sm tabular-nums">{lines.length + 1}</span>
             <input
               ref={inputRef}
@@ -371,7 +371,7 @@ function LineRow({
             'relative inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium',
             line.date && line.date !== today && line.date !== tomorrow
               ? 'border-brand bg-brand text-white'
-              : 'border-line-strong text-ink-2 hover:border-ink-4'
+              : 'border-border-subtle text-ink-2 hover:border-line-strong'
           )}
         >
           {line.date && line.date !== today && line.date !== tomorrow ? formatMonthDay(line.date) : '날짜 선택'}
@@ -425,7 +425,7 @@ function LineRow({
               value={line.startTime ?? ''}
               onChange={(e) => onChange({ startTime: e.target.value || null })}
               aria-label={`${index + 1}번 시작 시각`}
-              className="border-line-strong h-7 rounded-lg border px-1.5"
+              className="border-border-subtle h-7 rounded-lg border px-1.5"
             />
             ~
             <input
@@ -434,7 +434,7 @@ function LineRow({
               value={line.endTime ?? ''}
               onChange={(e) => onChange({ endTime: e.target.value || null })}
               aria-label={`${index + 1}번 종료 시각`}
-              className="border-line-strong h-7 rounded-lg border px-1.5"
+              className="border-border-subtle h-7 rounded-lg border px-1.5"
             />
           </span>
         )}
@@ -478,7 +478,7 @@ function DurationChip({
     <span
       className={cn(
         'relative inline-flex h-7 items-center gap-1 rounded-full border px-2.5 text-xs font-medium',
-        value ? 'border-brand bg-brand text-white' : 'border-line-strong text-ink-2 hover:border-ink-4',
+        value ? 'border-brand bg-brand text-white' : 'border-border-subtle text-ink-2 hover:border-line-strong',
         fixed && 'opacity-80'
       )}
       title={fixed ? '시작·종료 시각으로 정해져요' : '걸리는 시간 (비워 두면 AI가 추정)'}

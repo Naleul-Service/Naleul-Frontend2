@@ -403,7 +403,7 @@ function CheckInPrefilled({
           cancel('esc')
         }
       }}
-      className="border-brand/30 bg-brand-soft/50 mt-4 rounded-2xl border px-4 py-3"
+      className="border-border-subtle bg-brand-soft/50 mt-4 rounded-2xl border px-4 py-3"
     >
       <p className="text-[14px] font-semibold">{md(date)} 기록 고치기</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">

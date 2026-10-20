@@ -52,7 +52,7 @@ export default async function LoginPage({
         <div className="mt-8 flex flex-col gap-3">
           <KakaoLoginButton next={next} surface="login_page" />
           <AppleLoginButton next={next} surface="login_page" />
-          <IosAppDownloadLink className="border-line-strong bg-surface hover:bg-subtle flex h-14 items-center justify-center rounded-2xl border text-[15px] font-semibold transition" />
+          <IosAppDownloadLink className="border-border-subtle bg-surface hover:bg-subtle flex h-14 items-center justify-center rounded-2xl border text-[15px] font-semibold transition" />
         </div>
 
         <p className="text-ink-4 mt-10 text-center text-xs">© 2026 나를(Naleul)</p>

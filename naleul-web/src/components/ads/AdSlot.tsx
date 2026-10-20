@@ -92,7 +92,7 @@ export function AdSlot({
       <div
         ref={boxRef}
         className={cn(
-          'border-line-strong text-ink-4 grid h-[90px] place-items-center rounded-xl border border-dashed text-[12px]',
+          'border-border-subtle text-ink-4 grid h-[90px] place-items-center rounded-xl border border-dashed text-[12px]',
           className
         )}
       >

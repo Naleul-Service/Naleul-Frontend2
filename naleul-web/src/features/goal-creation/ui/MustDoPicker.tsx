@@ -112,7 +112,7 @@ export function MustDoPicker({
               aria-pressed={on}
               className={cn(
                 'inline-flex h-9 items-center gap-1 rounded-full border px-3.5 text-[14px] font-medium transition-colors disabled:opacity-40',
-                on ? 'border-brand bg-brand-soft text-text-brand' : 'border-line-strong text-ink-2 hover:border-ink-4'
+                on ? 'border-brand bg-brand-soft text-text-brand' : 'border-border-subtle text-ink-2 hover:border-line-strong'
               )}
             >
               {on && <Check className="size-3.5" />}
@@ -139,7 +139,7 @@ export function MustDoPicker({
         ))}
       </div>
 
-      <div className="border-line-strong bg-surface focus-within:border-border-focus mt-3 flex items-center gap-2 rounded-xl border px-3">
+      <div className="border-border-subtle bg-surface focus-within:border-border-focus mt-3 flex items-center gap-2 rounded-xl border px-3">
         <input
           ref={inputRef}
           value={draft}
