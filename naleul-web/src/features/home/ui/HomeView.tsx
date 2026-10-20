@@ -155,7 +155,9 @@ export function HomeView({ userName }: { userName: string }) {
   const onDeadClick = (e: MouseEvent<HTMLElement>) => {
     if (!(e.target instanceof Element)) return
     const target = e.target.closest<HTMLElement>('[data-dead]')?.dataset.dead
-    if (target) th(HE.deadClick, { dead_target: target })
+    // 어느 카드였는지 — home.section_scroll 과 같은 data-home-section 기준
+    const section = e.target.closest<HTMLElement>('[data-home-section]')?.dataset.homeSection
+    if (target) th(HE.deadClick, { dead_target: target, section })
   }
 
   const go = (d: string, event: typeof HE.datePrevClick | typeof HE.dateNextClick | typeof HE.dateTodayClick) => {

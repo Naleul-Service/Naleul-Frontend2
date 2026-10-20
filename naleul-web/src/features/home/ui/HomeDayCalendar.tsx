@@ -160,7 +160,7 @@ export function HomeDayCalendar({
           activities={acts}
           onSelectActivity={selectActivity}
           onEmptyClick={emptyClick}
-          onBlockedEmptyClick={() => trackHome(HE.deadClick, { dead_target: 'future_slot' })}
+          onBlockedEmptyClick={() => trackHome(HE.deadClick, { dead_target: 'future_slot', section: 'calendar' })}
           onDrop={drop}
           onDragCancel={dragCancel}
           onDragStart={close}

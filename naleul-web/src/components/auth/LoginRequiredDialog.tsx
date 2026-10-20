@@ -90,7 +90,13 @@ export function LoginRequiredDialog() {
       }
       setState(next)
       openedAt.current = Date.now()
-      track(EVENTS.loginModalView, { ...modalProps(next), prompt_count_session: nextPromptCount() })
+      track(EVENTS.loginModalView, {
+        ...modalProps(next),
+        redirect_path: next.next,
+        // 로그인 실패로 돌아와 다시 열린 경우에만 — 어떤 오류였는지
+        login_error_code: detail?.error ? loginErrorCodeOf(detail.error) : undefined,
+        prompt_count_session: nextPromptCount(),
+      })
     }
     window.addEventListener(LOGIN_REQUIRED_EVENT, onRequired)
 
