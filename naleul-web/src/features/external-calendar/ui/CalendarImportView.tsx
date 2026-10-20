@@ -1,17 +1,21 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowRight, CalendarDays, Check, Smartphone } from 'lucide-react'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { referrerType } from '@/lib/client/commonEvents'
+import { errorStatusOf } from '@/features/home/analytics'
 import { inputClass } from '@/features/goal-creation/ui/formParts'
 import { useGoalCategories } from '@/features/goal/api'
 import { isOngoing } from '@/features/goal/format'
-import { useImportExternalEvents } from '../api'
+import { partialImportOf, useImportExternalEvents } from '../api'
 import {
   googleClientId,
+  googleFailReasonOf,
   listGoogleCalendars,
   listGoogleEvents,
   requestGoogleToken,
@@ -38,10 +42,20 @@ const dayLabel = (ymd: string) => {
   return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${WEEKDAY[d.getUTCDay()]})`
 }
 const hm = (iso: string | null) => (iso ? iso.slice(11, 16) : '')
+/** 기간 일수 (시작 · 종료일 포함) */
+const rangeDays = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1
 
 /** 설정 > 외부 캘린더 가져오기 */
 export function CalendarImportView() {
   const [source, setSource] = useState<Source | null>(null)
+
+  // calendar_import.pageview — 화면을 그린 직후 한 번
+  const pageviewSent = useRef(false)
+  useEffect(() => {
+    if (pageviewSent.current) return
+    pageviewSent.current = true
+    track('calendar_import.pageview', { referrer_type: referrerType() })
+  }, [])
 
   return (
     <div className="mt-6 max-w-3xl space-y-6">
@@ -57,10 +71,13 @@ export function CalendarImportView() {
               type="button"
               role="radio"
               aria-checked={source === s.value}
-              onClick={() => setSource(s.value)}
+              onClick={() => {
+                track('calendar_import.source_select', { import_source: s.value })
+                setSource(s.value)
+              }}
               className={cn(
                 'flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-colors',
-                source === s.value ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4',
+                source === s.value ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
               )}
             >
               <span className="bg-subtle text-ink grid size-9 place-items-center rounded-xl text-[15px] font-bold">
@@ -93,7 +110,14 @@ function NotionGuide({ onGoogle }: { onGoogle: () => void }) {
         <li>· 구글 계정 → 아래 버튼으로 바로 가져와요</li>
         <li>· iCloud · Outlook 계정 → 나를 iOS 앱의 &ldquo;아이폰 기본 캘린더&rdquo;로 가져와요</li>
       </ul>
-      <Button variant="brand" className="mt-4" onClick={onGoogle}>
+      <Button
+        variant="brand"
+        className="mt-4"
+        onClick={() => {
+          track('calendar_import.notion_google_click', { import_source: 'GOOGLE' })
+          onGoogle()
+        }}
+      >
         구글 캘린더로 가져오기
         <ArrowRight className="size-4" />
       </Button>
@@ -131,21 +155,42 @@ function GoogleImport() {
   const [busy, setBusy] = useState<'connect' | 'load' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ImportResult | null>(null)
+  /** 지금 목록을 불러온 기간 일수 (import_click 의 range_days) */
+  const [loadedRange, setLoadedRange] = useState(0)
   const goals = useGoalCategories()
   const importer = useImportExternalEvents()
 
   const ongoingGoals = (goals.data ?? []).filter((g) => !g.temporary && isOngoing(g.goalCategoryStatus))
 
+  // calendar_import.not_ready_view — 클라이언트 키가 없어 '준비 중' 카드가 보일 때 (마운트 때 한 번)
+  const notReadySent = useRef(false)
+  useEffect(() => {
+    if (googleClientId || notReadySent.current) return
+    notReadySent.current = true
+    track('calendar_import.not_ready_view', { import_source: 'GOOGLE' })
+  }, [])
+
+  const changeOption = (field: 'start_date' | 'end_date' | 'goal', f: string, t: string, g: number | null) =>
+    track('calendar_import.option_change', {
+      edit_field: field,
+      range_days: rangeDays(f, t),
+      has_goal: g !== null,
+      has_list: events !== null,
+    })
+
   const connect = async () => {
+    track('calendar_import.google_connect_click', { import_source: 'GOOGLE' })
     setBusy('connect')
     setError(null)
     try {
       const t = await requestGoogleToken()
       const cals = await listGoogleCalendars(t)
+      track('calendar_import.google_connect_result', { result: 'success', item_count: cals.length })
       setToken(t)
       setCalendars(cals)
       setCalIds(new Set(cals.filter((c) => c.primary).map((c) => c.id)))
     } catch (e) {
+      track('calendar_import.google_connect_result', { result: 'fail', fail_reason: googleFailReasonOf(e) })
       setError((e as Error).message)
     } finally {
       setBusy(null)
@@ -154,6 +199,8 @@ function GoogleImport() {
 
   const load = async () => {
     if (!token) return
+    const days = rangeDays(from, to)
+    track('calendar_import.load_click', { selected_count: calIds.size, range_days: days, has_goal: goalId !== null })
     setBusy('load')
     setError(null)
     setResult(null)
@@ -163,10 +210,17 @@ function GoogleImport() {
       const all = lists
         .flat()
         .sort((a, b) => (a.date ?? '').localeCompare(b.date ?? '') || (a.start ?? '').localeCompare(b.start ?? ''))
+      track('calendar_import.load_result', {
+        result: 'success',
+        event_count: all.length,
+        all_day_count: all.filter((e) => e.allDay).length,
+      })
       setEvents(all)
+      setLoadedRange(days)
       // 하루 종일 일정(생일 · 휴가 등)은 할 일이 아닌 경우가 많아서 처음엔 빼 둬요
       setPicked(new Set(all.filter((e) => !e.allDay).map((e) => e.externalId)))
     } catch (e) {
+      track('calendar_import.load_result', { result: 'fail', fail_reason: googleFailReasonOf(e) })
       setError((e as Error).message)
       if ((e as Error).message.includes('만료')) setToken(null)
     } finally {
@@ -176,15 +230,36 @@ function GoogleImport() {
 
   const run = () => {
     if (!events) return
+    const chosen = events.filter((e) => picked.has(e.externalId))
+    track('calendar_import.import_click', {
+      selected_count: chosen.length,
+      all_day_count: chosen.filter((e) => e.allDay).length,
+      has_goal: goalId !== null,
+      range_days: loadedRange,
+    })
     importer.mutate(
-      { source: 'GOOGLE', goalCategoryId: goalId, events: events.filter((e) => picked.has(e.externalId)) },
+      { source: 'GOOGLE', goalCategoryId: goalId, events: chosen },
       {
         onSuccess: (r) => {
+          track('calendar_import.import_result', {
+            result: 'success',
+            created_count: r.created,
+            skipped_count: r.skippedDuplicate + r.skippedPast + r.skippedInvalid,
+          })
           setResult(r)
           setEvents(null)
         },
-        onError: (e) => setError(e.message),
-      },
+        onError: (e) => {
+          const partial = partialImportOf(e)
+          track('calendar_import.import_result', {
+            result: 'fail',
+            created_count: partial?.created ?? 0,
+            skipped_count: partial ? partial.skippedDuplicate + partial.skippedPast + partial.skippedInvalid : 0,
+            error_status: errorStatusOf(e) ?? 0,
+          })
+          setError(e.message)
+        },
+      }
     )
   }
 
@@ -228,11 +303,12 @@ function GoogleImport() {
                         const next = new Set(calIds)
                         if (on) next.delete(c.id)
                         else next.add(c.id)
+                        track('calendar_import.calendar_toggle', { checked: !on, selected_count: next.size })
                         setCalIds(next)
                       }}
                       className={cn(
                         'flex h-9 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition-colors',
-                        on ? 'border-ink bg-subtle text-ink' : 'border-line-strong text-ink-3 hover:text-ink',
+                        on ? 'border-ink bg-subtle text-ink' : 'border-line-strong text-ink-3 hover:text-ink'
                       )}
                     >
                       <span className="size-2.5 rounded-full" style={{ backgroundColor: c.color }} />
@@ -253,7 +329,10 @@ function GoogleImport() {
                   value={from}
                   min={today}
                   max={to}
-                  onChange={(e) => setFrom(e.target.value)}
+                  onChange={(e) => {
+                    changeOption('start_date', e.target.value, to, goalId)
+                    setFrom(e.target.value)
+                  }}
                 />
               </label>
               <label className="block">
@@ -264,7 +343,10 @@ function GoogleImport() {
                   value={to}
                   min={from}
                   max={addDays(today, 365)}
-                  onChange={(e) => setTo(e.target.value)}
+                  onChange={(e) => {
+                    changeOption('end_date', from, e.target.value, goalId)
+                    setTo(e.target.value)
+                  }}
                 />
               </label>
               <label className="block">
@@ -272,7 +354,11 @@ function GoogleImport() {
                 <select
                   className={cn(inputClass, 'mt-1.5')}
                   value={goalId ?? ''}
-                  onChange={(e) => setGoalId(e.target.value ? Number(e.target.value) : null)}
+                  onChange={(e) => {
+                    const g = e.target.value ? Number(e.target.value) : null
+                    changeOption('goal', from, to, g)
+                    setGoalId(g)
+                  }}
                 >
                   <option value="">목표 없이</option>
                   {ongoingGoals.map((g) => (
@@ -335,10 +421,13 @@ function EventPicker({
   }, [events])
 
   const allPicked = events.length > 0 && events.every((e) => picked.has(e.externalId))
-  const toggle = (id: string) => {
+  const toggle = (ev: ExternalEvent) => {
+    const id = ev.externalId
     const next = new Set(picked)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
+    const checked = !next.has(id)
+    if (checked) next.add(id)
+    else next.delete(id)
+    track('calendar_import.event_toggle', { checked, is_all_day: ev.allDay, selected_count: next.size })
     setPicked(next)
   }
 
@@ -355,7 +444,10 @@ function EventPicker({
         <button
           type="button"
           className="text-ink-2 hover:text-ink text-[13px] font-semibold"
-          onClick={() => setPicked(allPicked ? new Set() : new Set(events.map((e) => e.externalId)))}
+          onClick={() => {
+            track('calendar_import.select_all_click', { checked: !allPicked, event_count: events.length })
+            setPicked(allPicked ? new Set() : new Set(events.map((e) => e.externalId)))
+          }}
         >
           {allPicked ? '모두 해제' : '모두 선택'}
         </button>
@@ -374,7 +466,7 @@ function EventPicker({
                         type="checkbox"
                         className="accent-brand size-4 shrink-0"
                         checked={on}
-                        onChange={() => toggle(e.externalId)}
+                        onChange={() => toggle(e)}
                       />
                       <span className="text-ink-3 w-[92px] shrink-0 text-[13px] tabular-nums">
                         {e.allDay ? '하루 종일' : `${hm(e.start)}–${hm(e.end)}`}
@@ -416,7 +508,11 @@ function ResultCard({ r }: { r: ImportResult }) {
         {r.created ? `${r.created}개를 Task로 만들었어요` : '새로 만든 Task가 없어요'}
       </p>
       {skipped.length > 0 && <p className="text-ink-3 mt-1 text-[13px]">건너뜀: {skipped.join(' · ')}</p>}
-      <Link href="/calendar" className={cn(buttonClass('secondary'), 'mt-4')}>
+      <Link
+        href="/calendar"
+        className={cn(buttonClass('secondary'), 'mt-4')}
+        onClick={() => track('calendar_import.result_calendar_click', { created_count: r.created })}
+      >
         캘린더에서 보기
         <ArrowRight className="size-4" />
       </Link>

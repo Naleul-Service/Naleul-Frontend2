@@ -1,16 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, CreditCard, Smartphone } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Chip'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { errorStatusOf } from '@/features/home/analytics'
+import { track } from '@/lib/client/analytics'
+import { referrerType } from '@/lib/client/commonEvents'
 import { cn } from '@/lib/cn'
 import { toast } from '@/stores/toastStore'
 import { prepareBilling, useBillingStatus, useCancelBilling, useResumeBilling } from '../api'
 import { PLAN_LABEL, STATUS_LABEL, longDate, won } from '../format'
-import { openCardRegistration, tossClientKey } from '../toss'
+import { daysLeftOf, membershipStateOf, rememberPlan, webSubscription, type MembershipState } from '../analytics'
+import { CardWindowError, openCardRegistration, tossClientKey } from '../toss'
 import type { BillingStatus, WebPlan } from '../types'
 
 /**
@@ -27,7 +31,29 @@ const BENEFITS = [
 
 /** 설정 > 멤버십 — 웹 Pro 구독 (토스페이먼츠 자동결제) */
 export function MembershipView() {
-  const { data, isPending, isError, error, refetch } = useBillingStatus()
+  const { data, isPending, isError, error, errorUpdatedAt, refetch } = useBillingStatus()
+
+  // ── 분석 ──
+  // membership.pageview — 상태를 불러온 직후 한 번 (해지 · 해지 취소로 데이터가 바뀌어도 다시 안 보냄)
+  const pageviewSent = useRef(false)
+  useEffect(() => {
+    if (!data || pageviewSent.current) return
+    pageviewSent.current = true
+    track('membership.pageview', {
+      membership_state: membershipStateOf(data),
+      plan: webSubscription(data)?.plan,
+      days_left: daysLeftOf(data),
+      referrer_type: referrerType(),
+    })
+  }, [data])
+
+  // membership.load_fail — 실패 카드가 보일 때 (다시 시도해서 또 실패하면 다시 한 번)
+  const loadFailSentAt = useRef(0)
+  useEffect(() => {
+    if (!isError || loadFailSentAt.current === errorUpdatedAt) return
+    loadFailSentAt.current = errorUpdatedAt
+    track('membership.load_fail', { error_status: errorStatusOf(error) })
+  }, [isError, error, errorUpdatedAt])
 
   if (isPending)
     return <div className="bg-surface border-line mt-6 h-64 max-w-3xl animate-pulse rounded-[20px] border" />
@@ -36,15 +62,20 @@ export function MembershipView() {
       <Card className="mt-6 max-w-3xl p-8 text-center">
         <p className="font-bold">멤버십 정보를 불러오지 못했어요</p>
         <p className="text-ink-3 mt-1 text-sm">{error.message}</p>
-        <Button className="mt-4" onClick={() => refetch()}>
+        <Button
+          className="mt-4"
+          onClick={() => {
+            track('membership.retry_click', { error_status: errorStatusOf(error) })
+            refetch()
+          }}
+        >
           다시 시도
         </Button>
       </Card>
     )
   }
 
-  const sub = data.subscription
-  const webActive = sub && sub.status !== 'EXPIRED' && sub.status !== 'PENDING'
+  const webActive = !!webSubscription(data)
 
   return (
     <div className="mt-6 max-w-3xl space-y-6">
@@ -70,7 +101,7 @@ export function MembershipView() {
           </div>
         </Card>
       ) : (
-        <PlanPicker data={data} />
+        <PlanPicker data={data} state={membershipStateOf(data)} />
       )}
 
       {data.payments.length > 0 && <PaymentHistory payments={data.payments} />}
@@ -78,7 +109,7 @@ export function MembershipView() {
   )
 }
 
-function PlanPicker({ data }: { data: BillingStatus }) {
+function PlanPicker({ data, state }: { data: BillingStatus; state: MembershipState }) {
   const [plan, setPlan] = useState<WebPlan>('PRO_YEARLY')
   const [agreed, setAgreed] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -86,11 +117,35 @@ function PlanPicker({ data }: { data: BillingStatus }) {
   const chosen = data.plans.find((p) => p.plan === plan)
   const ready = data.configured && !!tossClientKey
 
+  // membership.not_ready_view — [UX] 결제 키가 없어 버튼이 꺼진 채 '웹 결제를 준비 중이에요'가 보일 때 한 번
+  const notReadySent = useRef(false)
+  useEffect(() => {
+    if (ready || notReadySent.current) return
+    notReadySent.current = true
+    track('membership.not_ready_view', { membership_state: state })
+  }, [ready, state])
+
   const start = async () => {
+    track('membership.subscribe_click', { plan })
+    rememberPlan(plan) // 성공 · 실패 페이지의 plan 속성용 (상품 이름만)
     setBusy(true)
     try {
-      const prep = await prepareBilling(plan)
-      await openCardRegistration(prep.customerKey, prep.customerName) // 성공하면 토스가 성공 페이지로 이동시켜요
+      let prep
+      try {
+        prep = await prepareBilling(plan)
+      } catch (e) {
+        track('membership.card_window_fail', { plan, fail_reason: 'prepare_failed', error_status: errorStatusOf(e) })
+        throw e
+      }
+      try {
+        await openCardRegistration(prep.customerKey, prep.customerName) // 성공하면 토스가 성공 페이지로 이동시켜요
+      } catch (e) {
+        track('membership.card_window_fail', {
+          plan,
+          fail_reason: e instanceof CardWindowError ? e.reason : 'window_error',
+        })
+        throw e
+      }
     } catch (e) {
       toast.error((e as Error).message)
       setBusy(false)
@@ -119,7 +174,10 @@ function PlanPicker({ data }: { data: BillingStatus }) {
               type="button"
               role="radio"
               aria-checked={plan === p.plan}
-              onClick={() => setPlan(p.plan)}
+              onClick={() => {
+                if (p.plan !== plan) track('membership.plan_select', { plan: p.plan })
+                setPlan(p.plan)
+              }}
               className={cn(
                 'relative rounded-2xl border p-4 text-left transition-colors',
                 plan === p.plan ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
@@ -148,7 +206,10 @@ function PlanPicker({ data }: { data: BillingStatus }) {
           type="checkbox"
           className="accent-brand mt-0.5 size-4 shrink-0"
           checked={agreed}
-          onChange={(e) => setAgreed(e.target.checked)}
+          onChange={(e) => {
+            track('membership.agree_toggle', { checked: e.target.checked, plan })
+            setAgreed(e.target.checked)
+          }}
         />
         <span>
           {chosen ? `${won(chosen.amount)}이 ${chosen.months === 12 ? '매년' : '매달'} ` : ''}자동으로 결제되는 데
@@ -179,6 +240,19 @@ function SubscriptionCard({ data }: { data: BillingStatus }) {
   const resume = useResumeBilling()
   const [confirming, setConfirming] = useState(false)
   const plan = data.plans.find((p) => p.plan === sub.plan)
+
+  // membership.past_due_view — [UX] '자동 결제에 실패했어요 (N/3)' 문구가 보일 때 한 번
+  const pastDue = sub.status === 'PAST_DUE'
+  const pastDueSent = useRef(false)
+  useEffect(() => {
+    if (!pastDue || pastDueSent.current) return
+    pastDueSent.current = true
+    track('membership.past_due_view', {
+      failed_attempts: data.subscription?.failedAttempts,
+      plan: data.subscription?.plan,
+      days_left: daysLeftOf(data),
+    })
+  }, [pastDue, data])
 
   return (
     <Card className="p-5 sm:p-6">
@@ -225,12 +299,31 @@ function SubscriptionCard({ data }: { data: BillingStatus }) {
           <Button
             variant="primary"
             loading={resume.isPending}
-            onClick={() => resume.mutate(undefined, { onError: (e) => toast.error(e.message) })}
+            onClick={() => {
+              track('membership.resume_click', { plan: sub.plan, days_left: daysLeftOf(data) })
+              resume.mutate(undefined, {
+                onSuccess: () => track('membership.resume_result', { result: 'success' }),
+                onError: (e) => {
+                  track('membership.resume_result', { result: 'fail', error_status: errorStatusOf(e) })
+                  toast.error(e.message)
+                },
+              })
+            }}
           >
             해지 취소하고 계속 구독하기
           </Button>
         ) : (
-          <Button variant="secondary" onClick={() => setConfirming(true)}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              track('membership.cancel_click', {
+                plan: sub.plan,
+                days_left: daysLeftOf(data),
+                membership_state: membershipStateOf(data),
+              })
+              setConfirming(true)
+            }}
+          >
             구독 해지
           </Button>
         )}
@@ -243,16 +336,24 @@ function SubscriptionCard({ data }: { data: BillingStatus }) {
         confirmLabel="해지하기"
         tone="danger"
         loading={cancel.isPending}
-        onConfirm={() =>
+        onConfirm={() => {
+          track('membership.cancel_confirm', { plan: sub.plan, days_left: daysLeftOf(data) })
           cancel.mutate(undefined, {
             onSuccess: () => {
+              track('membership.cancel_result', { result: 'success', plan: sub.plan })
               setConfirming(false)
               toast.success('구독을 해지했어요.')
             },
-            onError: (e) => toast.error(e.message),
+            onError: (e) => {
+              track('membership.cancel_result', { result: 'fail', error_status: errorStatusOf(e), plan: sub.plan })
+              toast.error(e.message)
+            },
           })
-        }
-        onCancel={() => setConfirming(false)}
+        }}
+        onCancel={(method) => {
+          track('membership.cancel_dismiss', { plan: sub.plan, close_method: method })
+          setConfirming(false)
+        }}
       />
     </Card>
   )

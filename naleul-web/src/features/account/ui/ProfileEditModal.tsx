@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
+import { track } from '@/lib/client/analytics'
 import { isApiError } from '@/lib/client/api'
+import { errorStatusOf } from '@/features/home/analytics'
 import { cn } from '@/lib/cn'
 import { toast } from '@/stores/toastStore'
 import { NICKNAME_HELP, NICKNAME_PATTERN, useUpdateNickname } from '../api'
@@ -25,29 +27,47 @@ export function ProfileEditModal({
   const trimmed = nickname.trim()
   const valid = NICKNAME_PATTERN.test(trimmed)
 
+  /** 입력칸 아래 빨간 문구 + settings.profile_error_view */
+  const showError = (message: string, textLength: number) => {
+    setError(message)
+    track('settings.profile_error_view', { validation_error: message, text_length: textLength })
+  }
+
+  /** 저장하지 않고 닫기 (취소 · X · 바깥 · Esc) — 고친 내용은 확인 없이 사라져요 */
+  const close = (method: ModalCloseMethod | 'cancel_button') => {
+    track('settings.profile_edit_close', { close_method: method, is_dirty: nickname !== currentName })
+    onClose()
+  }
+
   const submit = () => {
     if (!valid) {
-      setError(NICKNAME_HELP)
+      if (error !== NICKNAME_HELP) showError(NICKNAME_HELP, trimmed.length)
       return
     }
+    const textLength = trimmed.length
+    track('settings.profile_save_click', { text_length: textLength })
     update.mutate(trimmed, {
       onSuccess: () => {
+        track('settings.profile_save_result', { result: 'success' })
         toast.success('닉네임을 바꿨어요.')
         onClose()
       },
-      onError: (e) => setError(isApiError(e) ? e.message : '닉네임 수정에 실패했어요. 다시 시도해 주세요.'),
+      onError: (e) => {
+        track('settings.profile_save_result', { result: 'fail', error_status: errorStatusOf(e) })
+        showError(isApiError(e) ? e.message : '닉네임 수정에 실패했어요. 다시 시도해 주세요.', textLength)
+      },
     })
   }
 
   return (
     <Modal
       open={open}
-      onClose={onClose}
+      onClose={close}
       title="프로필 수정"
       dismissible={!update.isPending}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={update.isPending}>
+          <Button variant="secondary" onClick={() => close('cancel_button')} disabled={update.isPending}>
             취소
           </Button>
           <Button onClick={submit} disabled={!valid || trimmed === currentName} loading={update.isPending}>

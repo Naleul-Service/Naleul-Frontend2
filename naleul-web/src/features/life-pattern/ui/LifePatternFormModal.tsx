@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
+import { track } from '@/lib/client/analytics'
 import { cn } from '@/lib/cn'
 import type { JavaDayOfWeek } from '@/features/goal/api'
 import { Field, inputClass } from '@/features/goal-creation/ui/formParts'
@@ -144,12 +145,48 @@ export function LifePatternFormModal({
   const valid =
     title.length > 0 && title.length <= 30 && timeValid && form.days.length > 0 && sleepConflict < 0 && !badGenericDay
 
+  // ── 분석 ──
+  const isNew = !isEdit
+  // 연 순간의 값 — 닫을 때 is_dirty 비교용 (state 로 들고 있어 렌더 중에도 읽을 수 있어요)
+  const [openedSnapshot] = useState(() => JSON.stringify({ form, perDay, dayMap, nights }))
+  const isDirty = () => JSON.stringify({ form, perDay, dayMap, nights }) !== openedSnapshot
+  const trackClose = (method: ModalCloseMethod | 'cancel_button' | 'other_open') =>
+    track('life_pattern.form_close', { is_new: isNew, close_method: method, is_dirty: isDirty() })
+  const close = (method: ModalCloseMethod | 'cancel_button') => {
+    trackClose(method)
+    onClose()
+  }
+
+  // life_pattern.form_error_view — 화면에 뜬 입력 오류 문구 (새로 보일 때마다 한 번)
+  const perDayVisible = perDay && timeValid && form.days.length > 0
+  const errors: string[] = []
+  if (!timeValid) errors.push('시작과 종료 시간을 다르게 입력해 주세요.')
+  if (form.days.length === 0) errors.push('요일을 하나 이상 골라 주세요.')
+  if (perDayVisible && sleepConflict >= 0)
+    errors.push(`${dayShort(ALL_DAYS[sleepConflict])}요일 기상이 그날 취침보다 늦어요.`)
+  else if (perDayVisible && badGenericDay)
+    errors.push(`${dayShort(badGenericDay)}요일 시작과 종료를 다르게 입력해 주세요.`)
+  const errorKey = errors.join('\n')
+  const shownErrors = useRef<string[]>([])
+  const patternType = form.patternType
+  useEffect(() => {
+    const now = errorKey ? errorKey.split('\n') : []
+    for (const msg of now) {
+      if (shownErrors.current.includes(msg)) continue
+      track('life_pattern.form_error_view', { validation_error: msg, pattern_type: patternType, is_new: isNew })
+    }
+    shownErrors.current = now
+  }, [errorKey, patternType, isNew])
+
   // 추천: 추가할 때만, 입력한 제목과 맞는 것
   const suggestions = isEdit ? [] : matchPresets(form.title)
 
   const applyPreset = (p: LifePatternPreset) => {
     const existing = existingOfType(patterns, p)
+    track('life_pattern.form_suggestion_click', { pattern_type: p.patternType, is_new: !existing })
     if (existing) {
+      // 이 모달은 닫히고 그 패턴 수정 모달이 열려요
+      trackClose('other_open')
       onEditExisting(existing)
       return
     }
@@ -178,6 +215,19 @@ export function LifePatternFormModal({
 
   const submit = () => {
     if (!valid || loading) return
+    const dayTimes = perDay
+      ? isSleep
+        ? nightsToDayTimes(form.startTime, form.endTime, allNights)
+        : genericDayTimes()
+      : []
+    track('life_pattern.form_save_click', {
+      is_new: isNew,
+      pattern_type: form.patternType,
+      repeat_day_count: form.days.length,
+      per_day_time: dayTimes.length > 0,
+      crosses_midnight: crosses,
+      duration_minutes: e - s,
+    })
     onSubmit({
       patternType: form.patternType,
       title,
@@ -187,14 +237,14 @@ export function LifePatternFormModal({
       // 7개 다 고르면 매일 (백엔드는 빈 배열도 매일로 봐요)
       days: form.days.length === 7 ? [] : form.days,
       // 요일별을 끄면 [] → 모든 요일이 기본 시간으로 돌아가요
-      dayTimes: perDay ? (isSleep ? nightsToDayTimes(form.startTime, form.endTime, allNights) : genericDayTimes()) : [],
+      dayTimes,
     })
   }
 
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={close}
       title={isEdit ? '고정 시간 수정' : '고정 시간 추가'}
       description={
         isEdit
@@ -205,7 +255,7 @@ export function LifePatternFormModal({
       dismissible={!loading}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={loading}>
+          <Button variant="secondary" onClick={() => close('cancel_button')} disabled={loading}>
             취소
           </Button>
           <Button onClick={submit} disabled={!valid} loading={loading}>
@@ -354,6 +404,7 @@ export function LifePatternFormModal({
                 <button
                   type="button"
                   onClick={() => {
+                    track('life_pattern.form_per_day_toggle', { expanded: false, pattern_type: form.patternType })
                     setPerDay(false)
                     setDayMap({})
                     setNights([])
@@ -475,6 +526,7 @@ export function LifePatternFormModal({
             <button
               type="button"
               onClick={() => {
+                track('life_pattern.form_per_day_toggle', { expanded: true, pattern_type: form.patternType })
                 setPerDay(true)
                 // 처음 펼치면 지금 기본 시간으로 채워요 (이미 요일별 시간이 있던 패턴은 그대로)
                 if (!editing?.dayTimes?.length) {

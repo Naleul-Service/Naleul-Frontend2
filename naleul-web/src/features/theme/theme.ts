@@ -77,3 +77,6 @@ export function ThemeSync() {
   }, [])
   return null
 }
+
+/** 지금 고른 화면 모드 (이벤트 속성 theme_pref 용) */
+export const readThemePref = (): ThemePref => readPref()

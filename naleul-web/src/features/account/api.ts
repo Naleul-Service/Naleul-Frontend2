@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { api, logout } from '@/lib/client/api'
+import { trackBeforeLeave } from '@/lib/client/analytics'
 
 /** 백엔드 UserNicknameUpdateRequest 의 @Pattern 과 같아요 */
 export const NICKNAME_PATTERN = /^[가-힣a-zA-Z0-9]{2,10}$/
@@ -32,6 +33,10 @@ export function useUpdateNickname() {
 export function useWithdraw() {
   return useMutation({
     mutationFn: (body: { reason: WithdrawalReason; detail: string }) => api.delete<null>('/v1/users', body),
-    onSuccess: () => logout(),
+    // 결과 이벤트를 beacon 으로 먼저 보낸 뒤 로그아웃 (곧바로 페이지를 떠나요)
+    onSuccess: async (_d, body) => {
+      await trackBeforeLeave('withdraw.result', { result: 'success', withdraw_reason: body.reason })
+      await logout()
+    },
   })
 }

@@ -35,7 +35,7 @@ export const routineCountOf = (goal: GoalCategory) =>
 const modeOf = (goal: GoalCategory) => goal.goalMode ?? 'ACHIEVEMENT'
 
 /** 수정 폼을 연 위치 (분석용 entry_point) */
-export type GoalEditEntryPoint = 'header_edit' | 'motive_card' | 'progress_metric'
+export type GoalEditEntryPoint = 'header' | 'notes' | 'progress_cta'
 
 const trackEditOpen = (goal: GoalCategory, entryPoint: GoalEditEntryPoint) =>
   track('goal_detail.edit_open', {
@@ -440,7 +440,7 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
             <button
               type="button"
               onClick={() => {
-                trackEditOpen(goal, 'header_edit')
+                trackEditOpen(goal, 'header')
                 edit.open()
               }}
               className="text-ink-3 hover:bg-subtle hover:text-ink flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-semibold"
@@ -482,7 +482,7 @@ export function GoalNotes({ goal }: { goal: GoalCategory }) {
         <button
           type="button"
           onClick={() => {
-            trackEditOpen(goal, 'motive_card')
+            trackEditOpen(goal, 'notes')
             edit.open()
           }}
           className="hover:bg-canvas -m-2 block w-[calc(100%+16px)] rounded-xl p-2 text-left"

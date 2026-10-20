@@ -17,6 +17,20 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000
 
 export const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? ''
 
+/** 분석용 실패 코드 (fail_reason) — 권한 거부 · 창 닫음 · 연결 만료 · 그 밖의 실패 */
+export type GoogleFailReason = 'access_denied' | 'popup_closed' | 'expired' | 'failed'
+
+export class GoogleCalendarError extends Error {
+  readonly reason: GoogleFailReason
+  constructor(reason: GoogleFailReason, message: string) {
+    super(message)
+    this.reason = reason
+  }
+}
+
+export const googleFailReasonOf = (e: unknown): GoogleFailReason =>
+  e instanceof GoogleCalendarError ? e.reason : 'failed'
+
 // ── GIS 타입 (필요한 것만) ──────────────────────────────────────
 interface TokenResponse {
   access_token?: string
@@ -54,7 +68,7 @@ function loadGis(): Promise<void> {
     s.onload = () => resolve()
     s.onerror = () => {
       gisLoading = null
-      reject(new Error('구글 로그인 창을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'))
+      reject(new GoogleCalendarError('failed', '구글 로그인 창을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'))
     }
     document.head.appendChild(s)
   })
@@ -63,7 +77,8 @@ function loadGis(): Promise<void> {
 
 /** 구글 계정 선택 · 권한 동의 팝업 → access token (1시간) */
 export async function requestGoogleToken(): Promise<string> {
-  if (!googleClientId) throw new Error('구글 연동 설정(NEXT_PUBLIC_GOOGLE_CLIENT_ID)이 아직 없어요.')
+  if (!googleClientId)
+    throw new GoogleCalendarError('failed', '구글 연동 설정(NEXT_PUBLIC_GOOGLE_CLIENT_ID)이 아직 없어요.')
   await loadGis()
   return new Promise((resolve, reject) => {
     const client = window.google!.accounts.oauth2.initTokenClient({
@@ -73,11 +88,17 @@ export async function requestGoogleToken(): Promise<string> {
         if (r.access_token) resolve(r.access_token)
         else
           reject(
-            new Error(r.error === 'access_denied' ? '캘린더 읽기 권한을 허용해 주세요.' : '구글 연결에 실패했어요.'),
+            r.error === 'access_denied'
+              ? new GoogleCalendarError('access_denied', '캘린더 읽기 권한을 허용해 주세요.')
+              : new GoogleCalendarError('failed', '구글 연결에 실패했어요.')
           )
       },
       error_callback: (e) =>
-        reject(new Error(e.type === 'popup_closed' ? '구글 연결 창을 닫았어요.' : '구글 연결에 실패했어요.')),
+        reject(
+          e.type === 'popup_closed'
+            ? new GoogleCalendarError('popup_closed', '구글 연결 창을 닫았어요.')
+            : new GoogleCalendarError('failed', '구글 연결에 실패했어요.')
+        ),
     })
     client.requestAccessToken({ prompt: 'select_account' })
   })
@@ -87,8 +108,8 @@ async function gget<T>(token: string, path: string, params?: Record<string, stri
   const url = new URL(API + path)
   Object.entries(params ?? {}).forEach(([k, v]) => url.searchParams.set(k, v))
   const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-  if (res.status === 401) throw new Error('구글 연결이 만료됐어요. 다시 연결해 주세요.')
-  if (!res.ok) throw new Error('구글 캘린더를 불러오지 못했어요.')
+  if (res.status === 401) throw new GoogleCalendarError('expired', '구글 연결이 만료됐어요. 다시 연결해 주세요.')
+  if (!res.ok) throw new GoogleCalendarError('failed', '구글 캘린더를 불러오지 못했어요.')
   return res.json() as Promise<T>
 }
 
@@ -166,7 +187,7 @@ export async function listGoogleEvents(token: string, cal: GoogleCalendar, from:
         maxResults: '250',
         timeZone: 'Asia/Seoul',
         ...(pageToken ? { pageToken } : {}),
-      },
+      }
     )
     for (const e of r.items ?? []) {
       const ev = toExternalEvent(e, cal)

@@ -1,6 +1,7 @@
 'use client'
 
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
+import { track } from '@/lib/client/analytics'
 import { cn } from '@/lib/cn'
 import { useThemePref, type ThemePref } from './theme'
 
@@ -26,7 +27,11 @@ export function ThemePicker() {
             type="button"
             role="radio"
             aria-checked={pref === value}
-            onClick={() => setPref(value)}
+            onClick={() => {
+              if (value === pref) return
+              setPref(value)
+              track('settings.theme_change', { theme_pref: value })
+            }}
             className={cn(
               'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors',
               pref === value ? 'bg-surface text-ink shadow-card' : 'text-ink-3 hover:text-ink'

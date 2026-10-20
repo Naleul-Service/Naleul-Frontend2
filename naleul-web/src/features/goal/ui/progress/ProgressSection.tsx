@@ -583,7 +583,7 @@ function TaskView({ goalId, p }: { goalId: number; p: GoalProgress }) {
             track('goal_detail.edit_open', {
               goal_category_id: goalId,
               goal_mode: 'ACHIEVEMENT',
-              entry_point: 'progress_metric',
+              entry_point: 'progress_cta',
             })
             edit.open()
             window.scrollTo({ top: 0, behavior: 'smooth' })

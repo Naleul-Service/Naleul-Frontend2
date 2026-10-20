@@ -628,7 +628,7 @@ function RoutineRow({
   const goalId = goal.goalCategoryId
   const ids = { goal_category_id: goalId, routine_id: routine.routineId }
   useTrackOtherOpen(edit.isOpen, edit.current, goalId, false)
-  const openEdit = (entryPoint: 'row' | 'edit_icon') => {
+  const openEdit = (entryPoint: 'row' | 'icon') => {
     track('goal_detail.routine_edit_open', { ...ids, entry_point: entryPoint })
     edit.open()
   }
@@ -716,7 +716,7 @@ function RoutineRow({
       )}
       <RowActions
         label={routine.routineName}
-        onEdit={() => openEdit('edit_icon')}
+        onEdit={() => openEdit('icon')}
         onDelete={() => {
           track('goal_detail.routine_delete_click', ids)
           del.open()

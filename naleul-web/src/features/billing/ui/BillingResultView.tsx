@@ -8,6 +8,10 @@ import { CheckCircle2, XCircle } from 'lucide-react'
 import { buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { errorStatusOf } from '@/features/home/analytics'
+import { isApiError } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
+import { firstTimeFor, rememberedPlan } from '../analytics'
 import { billingKeys, confirmBilling } from '../api'
 import { PLAN_LABEL, longDate } from '../format'
 import type { BillingStatus } from '../types'
@@ -28,15 +32,33 @@ export function BillingSuccessView() {
   const customerKey = params.get('customerKey')
 
   useEffect(() => {
-    if (started.current || !authKey || !customerKey) return
+    if (started.current) return
     started.current = true
+    // membership.confirm_result — 같은 돌아온 주소에서는 한 번만 (새로고침 · 뒤로 가기로 다시 요청해도 다시 안 보냄).
+    // 주소에는 authKey 가 있어서 저장은 해시만, 속성에는 절대 넣지 않아요.
+    const sendOnce = (props: Parameters<typeof track>[1]) => {
+      if (firstTimeFor('confirm', window.location.search)) track('membership.confirm_result', props)
+    }
+    if (!authKey || !customerKey) {
+      sendOnce({ plan: rememberedPlan(), result: 'fail', fail_code: 'missing_params' })
+      return
+    }
     confirmBilling(authKey, customerKey)
       .then((data) => {
+        sendOnce({ plan: data.subscription?.plan ?? rememberedPlan(), result: 'success' })
         qc.setQueryData(billingKeys.status, data)
         setState({ kind: 'done', data })
         router.refresh() // 사이드바 · 설정의 FREE → PRO 표시
       })
-      .catch((e: Error) => setState({ kind: 'error', message: e.message }))
+      .catch((e: Error) => {
+        sendOnce({
+          plan: rememberedPlan(),
+          result: 'fail',
+          error_status: errorStatusOf(e),
+          fail_code: isApiError(e) ? e.status : undefined,
+        })
+        setState({ kind: 'error', message: e.message })
+      })
   }, [authKey, customerKey, qc, router])
 
   if (!authKey || !customerKey) {
@@ -72,6 +94,16 @@ export function BillingSuccessView() {
 export function BillingFailView() {
   const params = useSearchParams()
   const code = params.get('code')
+
+  // membership.fail_view — '구독하지 않았어요'가 보일 때 한 번 (같은 주소로 새로고침하면 다시 안 보냄)
+  const sent = useRef(false)
+  useEffect(() => {
+    if (sent.current) return
+    sent.current = true
+    if (firstTimeFor('fail', window.location.search))
+      track('membership.fail_view', { fail_code: code ?? 'missing_params' })
+  }, [code])
+
   const message =
     code === 'PAY_PROCESS_CANCELED' ? '카드 등록을 취소했어요.' : (params.get('message') ?? '카드를 등록하지 못했어요.')
   return <ResultCard ok={false} title="구독하지 않았어요" message={message} />
@@ -88,11 +120,21 @@ function ResultCard({ ok, title, message }: { ok: boolean; title: string; messag
       <p className="mt-3 text-[18px] font-bold">{title}</p>
       {message && <p className="text-ink-3 mt-1.5 text-sm">{message}</p>}
       <div className="mt-6 flex justify-center gap-2">
-        <Link href="/settings/membership" className={buttonClass(ok ? 'secondary' : 'primary')}>
+        <Link
+          href="/settings/membership"
+          className={buttonClass(ok ? 'secondary' : 'primary')}
+          onClick={() =>
+            track('membership.result_cta_click', { destination: 'membership', result: ok ? 'success' : 'fail' })
+          }
+        >
           {ok ? '멤버십 보기' : '다시 시도하기'}
         </Link>
         {ok && (
-          <Link href="/" className={buttonClass('primary')}>
+          <Link
+            href="/"
+            className={buttonClass('primary')}
+            onClick={() => track('membership.result_cta_click', { destination: 'home', result: 'success' })}
+          >
             홈으로
           </Link>
         )}

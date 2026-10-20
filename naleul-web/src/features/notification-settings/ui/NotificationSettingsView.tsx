@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Lock } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -8,18 +9,66 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Chip'
 import { Spinner } from '@/components/ui/Spinner'
 import { Switch } from '@/components/ui/Switch'
+import { errorStatusOf } from '@/features/home/analytics'
+import { track } from '@/lib/client/analytics'
 import { toast } from '@/stores/toastStore'
-import { MISSION_CATEGORIES, useNotificationSettings, useUpdateNotificationSetting } from '../api'
+import {
+  MISSION_CATEGORIES,
+  useNotificationSettings,
+  useUpdateNotificationSetting,
+  type NotificationChange,
+} from '../api'
 
 /**
  * /settings/notifications — iOS "푸시 알림 설정" 화면을 옮긴 것.
  * 웹에는 푸시가 없어서, 여기서 바꾼 값은 나를 앱의 푸시 알림에 적용돼요.
  *
  * @param locked FREE 플랜이면 true → 스위치 대신 자물쇠 (iOS 와 같은 규칙)
+ * @param isPremium Pro 사용자인지 (notification_settings.pageview 속성)
  */
-export function NotificationSettingsView({ locked }: { locked: boolean }) {
-  const { data, isPending, isError, refetch } = useNotificationSettings()
+export function NotificationSettingsView({ locked, isPremium }: { locked: boolean; isPremium: boolean }) {
+  const { data, isPending, isError, error, errorUpdatedAt, refetch } = useNotificationSettings()
   const update = useUpdateNotificationSetting()
+  const errorStatus = isError ? errorStatusOf(error) : undefined
+
+  // pageview: 설정을 처음 불러온 직후 한 번
+  const pageviewSent = useRef(false)
+  const loaded = !!data
+  useEffect(() => {
+    if (!loaded || pageviewSent.current) return
+    pageviewSent.current = true
+    track('notification_settings.pageview', { is_premium: isPremium })
+  }, [loaded, isPremium])
+
+  // load_fail: '설정을 불러오지 못했어요' 카드가 뜰 때마다 (실패 1회당 한 번)
+  const failSentAt = useRef(0)
+  const showFail = isError
+  useEffect(() => {
+    if (!showFail || failSentAt.current === errorUpdatedAt) return
+    failSentAt.current = errorUpdatedAt
+    track('notification_settings.load_fail', { error_status: errorStatus })
+  }, [showFail, errorUpdatedAt, errorStatus])
+
+  /** 스위치 — 먼저 바뀌고, 실패하면 원래 값으로 되돌려요 */
+  const toggle = (change: NotificationChange) => {
+    const kind = change.kind === 'task' ? 'task' : change.category
+    track('notification_settings.toggle', { notification_kind: kind, checked: change.enabled })
+    update.mutate(change, {
+      onSuccess: () =>
+        track('notification_settings.toggle_result', {
+          notification_kind: kind,
+          checked: change.enabled,
+          result: 'success',
+        }),
+      onError: (e) =>
+        track('notification_settings.toggle_result', {
+          notification_kind: kind,
+          checked: change.enabled,
+          result: 'fail',
+          error_status: errorStatusOf(e),
+        }),
+    })
+  }
 
   return (
     <>
@@ -36,7 +85,14 @@ export function NotificationSettingsView({ locked }: { locked: boolean }) {
       ) : isError || !data ? (
         <Card className="mt-6 p-8 text-center">
           <p className="text-ink-2 text-[15px]">설정을 불러오지 못했어요.</p>
-          <Button variant="secondary" className="mt-4" onClick={() => refetch()}>
+          <Button
+            variant="secondary"
+            className="mt-4"
+            onClick={() => {
+              track('notification_settings.retry_click', { error_status: errorStatus })
+              void refetch()
+            }}
+          >
             다시 시도
           </Button>
         </Card>
@@ -49,7 +105,7 @@ export function NotificationSettingsView({ locked }: { locked: boolean }) {
               description="개인이 설정한 Task 푸시 알림을 받을 수 있어요."
               checked={data.taskAlertEnabled}
               locked={locked}
-              onChange={(enabled) => update.mutate({ kind: 'task', enabled })}
+              onChange={(enabled) => toggle({ kind: 'task', enabled })}
             />
           </Card>
 
@@ -63,7 +119,7 @@ export function NotificationSettingsView({ locked }: { locked: boolean }) {
                     description={m.description}
                     checked={data[m.field]}
                     locked={locked}
-                    onChange={(enabled) => update.mutate({ kind: 'category', category: m.category, enabled })}
+                    onChange={(enabled) => toggle({ kind: 'category', category: m.category, enabled })}
                   />
                 </li>
               ))}

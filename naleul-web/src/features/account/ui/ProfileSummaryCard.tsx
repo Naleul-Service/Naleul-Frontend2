@@ -5,7 +5,9 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Chip'
 import type { SessionUserView } from '@/components/layout/types'
+import { track } from '@/lib/client/analytics'
 import { ProfileEditModal } from './ProfileEditModal'
+import { isPremiumRole } from './SettingsAnalytics'
 
 /** 설정 맨 위 프로필 요약 (iOS SettingProfileSummary) */
 export function ProfileSummaryCard({ user }: { user: SessionUserView }) {
@@ -29,6 +31,7 @@ export function ProfileSummaryCard({ user }: { user: SessionUserView }) {
         onClick={() => {
           setModalKey((k) => k + 1)
           setEditing(true)
+          track('settings.profile_edit_open', { is_premium: isPremiumRole(user.role) })
         }}
       >
         프로필 수정

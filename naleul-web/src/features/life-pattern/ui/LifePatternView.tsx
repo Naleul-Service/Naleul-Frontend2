@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Pencil, Plus, Sparkles, Trash2 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -9,9 +9,12 @@ import { Card, CardHeader } from '@/components/ui/Card'
 import { Badge, Chip } from '@/components/ui/Chip'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Spinner } from '@/components/ui/Spinner'
+import { errorStatusOf } from '@/features/home/analytics'
 import { useLifePatterns } from '@/features/timetable/api'
 import { formatDuration, timeToMinutes } from '@/features/timetable/time'
 import type { LifePattern } from '@/features/timetable/types'
+import { track } from '@/lib/client/analytics'
+import { referrerType } from '@/lib/client/commonEvents'
 import { useCreateLifePattern, useDeleteLifePattern, useUpdateLifePattern } from '../api'
 import { PRESETS, TYPE_LABEL, existingOfType, formatDays, toHm, type LifePatternPreset } from '../presets'
 import { LifePatternFormModal, presetToForm, type LifePatternFormValue } from './LifePatternFormModal'
@@ -19,8 +22,12 @@ import { WeeklyOverview } from './WeeklyOverview'
 
 /** 백엔드 LifePatternService.MAX_PATTERNS */
 const MAX_PATTERNS = 10
+const EMPTY_PATTERNS: LifePattern[] = []
 
 type FormState = { mode: 'create'; initial: LifePatternFormValue | null } | { mode: 'edit'; pattern: LifePattern }
+
+/** life_pattern.edit_click 의 entry_point — 연필 아이콘 · 한 주 미리보기 막대 · 페이지 추천 칩 · 모달 안 추천 칩 */
+type EditEntryPoint = 'icon' | 'weekly_overview' | 'preset' | 'suggestion'
 
 const durationOf = (p: LifePattern) => {
   const s = timeToMinutes(p.startTime)
@@ -34,7 +41,8 @@ const durationOf = (p: LifePattern) => {
  * 여기서 바꾸면 "오늘부터 모든 날짜"의 기본값이 바뀌어요. (그날만 바꾸기는 캘린더에서)
  */
 export function LifePatternView() {
-  const { data: patterns = [], isLoading, isError, refetch } = useLifePatterns()
+  const { data, isLoading, isError, error, errorUpdatedAt, refetch } = useLifePatterns()
+  const patterns = data ?? EMPTY_PATTERNS
   const create = useCreateLifePattern()
   const update = useUpdateLifePattern()
   const remove = useDeleteLifePattern()
@@ -46,14 +54,58 @@ export function LifePatternView() {
 
   const full = patterns.length >= MAX_PATTERNS
 
+  // ── 분석 ──
+  // life_pattern.pageview — 목록을 불러온 직후 한 번 (실패 후 '다시 시도'로 불러와도 그때 한 번)
+  const pageviewSent = useRef(false)
+  useEffect(() => {
+    if (!data || pageviewSent.current) return
+    pageviewSent.current = true
+    track('life_pattern.pageview', {
+      pattern_count: data.length,
+      has_sleep: data.some((p) => p.patternType === 'SLEEP'),
+      referrer_type: referrerType(),
+    })
+  }, [data])
+
+  // life_pattern.load_fail — 실패 카드가 보일 때 (다시 시도 후 또 실패하면 다시)
+  const loadFailSentAt = useRef(0)
+  useEffect(() => {
+    if (!isError || loadFailSentAt.current === errorUpdatedAt) return
+    loadFailSentAt.current = errorUpdatedAt
+    track('life_pattern.load_fail', { error_status: errorStatusOf(error) })
+  }, [isError, error, errorUpdatedAt])
+
+  // life_pattern.limit_view — 10개라 추가 버튼·추천 칩이 꺼질 때 (꺼지는 순간마다 한 번)
+  const limitShown = useRef(false)
+  const limited = !isLoading && !isError && full
+  useEffect(() => {
+    if (!limited) {
+      limitShown.current = false
+      return
+    }
+    if (limitShown.current) return
+    limitShown.current = true
+    track('life_pattern.limit_view', { pattern_count: patterns.length })
+  }, [limited, patterns.length])
+
   const openForm = (next: FormState) => {
     setFormKey((k) => k + 1)
     setForm(next)
   }
 
+  const openEdit = (pattern: LifePattern, entry: EditEntryPoint) => {
+    track('life_pattern.edit_click', { pattern_type: pattern.patternType, entry_point: entry })
+    openForm({ mode: 'edit', pattern })
+  }
+
   const openPreset = (preset: LifePatternPreset) => {
     const existing = existingOfType(patterns, preset)
-    if (existing) openForm({ mode: 'edit', pattern: existing })
+    track('life_pattern.preset_click', {
+      pattern_type: preset.patternType,
+      is_new: !existing,
+      pattern_count: patterns.length,
+    })
+    if (existing) openEdit(existing, 'preset')
     else openForm({ mode: 'create', initial: presetToForm(preset) })
   }
 
@@ -73,7 +125,10 @@ export function LifePatternView() {
         description="매주 반복되는 고정 시간이에요. 이 시간은 비워두고 Task를 배치해요."
         actions={
           <Button
-            onClick={() => openForm({ mode: 'create', initial: null })}
+            onClick={() => {
+              track('life_pattern.add_click', { pattern_count: patterns.length })
+              openForm({ mode: 'create', initial: null })
+            }}
             disabled={full || isError}
             title={full ? `고정 시간은 최대 ${MAX_PATTERNS}개까지 만들 수 있어요` : undefined}
           >
@@ -87,7 +142,14 @@ export function LifePatternView() {
         <Card className="mt-6 grid min-h-[240px] place-items-center p-10 text-center">
           <div>
             <p className="font-bold">고정 시간을 불러오지 못했어요</p>
-            <Button variant="secondary" className="mt-4" onClick={() => refetch()}>
+            <Button
+              variant="secondary"
+              className="mt-4"
+              onClick={() => {
+                track('life_pattern.retry_click', { error_status: errorStatusOf(error) })
+                refetch()
+              }}
+            >
               다시 시도
             </Button>
           </div>
@@ -148,7 +210,7 @@ export function LifePatternView() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => openForm({ mode: 'edit', pattern: p })}
+                      onClick={() => openEdit(p, 'icon')}
                       aria-label={`${p.title} 수정`}
                       className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-2"
                     >
@@ -156,7 +218,10 @@ export function LifePatternView() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setDeleting(p)}
+                      onClick={() => {
+                        track('life_pattern.delete_click', { pattern_type: p.patternType })
+                        setDeleting(p)
+                      }}
                       aria-label={`${p.title} 삭제`}
                       className="text-ink-3 hover:bg-danger-soft hover:text-danger rounded-lg p-2"
                     >
@@ -170,7 +235,7 @@ export function LifePatternView() {
 
           {/* 한 주 미리보기 */}
           {patterns.length > 0 && (
-            <WeeklyOverview patterns={patterns} onSelect={(p) => openForm({ mode: 'edit', pattern: p })} />
+            <WeeklyOverview patterns={patterns} onSelect={(p) => openEdit(p, 'weekly_overview')} />
           )}
 
           <p className="text-ink-4 text-center text-xs">
@@ -186,10 +251,24 @@ export function LifePatternView() {
           initial={form.mode === 'create' ? form.initial : null}
           patterns={patterns}
           loading={create.isPending || update.isPending}
-          onEditExisting={(p) => openForm({ mode: 'edit', pattern: p })}
+          onEditExisting={(p) => openEdit(p, 'suggestion')}
           onClose={() => setForm(null)}
           onSubmit={(v) => {
-            const done = { onSuccess: () => setForm(null) }
+            const isNew = form.mode === 'create'
+            const patternType = form.mode === 'edit' ? form.pattern.patternType : v.patternType
+            const done = {
+              onSuccess: () => {
+                track('life_pattern.save_result', { is_new: isNew, result: 'success', pattern_type: patternType })
+                setForm(null)
+              },
+              onError: (err: unknown) =>
+                track('life_pattern.save_result', {
+                  is_new: isNew,
+                  result: 'fail',
+                  error_status: errorStatusOf(err),
+                  pattern_type: patternType,
+                }),
+            }
             if (form.mode === 'edit') {
               const { patternType, ...body } = v
               void patternType // 종류는 수정 API 에 보내지 않아요
@@ -212,13 +291,28 @@ export function LifePatternView() {
         confirmLabel="삭제"
         tone="danger"
         loading={remove.isPending}
-        onCancel={() => setDeleting(null)}
-        onConfirm={() =>
-          deleting &&
+        onCancel={(method) => {
+          if (deleting)
+            track('life_pattern.delete_cancel', { pattern_type: deleting.patternType, close_method: method })
+          setDeleting(null)
+        }}
+        onConfirm={() => {
+          if (!deleting) return
+          const patternType = deleting.patternType
+          track('life_pattern.delete_confirm', { pattern_type: patternType })
           remove.mutate(deleting.lifePatternId, {
-            onSuccess: () => setDeleting(null),
+            onSuccess: () => {
+              track('life_pattern.delete_result', { result: 'success', pattern_type: patternType })
+              setDeleting(null)
+            },
+            onError: (err) =>
+              track('life_pattern.delete_result', {
+                result: 'fail',
+                error_status: errorStatusOf(err),
+                pattern_type: patternType,
+              }),
           })
-        }
+        }}
       />
     </>
   )

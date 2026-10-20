@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Card } from '@/components/ui/Card'
+import { TermsScrollDepth } from '@/features/terms/analytics'
 import { MARKETING_INFO_ROWS, TERMS_BODY, TERMS_META, isTermsType } from '@/features/terms/content'
 
 type Props = { params: Promise<{ type: string }> }
@@ -19,6 +20,7 @@ export default async function TermsDetailPage({ params }: Props) {
 
   return (
     <>
+      <TermsScrollDepth type={type} />
       <PageHeader
         breadcrumb={
           <>

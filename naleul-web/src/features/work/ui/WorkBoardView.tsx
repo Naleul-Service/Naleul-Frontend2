@@ -76,7 +76,7 @@ type MoveMethod = 'check' | 'drag' | 'next_button'
 type TopicAction = 'create' | 'update' | 'delete' | 'complete' | 'reopen'
 type PillKind = 'remaining' | 'in_progress' | 'pace' | 'overdue_topic' | 'overdue_task' | 'due_this_week'
 /** 보드 필터를 바꾼 곳 — 보드 위 주제 칩 · 로드맵 주제 이름 · 새 주제를 만든 직후 */
-type FilterEntry = 'topic_chip' | 'roadmap_topic' | 'topic_created'
+type FilterEntry = 'topic_bar' | 'roadmap' | 'topic_created'
 
 /** 실패한 요청의 HTTP 상태코드 (네트워크 끊김 0) */
 const failStatus = (e: unknown) => errorStatusOf(e) ?? 0
@@ -886,7 +886,7 @@ function Roadmap({
                 goalId={goalId}
                 topic={t}
                 selected={filter === t.topicId}
-                onSelect={() => onFilter(filter === t.topicId ? 'ALL' : t.topicId!, 'roadmap_topic')}
+                onSelect={() => onFilter(filter === t.topicId ? 'ALL' : t.topicId!, 'roadmap')}
               >
                 <TopicTasks
                   goalId={goalId}
@@ -1358,7 +1358,7 @@ function TopicBar({
         type="button"
         role="tab"
         aria-selected={filter === 'ALL'}
-        onClick={() => onFilter('ALL', 'topic_chip')}
+        onClick={() => onFilter('ALL', 'topic_bar')}
         className={chip(filter === 'ALL')}
       >
         전체 <span className="tabular-nums opacity-60">{total}</span>
@@ -1371,7 +1371,7 @@ function TopicBar({
             type="button"
             role="tab"
             aria-selected={selected}
-            onClick={() => onFilter(t.topicId === null ? 'NONE' : t.topicId, 'topic_chip')}
+            onClick={() => onFilter(t.topicId === null ? 'NONE' : t.topicId, 'topic_bar')}
             className={chip(selected)}
           >
             {t.emoji ? `${t.emoji} ` : ''}

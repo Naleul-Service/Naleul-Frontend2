@@ -1,13 +1,34 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { track } from '@/lib/client/analytics'
 import { cn } from '@/lib/cn'
 import { useAiUsage } from '../api'
 
 /** 설정 · "오늘 사용량" — 하루 횟수가 정해진 기능을 한눈에 */
 export function UsageCard() {
-  const { data, isPending } = useAiUsage()
+  const { data, isPending, isError } = useAiUsage()
+
+  // settings.usage_view — 불러오기가 끝난 직후 한 번 (실패하면 빈 카드). 이 카드는 설정에서만 써요
+  const viewSent = useRef(false)
+  useEffect(() => {
+    if (viewSent.current || isPending) return
+    viewSent.current = true
+    if (isError || !data) {
+      track('settings.usage_view', { result: 'fail' })
+      return
+    }
+    track('settings.usage_view', {
+      result: 'success',
+      is_premium: data.pro,
+      exhausted_keys: data.items
+        .filter((i) => i.limit != null && i.remaining === 0)
+        .map((i) => i.key)
+        .join(','),
+    })
+  }, [isPending, isError, data])
   return (
     <Card className="p-5">
       <div className="flex items-center gap-2">
