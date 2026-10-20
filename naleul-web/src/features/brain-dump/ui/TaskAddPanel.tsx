@@ -8,6 +8,9 @@ import { TaskAddView, type TaskAddedInfo, type TaskAddViewHandle } from './TaskA
 /** 패널 폭 — 캘린더는 이만큼 비켜서 나란히 보여요 (xl 이상) */
 export const TASK_PANEL_WIDTH = 420
 
+/** 패널 제목 = 캘린더 + 메뉴의 항목 이름 (명세 11.2 · 11.3) */
+export const ADD_MODE_LABEL = { ai: 'AI로 자동 Task 추가', manual: '계획 할 일 추가', log: '실제 한 일 추가' } as const
+
 /**
  * 캘린더 오른쪽에 여는 Task 추가 패널.
  *  - xl(1280px) 이상: 캘린더 옆에 나란히 (캘린더를 보면서 빈 시간을 골라 추가)
@@ -18,8 +21,11 @@ export function TaskAddPanel({
   mode,
   onClose,
   onAdded,
+  prefill,
 }: {
   mode: 'ai' | 'manual' | 'log'
+  /** 계획 할 일 추가: 캘린더 빈 곳을 눌러 연 날짜 · 시각 */
+  prefill?: { date: string; startTime?: string | null; endTime?: string | null }
   onClose: () => void
   onAdded: (info: TaskAddedInfo) => void
 }) {
@@ -45,23 +51,30 @@ export function TaskAddPanel({
 
   return (
     <aside
-      aria-label="Task 추가"
+      aria-label={ADD_MODE_LABEL[mode]}
       className="bg-canvas border-line shadow-pop fixed inset-0 z-40 flex animate-[slide-in-right_180ms_ease-out] flex-col sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[420px] sm:border-l xl:shadow-none"
     >
       <div className="border-line bg-surface flex h-14 shrink-0 items-center gap-2 border-b px-4">
-        <p className="text-[16px] font-bold">Task 추가</p>
-        <p className="text-ink-3 hidden text-xs sm:block">캘린더를 보면서 추가해요</p>
+        <p className="text-h4">{ADD_MODE_LABEL[mode]}</p>
         <button
           type="button"
           onClick={() => closeWith('x_button')}
-          aria-label="Task 추가 닫기"
+          aria-label={`${ADD_MODE_LABEL[mode]} 닫기`}
           className="text-ink-3 hover:bg-subtle hover:text-ink ml-auto rounded-lg p-1.5"
         >
           <X className="size-5" />
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        <TaskAddView ref={viewRef} key={mode} variant="panel" initialMode={mode} onAdded={onAdded} />
+        <TaskAddView
+          ref={viewRef}
+          key={`${mode}-${prefill?.date ?? ''}-${prefill?.startTime ?? ''}`}
+          variant="panel"
+          initialMode={mode}
+          singleMode
+          prefill={prefill}
+          onAdded={onAdded}
+        />
       </div>
     </aside>
   )

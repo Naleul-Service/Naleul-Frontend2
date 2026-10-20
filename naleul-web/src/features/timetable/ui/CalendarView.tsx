@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { ChevronLeft, ChevronRight, Plus } from '@/components/icons'
-import { rectOf } from '@/components/ui/Popover'
+import { CalendarClock, ChevronLeft, ChevronRight, NotebookPen, Plus, Sparkles, SquarePen } from '@/components/icons'
+import { rectOf, type AnchorRect } from '@/components/ui/Popover'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -19,7 +19,9 @@ import { visibleHours } from '../layout'
 import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst } from '../time'
 import { HATCH } from './Blocks'
 import { MonthView } from './MonthView'
-import { AutoPlaceBar } from './AutoPlaceBar'
+import { ActionMenu } from './ActionMenu'
+import { ADD_MODE_LABEL } from '@/features/brain-dump/ui/TaskAddPanel'
+import { AutoPlaceBar, unplacedOf } from './AutoPlaceBar'
 import { ScheduleAiBar } from './ScheduleAiBar'
 import { DayTaskList } from './DayTaskList'
 import { TimeGrid } from './TimeGrid'
@@ -60,6 +62,14 @@ export function CalendarView() {
   const { view, date, add, go } = useCalendarParams()
   // 패널에서 방금 추가한 Task — 캘린더에 NEW 로 표시
   const [newIds, setNewIds] = useState<ReadonlySet<number>>(new Set())
+  // + 메뉴 · AI 메뉴 (명세 11) — slot 이 있으면 빈 곳을 눌러 연 것 (그 날짜 · 시각을 미리 채워요)
+  const [menu, setMenu] = useState<{
+    kind: 'add' | 'ai'
+    anchor: AnchorRect
+    slot?: { date: string; minutes: number }
+  } | null>(null)
+  // 계획 할 일 추가 패널에 미리 채울 날짜 · 시각
+  const [prefill, setPrefill] = useState<{ date: string; startTime: string; endTime: string } | undefined>()
   // 월간은 오른쪽 패널에 보여줄 "선택한 날" 하루만 불러와요 (달 전체 요약은 MonthView 가 따로)
   const start = view === 'week' ? startOfWeek(date) : date
   const end = view === 'week' ? addDays(start, 6) : date
@@ -89,7 +99,11 @@ export function CalendarView() {
     focusIds,
     fadeOthers,
     gridEvents,
-  } = useTimetableInteractions(rawDays, date, { sidePanel: !!add, surface: 'calendar' })
+  } = useTimetableInteractions(rawDays, date, {
+    sidePanel: !!add,
+    surface: 'calendar',
+    onEmptyMenu: (slot, anchor) => setMenu({ kind: 'add', anchor, slot }),
+  })
   const { startHour, endHour } = useMemo(() => visibleHours(days, acts), [days, acts])
 
   // ── 이동 ──
@@ -135,6 +149,99 @@ export function CalendarView() {
     track('calendar.load_fail', { view_mode: view, view_date: date, error_status: errorStatus })
   }, [loadFailed, view, date, errorStatus])
 
+  // ── + 메뉴 (명세 11.2) — AI로 자동 Task 추가 · 계획 할 일 추가 · 실제 한 일 추가 ──
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const hhmm = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`
+  const addMenuItems = (slot: { date: string; minutes: number } | undefined, anchor: AnchorRect) => {
+    // 자정 뒤 칸(24:00~)은 다음 날
+    const at = slot && slot.minutes >= 1440 ? { date: addDays(slot.date, 1), minutes: slot.minutes - 1440 } : slot
+    const nowMin = nowKst().minutes
+    const future = !!at && (at.date > today || (at.date === today && at.minutes >= nowMin))
+    const panelView = view === 'month' ? 'week' : view
+    return [
+      {
+        key: 'ai',
+        label: ADD_MODE_LABEL.ai,
+        icon: <Sparkles />,
+        onSelect: () => {
+          track('calendar.task_add_click', { view_mode: view, view_date: at?.date ?? date, add_mode: 'ai' })
+          setPrefill(undefined)
+          go({ add: 'ai', view: panelView, ...(at ? { date: at.date } : {}) })
+        },
+      },
+      {
+        key: 'manual',
+        label: ADD_MODE_LABEL.manual,
+        icon: <SquarePen />,
+        onSelect: () => {
+          track('calendar.task_add_click', { view_mode: view, view_date: at?.date ?? date, add_mode: 'manual' })
+          setPrefill(
+            at
+              ? { date: at.date, startTime: hhmm(at.minutes), endTime: hhmm(Math.min(at.minutes + 60, 1439)) }
+              : undefined
+          )
+          go({ add: 'manual', view: panelView })
+        },
+      },
+      {
+        key: 'log',
+        label: ADD_MODE_LABEL.log,
+        icon: <NotebookPen />,
+        disabled: future,
+        hint: future ? '지난 시간만 남길 수 있어요' : undefined,
+        onSelect: () => {
+          if (at) {
+            track('calendar.activity_add_click', {
+              view_mode: view,
+              date_relation: dateRelationOf(at.date),
+            })
+            openActivity({ date: at.date, start: at.minutes, end: at.minutes + 60 }, anchor)
+            return
+          }
+          // 머리글에서 열면 예전 "실제로 한 일" 버튼처럼 오늘(또는 보고 있는 지난 날)의 최근 1시간
+          const now = nowKst()
+          const day = view === 'day' && date < today ? date : today
+          const endMin = day === today ? Math.floor(now.minutes / 10) * 10 : 13 * 60
+          track('calendar.activity_add_click', { view_mode: view, date_relation: dateRelationOf(day) })
+          openActivity({ date: day, start: Math.max(endMin - 60, 0), end: endMin }, anchor)
+        },
+      },
+    ]
+  }
+
+  // ── AI 메뉴 (명세 11.1) — AI로 일정 조정 · AI로 TimeTable 자동 배치 ──
+  const unplaced = unplacedOf(rawDays, today)
+  const unplacedTotal = unplaced.reduce((n, d) => n + d.count, 0)
+  const aiMenuItems = () => [
+    {
+      key: 'adjust',
+      label: 'AI로 일정 조정',
+      icon: <CalendarClock />,
+      onSelect: () => {
+        // 머리 아래 "일정 조정" 입력칸으로 (그 칸의 분석 이벤트가 그대로 나가요)
+        const el = document.getElementById('schedule-ai-input')
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el?.focus({ preventScroll: true })
+      },
+    },
+    {
+      key: 'auto_place',
+      label: 'AI로 TimeTable 자동 배치',
+      icon: <Sparkles />,
+      disabled: !unplacedTotal || proposing || fillPreviewing,
+      hint: !unplacedTotal ? '배치할 시간 미정 Task가 없어요' : undefined,
+      onSelect: () => {
+        // AutoPlaceBar 의 "AI로 TimeTable 배치하기" 와 같은 동작 · 같은 이벤트
+        track('calendar.auto_place_click', {
+          view_mode: view,
+          unscheduled_count: unplacedTotal,
+          day_count: unplaced.length,
+        })
+        previewFill({ startDate: unplaced[0].date, endDate: unplaced[unplaced.length - 1].date })
+      },
+    },
+  ]
+
   return (
     // 패널이 열려 있으면 xl 이상에서는 캘린더가 패널 폭만큼 비켜서 나란히 보여요
     // 모바일: 페이지 전체 흰 바탕 (명세 9.1) — 바깥 여백(px-5 · py-6)까지 덮어요
@@ -153,13 +260,26 @@ export function CalendarView() {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => {
-                  track('calendar.task_add_click', { view_mode: view, view_date: date })
-                  go({ add: 'ai', view: view === 'month' ? 'week' : view })
+                aria-haspopup="menu"
+                onClick={(e) => {
+                  // + 메뉴(3가지)를 열어요 (명세 11.2) — 메뉴 열기는 이벤트 없음, 항목을 고를 때 보내요
+                  setMenu({ kind: 'add', anchor: rectOf(e.currentTarget) })
                 }}
               >
                 <Plus className="size-4" />
                 Task 추가
+              </Button>
+            )}
+            {/* AI 메뉴 (명세 11.1) — 웹에는 떠 있는 버튼이 없어서 머리글에 둬요. 일정 조정 바 · 자동 배치가 있는 일간 · 주간만 */}
+            {view !== 'month' && (
+              <Button
+                variant="ai"
+                size="sm"
+                aria-haspopup="menu"
+                onClick={(e) => setMenu({ kind: 'ai', anchor: rectOf(e.currentTarget) })}
+              >
+                <Sparkles className="size-4" />
+                AI
               </Button>
             )}
             <div className={segmentedClass()} role="tablist" aria-label="보기">
@@ -235,24 +355,6 @@ export function CalendarView() {
         </h2>
         {isFetching && !isPending && <Spinner className="text-ink-4 size-3.5" />}
         {view !== 'month' && <Legend />}
-        {view !== 'month' && (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="max-md:ml-auto"
-            onClick={(e) => {
-              // 오늘(또는 보고 있는 지난 날)의 최근 1시간으로 열어요
-              const now = nowKst()
-              const day = view === 'day' && date < today ? date : today
-              const endMin = day === today ? Math.floor(now.minutes / 10) * 10 : 13 * 60
-              track('calendar.activity_add_click', { view_mode: view, date_relation: dateRelationOf(day) })
-              openActivity({ date: day, start: Math.max(endMin - 60, 0), end: endMin }, rectOf(e.currentTarget))
-            }}
-          >
-            <Plus className="size-4" />
-            실제로 한 일
-          </Button>
-        )}
       </div>
 
       {view === 'month' ? (
@@ -316,6 +418,7 @@ export function CalendarView() {
           >
             <TimeGrid
               {...gridEvents}
+              allowFutureEmpty
               days={days}
               startHour={startHour}
               endHour={endHour}
@@ -355,10 +458,27 @@ export function CalendarView() {
 
       {overlays}
 
+      {/* + 메뉴 · AI 메뉴 (명세 11) */}
+      {menu?.kind === 'add' && (
+        <ActionMenu
+          anchor={menu.anchor}
+          onClose={() => setMenu(null)}
+          label="추가"
+          items={addMenuItems(menu.slot, menu.anchor)}
+        />
+      )}
+      {menu?.kind === 'ai' && (
+        <ActionMenu anchor={menu.anchor} onClose={() => setMenu(null)} label="AI" items={aiMenuItems()} />
+      )}
+
       {add && (
         <TaskAddPanel
           mode={add}
-          onClose={() => go({ add: null })}
+          prefill={add === 'manual' ? prefill : undefined}
+          onClose={() => {
+            setPrefill(undefined)
+            go({ add: null })
+          }}
           onAdded={(info) => {
             setNewIds((prev) => new Set([...prev, ...info.taskIds]))
             const inView = (d: string) => d >= start && d <= end

@@ -39,7 +39,10 @@ export function GoalTaskForm({
   onDone,
   onCreated,
   surface,
+  prefill,
 }: {
+  /** 새로 추가할 때 미리 채울 날짜 · 시각 (캘린더 빈 곳을 눌러 열었을 때) */
+  prefill?: { date: string; startTime?: string | null; endTime?: string | null }
   goal: GoalCategory
   /** 없으면 새로 추가 */
   task?: TimeBlockTask
@@ -58,9 +61,9 @@ export function GoalTaskForm({
   const [f, setF] = useState(() => ({
     emoji: task?.emoji ?? '',
     name: task?.taskName ?? '',
-    date: task?.plannedStartAt?.slice(0, 10) ?? task?.date ?? task?.scheduledDate ?? todayKst(),
-    startTime: hm(task?.plannedStartAt),
-    endTime: hm(task?.plannedEndAt),
+    date: task?.plannedStartAt?.slice(0, 10) ?? task?.date ?? task?.scheduledDate ?? prefill?.date ?? todayKst(),
+    startTime: task ? hm(task.plannedStartAt) : (prefill?.startTime ?? hm(undefined)),
+    endTime: task ? hm(task.plannedEndAt) : (prefill?.endTime ?? hm(undefined)),
     sub:
       task?.generalCategoryId && subs.some((s) => s.generalCategoryId === task.generalCategoryId)
         ? task.generalCategoryId

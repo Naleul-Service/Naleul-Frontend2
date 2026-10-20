@@ -24,6 +24,8 @@ interface PopoverProps {
   width?: number
   label?: string
   className?: string
+  /** 메뉴처럼 닫기(X) 버튼이 필요 없을 때 */
+  hideClose?: boolean
 }
 
 const GAP = 8
@@ -36,7 +38,7 @@ const SHEET_BREAKPOINT = 640
  *  - 좁은 화면(640px 미만): 아래에서 올라오는 시트
  *  - 바깥 클릭 · ESC · 스크롤 · 창 크기 변경 시 닫혀요
  */
-export function Popover({ anchor, onClose, children, width = 320, label, className }: PopoverProps) {
+export function Popover({ anchor, onClose, children, width = 320, label, className, hideClose = false }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null)
   // 클릭으로만 열리는 컴포넌트라 첫 렌더에서 window 를 읽어도 안전해요 (resize 되면 닫힘)
   const [sheet] = useState(() => typeof window !== 'undefined' && window.innerWidth < SHEET_BREAKPOINT)
@@ -111,6 +113,7 @@ export function Popover({ anchor, onClose, children, width = 320, label, classNa
           className
         )}
       >
+        {!hideClose && (
         <button
           type="button"
           onClick={onClose}
@@ -119,6 +122,7 @@ export function Popover({ anchor, onClose, children, width = 320, label, classNa
         >
           <X className="size-4" />
         </button>
+        )}
         {children}
       </div>
     </>,

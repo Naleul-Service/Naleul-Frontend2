@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { cn } from '@/lib/cn'
 import Link from 'next/link'
 import { CalendarDays, Check, Sparkles } from '@/components/icons'
 import { Button, buttonClass } from '@/components/ui/Button'
@@ -40,7 +41,10 @@ export function ManualTaskAdd({
   inPanel = false,
   onCreated,
   surface = 'page',
+  prefill,
 }: {
+  /** 첫 Task 폼에 미리 채울 날짜 · 시각 */
+  prefill?: { date: string; startTime?: string | null; endTime?: string | null }
   /** 분석용 — task_add_manual.* 의 surface */
   surface?: TaskAddSurface
   /** 캘린더 옆 패널 안 — 캘린더가 이미 보이므로 "캘린더에서 보기"는 숨겨요 */
@@ -99,8 +103,8 @@ export function ManualTaskAdd({
 
   return (
     <Card className="p-5 sm:p-6">
-      <h2 className="text-h4">직접 추가하기</h2>
-      <p className="text-ink-3 mt-1 text-sm">
+      {!inPanel && <h2 className="text-h4">직접 추가하기</h2>}
+      <p className={cn('text-ink-3 text-sm', !inPanel && 'mt-1')}>
         이름과 날짜만 넣고 Enter. 시간을 비워 두면 그날 빈 시간에 AI가 배치할 수 있어요.
       </p>
 
@@ -137,6 +141,8 @@ export function ManualTaskAdd({
             key={`${selectedId}-${formKey}`}
             goal={goal.data}
             surface="task_add_manual"
+            // 빈 곳을 눌러 연 시각은 첫 Task 에만 (저장하고 다음 Task 는 비워서)
+            prefill={formKey === 0 ? prefill : undefined}
             // 저장하면 폼을 비우고 다음 Task 를 바로 적을 수 있게
             onDone={() => setFormKey((k) => k + 1)}
             onCreated={(t) => {

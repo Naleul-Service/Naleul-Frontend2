@@ -191,6 +191,7 @@ export function ScheduleAiBar({
       <div className="flex items-center gap-2">
         <AIBadge size="sm" />
         <input
+          id="schedule-ai-input"
           ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, MAX))}

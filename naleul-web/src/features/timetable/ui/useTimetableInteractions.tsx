@@ -194,7 +194,15 @@ export function useTimetableInteractions(
    * surface: 이 TimeTable 이 쓰인 화면 (분석). 없으면 'calendar' 로 봐요.
    *          'home' 이면 격자 이벤트(timetable.*)는 보내지 않아요 — 홈은 home.calendar_* 로 따로 보내요.
    */
-  opts: { sidePanel?: boolean; surface?: TimetableSurface } = {}
+  opts: {
+    sidePanel?: boolean
+    surface?: TimetableSurface
+    /**
+     * 빈 곳 클릭 → (실제 기록 바로 열기 대신) + 메뉴를 그 자리에 띄워요 (명세 11.4). 캘린더에서만 넘겨요.
+     * 앞날 · 지금 이후 칸도 메뉴는 떠요 (계획 할 일 추가는 앞날이 맞으니까)
+     */
+    onEmptyMenu?: (slot: { date: string; minutes: number }, anchor: AnchorRect) => void
+  } = {}
 ) {
   const surface: TimetableSurface = opts.surface ?? 'calendar'
   // 캘린더 보기: 격자는 일간(1일) · 주간(7일)에서만 그려요. 월간에서 Task 를 눌러도 격자 이벤트는 아니에요
@@ -496,10 +504,14 @@ export function useTimetableInteractions(
       date_relation: dateRelationOf(date, today),
       slot_minutes: minutes,
     })
-    openActivity(
-      { date, start: minutes, end: minutes + 60 },
-      { top: e.clientY, bottom: e.clientY, left: e.clientX, right: e.clientX }
-    )
+    const anchor = { top: e.clientY, bottom: e.clientY, left: e.clientX, right: e.clientX }
+    if (opts.onEmptyMenu) {
+      setOpened(null)
+      setConfirmDeleteId(null)
+      opts.onEmptyMenu({ date, minutes }, anchor)
+      return
+    }
+    openActivity({ date, start: minutes, end: minutes + 60 }, anchor)
   }
 
   // ── Task 작업 ──

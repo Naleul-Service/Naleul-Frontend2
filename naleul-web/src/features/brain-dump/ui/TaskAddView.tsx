@@ -88,7 +88,13 @@ export function TaskAddView({
   variant = 'page',
   onAdded,
   ref,
+  singleMode = false,
+  prefill,
 }: {
+  /** 한 가지 방식만 (캘린더 + 메뉴에서 연 패널 — 방식 고르기 탭을 숨겨요, 명세 11.3) */
+  singleMode?: boolean
+  /** 직접 추가 폼에 미리 채울 날짜 · 시각 */
+  prefill?: { date: string; startTime?: string | null; endTime?: string | null }
   initialMode?: 'ai' | 'manual' | 'log'
   /** page = /tasks/new 화면 · panel = 캘린더 오른쪽 패널 (좁은 폭, 결과는 옆 캘린더에서 확인) */
   variant?: 'page' | 'panel'
@@ -299,7 +305,8 @@ export function TaskAddView({
         />
       )}
 
-      {/* 추가 방식 고르기 */}
+      {/* 추가 방식 고르기 (캘린더 + 메뉴에서 연 패널은 방식이 정해져 있어서 숨겨요) */}
+      {!singleMode && (
       <div
         className={cn('grid gap-3', panel ? 'grid-cols-3 gap-1.5' : 'mt-5 max-w-5xl sm:grid-cols-3')}
         role="tablist"
@@ -375,6 +382,7 @@ export function TaskAddView({
           )
         })}
       </div>
+      )}
 
       <div ref={contentRef} className="contents">
         {mode === 'log' ? (
@@ -386,6 +394,7 @@ export function TaskAddView({
             <ManualTaskAdd
               inPanel={panel}
               surface={surface}
+              prefill={prefill}
               onCreated={(t) =>
                 onAdded?.({
                   taskIds: [t.taskId],

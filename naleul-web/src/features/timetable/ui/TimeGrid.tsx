@@ -101,6 +101,8 @@ interface Props {
   onTaskHold?: (t: TimeBlockTask) => void
   /** 터치: 묶음 고르는 중 빈 곳을 탭 → 묶음 풀기 */
   onGroupClear?: () => void
+  /** 앞날 · 지금 이후 빈 칸도 onEmptyClick 으로 (캘린더 + 메뉴 — 명세 11.4) */
+  allowFutureEmpty?: boolean
 }
 
 /** 기상은 취침보다, 취침은 기상보다 30분 이상 떨어져야 해요 (같은 날 칸 기준) */
@@ -180,6 +182,7 @@ export function TimeGrid({
   onHabitToggle,
   onTaskHold,
   onGroupClear,
+  allowFutureEmpty = false,
 }: Props) {
   const now = useNowKst()
   const from = startHour * 60
@@ -358,7 +361,7 @@ export function TimeGrid({
     const minutes = Math.floor((from + (e.clientY - rect.top) / PPM) / 30) * 30
     // 자정 뒤 칸(24:00~)은 다음 날 시각
     const nowOnDay = date === now.date ? now.minutes : addDays(date, 1) === now.date ? now.minutes + 1440 : null
-    if (date > now.date || (nowOnDay !== null && minutes >= nowOnDay)) {
+    if (!allowFutureEmpty && (date > now.date || (nowOnDay !== null && minutes >= nowOnDay))) {
       onBlockedEmptyClick?.(date, minutes)
       return
     }
@@ -524,7 +527,7 @@ export function TimeGrid({
           // 한 열로 그릴 땐 Task 와 실제 기록을 같이 놓고 겹치는 것끼리만 나란히 (col/cols 를 다시 정해요)
           if (!split && acts.length) layoutColumns<Placed<unknown>>([...tasks, ...acts])
           const isToday = d.date === now.date
-          const canClickEmpty = !!onEmptyClick && d.date <= now.date
+          const canClickEmpty = !!onEmptyClick && (allowFutureEmpty || d.date <= now.date)
           return (
             <div
               key={d.date}

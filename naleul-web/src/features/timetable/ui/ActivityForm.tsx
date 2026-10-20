@@ -224,7 +224,7 @@ export function ActivityForm({
     <form ref={formRef} onSubmit={submit} onKeyDown={onKeyDown} className="space-y-3 p-5">
       {/* 오른쪽 위 닫기(X) 버튼 자리 비워 두기 */}
       <div className="pr-8">
-        <p className="text-success text-[12px] font-bold">✓ 실제로 한 일</p>
+        <p className="text-success text-[12px] font-bold">✓ {a ? '실제로 한 일' : '실제 한 일 추가'}</p>
         <p className="text-ink-3 mt-0.5 text-[12px]">계획과 상관없이 그 시간에 실제로 한 일을 남겨요.</p>
       </div>
 
