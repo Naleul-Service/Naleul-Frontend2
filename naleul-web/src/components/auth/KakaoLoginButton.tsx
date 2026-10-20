@@ -1,4 +1,8 @@
+'use client'
+
 import { cn } from '@/lib/cn'
+import { EVENTS, trackBeforeLeave, type EventProps } from '@/lib/client/analytics'
+import { saveLoginAttempt, type LoginSurface } from '@/lib/loginAnalytics'
 import { kakaoAuthUrl } from './kakaoAuth'
 
 function KakaoIcon() {
@@ -14,11 +18,33 @@ function KakaoIcon() {
   )
 }
 
-/** 카카오 로그인 버튼. 로그인이 끝나면 next 경로로 돌아와요. */
-export function KakaoLoginButton({ next, className }: { next: string; className?: string }) {
+/**
+ * 카카오 로그인 버튼. 로그인이 끝나면 next 경로로 돌아와요.
+ * surface: 어느 화면의 버튼인지 → login.kakao_click / login_modal.kakao_click
+ * trackProps: 그 이벤트에 같이 보낼 속성 (모달이면 modal_reason · trigger_source 등)
+ */
+export function KakaoLoginButton({
+  next,
+  surface,
+  trackProps,
+  className,
+}: {
+  next: string
+  surface: LoginSurface
+  trackProps?: EventProps
+  className?: string
+}) {
   return (
     <a
       href={kakaoAuthUrl(next)}
+      onClick={() => {
+        // 카카오 페이지로 이동하기 직전 → beacon 으로 보내요 (기다리지 않아요)
+        saveLoginAttempt('kakao', surface)
+        void trackBeforeLeave(surface === 'login_page' ? EVENTS.loginKakaoClick : EVENTS.loginModalKakaoClick, {
+          redirect_path: next,
+          ...trackProps,
+        })
+      }}
       className={cn(
         'flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-[#FEE500] text-[15px] font-semibold text-[#191600] transition hover:brightness-95',
         className

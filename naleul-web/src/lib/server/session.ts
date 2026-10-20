@@ -8,6 +8,7 @@
  * 둘 다 set/delete 메서드를 가지고 있어서 아래 CookieWriter 하나로 받아요.
  */
 import { secondsUntilExp } from '@/lib/jwt'
+import { LOGIN_RESULT_COOKIE, LOGIN_RESULT_MAX_AGE_SEC, encodeLoginResult, type LoginResult } from '@/lib/loginAnalytics'
 
 export const COOKIE = {
   access: 'accessToken',
@@ -96,4 +97,18 @@ export function setGuestCookies(writer: CookieWriter, accessToken: string) {
 
 export function clearSessionCookies(writer: CookieWriter) {
   Object.values(COOKIE).forEach((name) => writer.delete(name))
+}
+
+/**
+ * 로그인 성공 결과를 1회용 쿠키로 남겨요 → 첫 화면(AnalyticsBootstrap)이 읽어서 login.complete 를 보내고 지워요.
+ * 브라우저 JS 가 읽어야 하므로 httpOnly 가 아니에요. (토큰은 넣지 않아요)
+ */
+export function setLoginResultCookie(writer: CookieWriter, result: LoginResult) {
+  writer.set(LOGIN_RESULT_COOKIE, encodeLoginResult(result), {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: LOGIN_RESULT_MAX_AGE_SEC,
+  })
 }

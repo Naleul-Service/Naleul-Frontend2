@@ -9,6 +9,7 @@
  * 실패하면 ApiError 를 throw 해요. → TanStack Query 의 error 로 들어가요.
  */
 import type { ApiEnvelope, Violation } from '@/types/api'
+import { resetAnalytics, trackBeforeLeave, type AnalyticsEventName } from './analytics'
 
 export class ApiError<D = unknown> extends Error {
   /** 숫자 HTTP 상태코드 (409, 422, 429, 502 ...) */
@@ -44,7 +45,16 @@ export const isGuestLoginRequired = (e: unknown) => isApiError(e) && e.status ==
 function goToLogin() {
   if (typeof window === 'undefined') return
   const here = window.location.pathname + window.location.search
-  window.location.href = `/login?redirect=${encodeURIComponent(here)}`
+  window.location.href = `/login?redirect=${encodeURIComponent(here)}&from=unauthorized`
+}
+
+/**
+ * 막힌 API 를 Amplitude 에 남길 때 쓰는 모양 (login_modal.view 의 blocked_api_path).
+ * 숫자 id 는 :id 로 바꾸고 쿼리는 빼요 → "POST /v1/goals/:id/tasks" 처럼 묶어서 볼 수 있어요.
+ */
+function apiPathForAnalytics(method: string, path: string) {
+  const clean = path.split('?')[0].replace(/\/\d+(?=\/|$)/g, '/:id')
+  return `${method} ${clean}`
 }
 
 async function request<T>(method: string, path: string, body?: unknown, init?: RequestInit): Promise<T> {
@@ -67,7 +77,13 @@ async function request<T>(method: string, path: string, body?: unknown, init?: R
 
   if (!res.ok || !json?.success) {
     if (res.status === 401 && json?.status === 'GUEST_LOGIN_REQUIRED') {
-      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(LOGIN_REQUIRED_EVENT))
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent(LOGIN_REQUIRED_EVENT, {
+            detail: { reason: 'save', source: 'guest_blocked_api', blockedApiPath: apiPathForAnalytics(method, path) },
+          })
+        )
+      }
     } else if (res.status === 401) goToLogin()
     throw new ApiError(res.status, json?.message ?? '문제가 생겼어요. 다시 시도해 주세요.', json?.status, json?.data)
   }
@@ -84,8 +100,16 @@ export const api = {
   delete: <T>(path: string, body?: unknown, init?: RequestInit) => request<T>('DELETE', path, body, init),
 }
 
-/** 로그아웃: 쿠키 삭제 후 로그인 화면으로 */
-export async function logout() {
+/**
+ * 로그아웃: (이벤트 전송) → Amplitude 초기화 → 쿠키 삭제 → 로그인 화면으로
+ * trackEvent: 어디서 로그아웃했는지 (settings.logout_confirm_click / sidebar.logout_click)
+ *
+ * 순서가 중요해요. 이벤트를 다 보낸 뒤에 reset 해야 그 이벤트가 "로그아웃한 사람"에게 붙어요.
+ * reset 을 먼저 하면 로그아웃 이벤트가 익명 사용자에게 붙어요.
+ */
+export async function logout(trackEvent?: AnalyticsEventName) {
+  if (trackEvent) await trackBeforeLeave(trackEvent)
+  resetAnalytics()
   await fetch('/api/auth/logout', { method: 'POST' }).catch(() => undefined)
-  window.location.href = '/login'
+  window.location.href = '/login?from=logout'
 }

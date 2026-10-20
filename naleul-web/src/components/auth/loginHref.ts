@@ -12,10 +12,17 @@ export function currentPath() {
  *  - 'login' : 배너 · 사이드바의 "로그인" 버튼처럼 직접 로그인하려고 할 때
  */
 export type LoginDialogReason = 'save' | 'login'
+
+/** 로그인 모달을 연 곳 (Amplitude trigger_source) */
+export type LoginTriggerSource = 'guest_blocked_api' | 'guest_banner' | 'sidebar' | 'login_error_return'
+
 export interface LoginDialogDetail {
   reason?: LoginDialogReason
   /** 카카오 콜백이 실패를 알려준 경우 (loginError 코드) */
   error?: string
+  source?: LoginTriggerSource
+  /** 둘러보기 중 401 GUEST_LOGIN_REQUIRED 로 막힌 API (예: POST /v1/goals) */
+  blockedApiPath?: string
 }
 
 export function openLoginDialog(detail: LoginDialogDetail = {}) {

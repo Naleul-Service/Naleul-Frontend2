@@ -17,17 +17,23 @@ const PUBLIC_PATHS = ['/login']
 
 const isPublic = (pathname: string) => PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
 
-function redirectToLogin(req: NextRequest) {
+/**
+ * from: 로그인 화면에 온 이유 (login.pageview 의 entry_source)
+ *  - guest_unavailable : 둘러보기 토큰을 못 받음
+ *  - session_expired   : refresh token 이 만료/무효
+ */
+function redirectToLogin(req: NextRequest, from: 'guest_unavailable' | 'session_expired') {
   const url = new URL('/login', req.url)
   const target = req.nextUrl.pathname + req.nextUrl.search
   if (target !== '/') url.searchParams.set('redirect', target)
+  url.searchParams.set('from', from)
   return NextResponse.redirect(url)
 }
 
 /** 둘러보기 토큰을 받아 지금 요청 · 응답 양쪽에 넣어요. 실패하면 로그인 화면으로 */
 async function startGuest(req: NextRequest) {
   const token = await guestLogin()
-  if (!token) return redirectToLogin(req)
+  if (!token) return redirectToLogin(req, 'guest_unavailable')
   req.cookies.set(COOKIE.access, token)
   req.cookies.delete(COOKIE.refresh)
   req.cookies.set(COOKIE.userName, GUEST_NAME)
@@ -57,7 +63,7 @@ export async function proxy(req: NextRequest) {
   // 서버가 잠깐 응답을 못 하면 로그아웃시키지 않고 그대로 보여줘요 (API 호출 때 다시 재발급 시도)
   if (tokens === 'unavailable') return NextResponse.next()
   if (!tokens) {
-    const res = redirectToLogin(req)
+    const res = redirectToLogin(req, 'session_expired')
     clearSessionCookies(res.cookies)
     return res
   }

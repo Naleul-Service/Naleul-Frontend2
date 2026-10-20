@@ -1,4 +1,8 @@
+'use client'
+
 import { cn } from '@/lib/cn'
+import { EVENTS, trackBeforeLeave, type EventProps } from '@/lib/client/analytics'
+import { saveLoginAttempt, type LoginSurface } from '@/lib/loginAnalytics'
 import { appleAuthUrl, isAppleLoginEnabled } from './appleAuth'
 
 function AppleIcon() {
@@ -13,11 +17,28 @@ function AppleIcon() {
  * Apple 로그인 버튼 (Apple 디자인 가이드: 검정 배경 + 흰 로고).
  * NEXT_PUBLIC_APPLE_CLIENT_ID / NEXT_PUBLIC_APPLE_REDIRECT_URI 가 없으면 아무것도 그리지 않아요.
  */
-export function AppleLoginButton({ next, className }: { next: string; className?: string }) {
+export function AppleLoginButton({
+  next,
+  surface,
+  trackProps,
+  className,
+}: {
+  next: string
+  surface: LoginSurface
+  trackProps?: EventProps
+  className?: string
+}) {
   if (!isAppleLoginEnabled()) return null
   return (
     <a
       href={appleAuthUrl(next)}
+      onClick={() => {
+        saveLoginAttempt('apple', surface)
+        void trackBeforeLeave(surface === 'login_page' ? EVENTS.loginAppleClick : EVENTS.loginModalAppleClick, {
+          redirect_path: next,
+          ...trackProps,
+        })
+      }}
       className={cn(
         'flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-black text-[15px] font-semibold text-white transition hover:bg-black/85 dark:bg-white dark:text-black dark:hover:bg-white/85',
         className

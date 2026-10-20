@@ -9,9 +9,10 @@
  */
 import { NextResponse, type NextRequest } from 'next/server'
 import { kakaoLogin } from '@/lib/server/authApi'
-import { clearSessionCookies, setTokenCookies, setUserCookies } from '@/lib/server/session'
+import { clearSessionCookies, setLoginResultCookie, setTokenCookies, setUserCookies } from '@/lib/server/session'
 import { safeRedirectPath } from '@/lib/redirectPath'
 import { LOGIN_ERROR_PARAM } from '@/components/auth/kakaoAuth'
+import { LOGIN_PROVIDER_PARAM } from '@/lib/loginAnalytics'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = request.nextUrl
@@ -23,6 +24,7 @@ export async function GET(request: NextRequest) {
   const toLogin = (error: string) => {
     const url = new URL(next, origin)
     url.searchParams.set(LOGIN_ERROR_PARAM, error)
+    url.searchParams.set(LOGIN_PROVIDER_PARAM, 'kakao') // login.fail 이벤트용
     return NextResponse.redirect(url)
   }
 
@@ -37,5 +39,12 @@ export async function GET(request: NextRequest) {
   clearSessionCookies(response.cookies)
   setTokenCookies(response.cookies, { accessToken: result.accessToken, refreshToken: result.refreshToken })
   setUserCookies(response.cookies, { ...result, userRole: result.userRole ?? 'FREE' })
+  // login.complete 이벤트용 1회용 쿠키 (첫 화면에서 읽고 지워요)
+  setLoginResultCookie(response.cookies, {
+    provider: 'kakao',
+    userId: String(result.userId),
+    userRole: result.userRole ?? 'FREE',
+    isNewUser: result.isNewUser,
+  })
   return response
 }

@@ -105,6 +105,8 @@ export interface KakaoLoginData {
   userName?: string
   userEmail?: string
   userRole?: UserRole
+  /** 이번 로그인이 신규 가입인지 (백엔드 LoginResponse.isNewUser) */
+  isNewUser?: boolean
 }
 
 /**
