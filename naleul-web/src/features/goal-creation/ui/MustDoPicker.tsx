@@ -3,6 +3,7 @@
 import { useState, type KeyboardEvent, type Ref } from 'react'
 import { Check, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
 
 export const MUST_DO_MAX = 5
 const ITEM_MAX = 30
@@ -38,6 +39,8 @@ export function MustDoPicker({
   draft: draftProp,
   onDraftChange,
   inputRef,
+  surface,
+  sessionId,
 }: {
   value: string[]
   onChange: (next: string[]) => void
@@ -46,6 +49,9 @@ export function MustDoPicker({
   draft?: string
   onDraftChange?: (v: string) => void
   inputRef?: Ref<HTMLInputElement>
+  /** 분석: 이 부품이 쓰인 화면 (goal_new 시작 화면 / goal_review 정리 확인의 꼭 할 일 창). 있으면 이벤트를 보내요 */
+  surface?: 'goal_new' | 'goal_review'
+  sessionId?: number
 }) {
   const [innerDraft, setInnerDraft] = useState('')
   const draft = draftProp ?? innerDraft
@@ -54,18 +60,39 @@ export function MustDoPicker({
   const has = (v: string) => value.includes(v)
 
   const toggle = (v: string) => {
-    if (has(v)) onChange(value.filter((x) => x !== v))
-    else if (!full) onChange([...value, v])
+    const removing = has(v)
+    if (!removing && full) return
+    if (surface) {
+      track('must_do_picker.toggle', {
+        surface,
+        must_do_action: removing ? 'remove' : 'add',
+        item_source: suggestions.includes(v) ? 'suggestion' : 'custom',
+        must_do_count: value.length + (removing ? -1 : 1),
+        session_id: sessionId,
+      })
+    }
+    if (removing) onChange(value.filter((x) => x !== v))
+    else onChange([...value, v])
   }
-  const addDraft = () => {
+  const addDraft = (method: 'button' | 'enter') => {
     const v = clean(draft)
-    if (v && !has(v) && !full) onChange([...value, v])
+    const added = !!v && !has(v) && !full
+    // 이미 있는 일 · 빈 글은 칩이 안 생기고 입력칸만 비워져요 (조용히 무시) → 실제로 들어간 것만 셉니다
+    if (surface && added) {
+      track('must_do_picker.add', {
+        surface,
+        submit_method: method,
+        must_do_count: value.length + 1,
+        session_id: sessionId,
+      })
+    }
+    if (added) onChange([...value, v])
     setDraft('')
   }
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter' || e.nativeEvent.isComposing) return
     e.preventDefault()
-    addDraft()
+    addDraft('enter')
   }
 
   // 추천에 없는, 직접 적은 일
@@ -132,7 +159,7 @@ export function MustDoPicker({
         />
         <button
           type="button"
-          onClick={addDraft}
+          onClick={() => addDraft('button')}
           disabled={disabled || full || !draft.trim()}
           className="text-ink-2 hover:text-ink inline-flex items-center gap-1 text-[13px] font-semibold disabled:opacity-40"
         >

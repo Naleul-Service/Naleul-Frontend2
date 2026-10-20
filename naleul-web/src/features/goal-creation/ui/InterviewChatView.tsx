@@ -6,6 +6,7 @@ import { CheckCircle2, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { track } from '@/lib/client/analytics'
 import { LEAVE_NOTICE } from '../constants'
 import { goalFlowPath } from '../routes'
 import { useInterviewChat } from '../hooks/useInterviewChat'
@@ -33,16 +34,55 @@ export function InterviewChatView({ initial, onResync }: Props) {
   const [leaveOpen, setLeaveOpen] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
+  // ── 분석 (노션 「목표 만들기」 goal_chat.*) ──
+  const sid = chat.sessionId
+  const qc = meta.questionCount
+  useEffect(() => {
+    track('goal_chat.pageview', {
+      session_id: sid,
+      question_count: initial.questionCount,
+      max_questions: initial.maxQuestions,
+      // 전에 나눈 대화가 있는 세션을 다시 연 건지 (사용자 답이 하나라도 있으면)
+      is_resume: initial.messages.some((m) => m.role === 'USER'),
+    })
+    // 화면이 그려질 때 한 번
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // 새 말풍선이 생기면 맨 아래로
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
   }, [items.length, pending, meta.status, rejectedMessage])
 
   const leave = () => router.push('/goal')
-  const onClose = () => (interviewing ? setLeaveOpen(true) : leave())
+  const onClose = () => {
+    track('goal_chat.close_click', { session_id: sid, has_confirm: interviewing, question_count: qc })
+    if (interviewing) setLeaveOpen(true)
+    else leave()
+  }
 
   const done = meta.status === 'READY_TO_GENERATE' && !rejectedMessage
-  const goReview = () => router.replace(goalFlowPath.review(chat.sessionId))
+  const goReview = () => {
+    track('goal_chat.review_click', { session_id: sid })
+    router.replace(goalFlowPath.review(chat.sessionId))
+  }
+
+  // 인터뷰 완료 · 거절은 화면에 보이는 순간 한 번
+  useEffect(() => {
+    if (!done) return
+    track('goal_chat.interview_complete', {
+      session_id: sid,
+      complete_reason: chat.finishedEarly.current ? 'finish_early' : 'all_collected',
+      question_count: qc,
+    })
+    // 완료되는 순간 한 번
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [done])
+  useEffect(() => {
+    if (rejectedMessage) track('goal_chat.goal_rejected_view', { session_id: sid, question_count: qc })
+    // 거절 안내가 뜨는 순간 한 번 (문구 원문은 보내지 않아요)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!rejectedMessage])
 
   // 인터뷰가 끝나면 마지막 말풍선을 잠깐 보여준 뒤 정리 확인 화면(G-2)으로 이동
   useEffect(() => {
@@ -60,7 +100,19 @@ export function InterviewChatView({ initial, onResync }: Props) {
         action={
           interviewing &&
           meta.canFinishEarly && (
-            <Button variant="secondary" size="sm" onClick={chat.finishEarly} disabled={!canInteract}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                track('goal_chat.finish_early_click', {
+                  session_id: sid,
+                  question_count: qc,
+                  max_questions: meta.maxQuestions,
+                })
+                chat.finishEarly()
+              }}
+              disabled={!canInteract}
+            >
               <Sparkles className="text-brand size-3.5" />
               <span className="hidden sm:inline">바로 계획 만들기</span>
               <span className="sm:hidden">바로 만들기</span>
@@ -76,15 +128,34 @@ export function InterviewChatView({ initial, onResync }: Props) {
             item.role === 'ASSISTANT' ? (
               <AssistantBubble key={item.key} content={item.content} />
             ) : (
-              <UserBubble key={item.key} item={item} onRetry={chat.retry} onDiscard={chat.discardFailed} />
+              <UserBubble
+                key={item.key}
+                item={item}
+                onRetry={(key) => {
+                  track('goal_chat.retry_click', { session_id: sid })
+                  chat.retry(key)
+                }}
+                onDiscard={(key) => {
+                  track('goal_chat.discard_click', { session_id: sid })
+                  chat.discardFailed(key)
+                }}
+              />
             )
           )}
 
           {/* 마지막 질문의 빠른 답변 */}
           {interviewing && currentQuestion && currentQuestion.quickReplies.length > 0 && !pending && (
             <div className="-mt-1 flex flex-wrap gap-2 pl-[42px]">
-              {currentQuestion.quickReplies.map((reply) => (
-                <Chip key={reply} onClick={() => chat.sendQuickReply(reply)} disabled={!canInteract}>
+              {currentQuestion.quickReplies.map((reply, i) => (
+                <Chip
+                  key={reply}
+                  onClick={() => {
+                    // 칩 문장은 AI 가 만든 거라 원문 대신 순서만 보내요
+                    track('goal_chat.quick_reply_click', { session_id: sid, question_index: qc, reply_index: i })
+                    chat.sendQuickReply(reply)
+                  }}
+                  disabled={!canInteract}
+                >
                   {reply}
                 </Chip>
               ))}
@@ -96,7 +167,13 @@ export function InterviewChatView({ initial, onResync }: Props) {
           {rejectedMessage && (
             <div className="border-line bg-canvas mt-2 rounded-2xl border p-5">
               <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{rejectedMessage}</p>
-              <Button className="mt-4" onClick={() => router.replace('/goal/new')}>
+              <Button
+                className="mt-4"
+                onClick={() => {
+                  track('goal_chat.restart_click', { session_id: sid })
+                  router.replace('/goal/new')
+                }}
+              >
                 다른 목표로 시작하기
               </Button>
             </div>
@@ -115,7 +192,10 @@ export function InterviewChatView({ initial, onResync }: Props) {
                 <div className="mb-2 flex justify-end">
                   <button
                     type="button"
-                    onClick={chat.skip}
+                    onClick={() => {
+                      track('goal_chat.skip_click', { session_id: sid, question_index: qc })
+                      chat.skip()
+                    }}
                     disabled={!canInteract}
                     className="text-ink-3 hover:text-ink rounded-lg px-2 py-1 text-[13px] font-medium disabled:opacity-40"
                   >
@@ -126,7 +206,15 @@ export function InterviewChatView({ initial, onResync }: Props) {
               <ChatComposer
                 value={chat.input}
                 onChange={chat.setInput}
-                onSubmit={chat.sendText}
+                onSubmit={(method) => {
+                  track('goal_chat.answer_send', {
+                    session_id: sid,
+                    question_index: qc,
+                    answer_length: chat.input.trim().length,
+                    submit_method: method,
+                  })
+                  chat.sendText()
+                }}
                 disabled={!canInteract}
                 autoFocus
               />
@@ -157,8 +245,14 @@ export function InterviewChatView({ initial, onResync }: Props) {
         description={LEAVE_NOTICE}
         confirmLabel="나가기"
         cancelLabel="계속 만들기"
-        onConfirm={leave}
-        onCancel={() => setLeaveOpen(false)}
+        onConfirm={() => {
+          track('goal_chat.leave_confirm_click', { session_id: sid, question_count: qc })
+          leave()
+        }}
+        onCancel={(method) => {
+          track('goal_chat.leave_cancel_click', { session_id: sid, close_method: method })
+          setLeaveOpen(false)
+        }}
       />
     </div>
   )

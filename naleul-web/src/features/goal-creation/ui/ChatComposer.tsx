@@ -9,7 +9,8 @@ const MAX_LENGTH = 500
 interface ChatComposerProps {
   value: string
   onChange: (value: string) => void
-  onSubmit: () => void
+  /** method: Enter 로 보냈는지 버튼으로 보냈는지 (분석용) */
+  onSubmit: (method: 'enter' | 'button') => void
   disabled?: boolean
   placeholder?: string
   autoFocus?: boolean
@@ -38,7 +39,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, placeholder,
     if (e.key !== 'Enter' || e.shiftKey) return
     if (e.nativeEvent.isComposing) return
     e.preventDefault()
-    if (canSend) onSubmit()
+    if (canSend) onSubmit('enter')
   }
 
   const nearLimit = value.length > MAX_LENGTH - 50
@@ -47,7 +48,7 @@ export function ChatComposer({ value, onChange, onSubmit, disabled, placeholder,
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        if (canSend) onSubmit()
+        if (canSend) onSubmit('button')
       }}
       className={cn(
         'border-line-strong bg-surface flex items-end gap-2 rounded-[20px] border p-2 pl-4 transition-colors',

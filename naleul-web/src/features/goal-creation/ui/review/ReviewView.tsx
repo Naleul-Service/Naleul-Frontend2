@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronRight, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
 import { isApiError } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
 import { toast } from '@/stores/toastStore'
 import { goalCreationApi, goalCreationKeys } from '../../api'
 import { PLAN_INTENSITY_DESCRIPTION, PLAN_INTENSITY_LABEL, PLANNING_STYLE_LABEL } from '../../constants'
@@ -74,7 +75,27 @@ export function ReviewView({ session }: { session: SessionDetail }) {
   // 계획 강도 — 기본은 안정형. 초안 화면에서 바꾸면 한 번 다시 만들어요
   const [intensity, setIntensity] = useState<PlanIntensity>('STEADY')
 
-  const openEdit = (slot: SlotKey) => {
+  // ── 분석 (노션 「목표 만들기」 goal_review.*) ──
+  const regenerate = session.status === 'DRAFT_READY'
+  useEffect(() => {
+    track('goal_review.pageview', {
+      session_id: sessionId,
+      is_regenerate: regenerate,
+      filled_slot_count: Object.values(session.slots).filter((s) => s?.status === 'FILLED').length,
+      ai_style: aiStyle,
+    })
+    // 화면이 그려질 때 한 번
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  // 수정 창이 열려 있는 항목 (꼭 할 일 창은 mustDo)
+  const editingKey = mustDoOpen ? 'mustDo' : editing
+  const slotResult = (props: Record<string, string | number | undefined>) =>
+    track('goal_review.slot_edit_result', { session_id: sessionId, slot_key: editingKey ?? undefined, ...props })
+  const cancelEdit = (key: string, method: ModalCloseMethod | 'cancel_button') =>
+    track('goal_review.slot_edit_cancel', { session_id: sessionId, slot_key: key, close_method: method })
+
+  const openEdit = (slot: SlotKey, value: string | null) => {
+    track('goal_review.slot_edit_open', { session_id: sessionId, slot_key: slot, was_empty: !value })
     setSaveError(null)
     setEditing(slot)
   }
@@ -90,10 +111,12 @@ export function ReviewView({ session }: { session: SessionDetail }) {
           ? { ...prev, status: turn.status, slots: turn.slots, summary: turn.summary, mustDoItems: turn.mustDoItems }
           : prev
       )
+      slotResult({ result: 'success' })
       setEditing(null)
       setMustDoOpen(false)
       toast.success('수정했어요.')
     } catch (error) {
+      slotResult({ result: 'fail', error_status: isApiError(error) ? error.httpStatus : undefined })
       if (isApiError(error) && error.httpStatus === 409) {
         // 이미 생성이 시작됐거나 끝난 세션 → 서버 상태로 화면 이동
         toast.show(error.message)
@@ -108,6 +131,7 @@ export function ReviewView({ session }: { session: SessionDetail }) {
   }
 
   const chooseStyle = (next: PlanningStyle) => {
+    track('goal_review.style_select', { session_id: sessionId, planning_style: next, ai_style: aiStyle })
     setStyle(next)
     setStyleByUser(true)
     markStyleSelectedByUser(sessionId)
@@ -115,6 +139,13 @@ export function ReviewView({ session }: { session: SessionDetail }) {
 
   const generate = async () => {
     if (generating) return
+    track('goal_review.generate_click', {
+      session_id: sessionId,
+      planning_style: style,
+      style_by_user: styleByUser,
+      plan_intensity: intensity,
+      is_regenerate: regenerate,
+    })
     setGenerating(true)
     try {
       // 성향은 사용자가 직접 골랐을 때만 보내요 (안 보내면 서버가 대화에서 추정한 값 사용)
@@ -122,23 +153,33 @@ export function ReviewView({ session }: { session: SessionDetail }) {
         intensity,
         ...(styleByUser ? { planningStyle: style } : {}),
       })
+      track('goal_review.generate_result', { session_id: sessionId, result: 'success', draft_id: res.draftId })
       queryClient.removeQueries({ queryKey: goalCreationKeys.session(sessionId) })
-      router.replace(goalFlowPath.generating(sessionId, res.draftId))
+      router.replace(goalFlowPath.generating(sessionId, res.draftId, 'review'))
     } catch (error) {
+      track('goal_review.generate_result', {
+        session_id: sessionId,
+        result: 'fail',
+        error_status: isApiError(error) ? error.httpStatus : undefined,
+      })
       setGenerating(false)
       if (isApiError(error) && error.httpStatus === 409) {
         // 이미 생성 중 (다른 탭에서 눌렀거나 더블클릭) → 생성 중 화면으로
-        router.replace(goalFlowPath.generating(sessionId))
+        router.replace(goalFlowPath.generating(sessionId, undefined, 'review'))
         return
       }
       toast.error(isApiError(error) ? error.message : '계획을 만들지 못했어요. 다시 시도해 주세요.')
     }
   }
 
-  const regenerate = session.status === 'DRAFT_READY'
-
   return (
-    <FlowShell>
+    <FlowShell
+      onClose={() => {
+        // 확인창 없이 나가요 (세션은 남아서 시작 화면에서 이어서 만들기 가능)
+        track('goal_review.close_click', { session_id: sessionId })
+        router.push('/goal')
+      }}
+    >
       <div className="flex-1 overflow-y-auto">
         <main className="mx-auto w-full max-w-2xl px-4 pt-8 pb-10 sm:px-6 sm:pt-12">
           <Badge tone="brand">
@@ -153,23 +194,44 @@ export function ReviewView({ session }: { session: SessionDetail }) {
               <SummaryRow
                 label="목표"
                 value={summary?.goalStatement ?? null}
-                onClick={() => openEdit('goalStatement')}
+                onClick={() => openEdit('goalStatement', summary?.goalStatement ?? null)}
               />
-              <SummaryRow label="수치" value={summary?.metricText ?? null} onClick={() => openEdit('metric')} />
-              <SummaryRow label="기한" value={summary?.deadlineText ?? null} onClick={() => openEdit('deadline')} />
-              <SummaryRow label="계획" value={summary?.approach ?? null} onClick={() => openEdit('approach')} />
+              <SummaryRow
+                label="수치"
+                value={summary?.metricText ?? null}
+                onClick={() => openEdit('metric', summary?.metricText ?? null)}
+              />
+              <SummaryRow
+                label="기한"
+                value={summary?.deadlineText ?? null}
+                onClick={() => openEdit('deadline', summary?.deadlineText ?? null)}
+              />
+              <SummaryRow
+                label="계획"
+                value={summary?.approach ?? null}
+                onClick={() => openEdit('approach', summary?.approach ?? null)}
+              />
               {summary?.motivation && (
-                <SummaryRow label="이유" value={summary.motivation} onClick={() => openEdit('motivation')} />
+                <SummaryRow
+                  label="이유"
+                  value={summary.motivation}
+                  onClick={() => openEdit('motivation', summary.motivation)}
+                />
               )}
               <SummaryRow
                 label="실천 시간"
                 value={summary?.preferenceText ?? null}
-                onClick={() => openEdit('practicePreference')}
+                onClick={() => openEdit('practicePreference', summary?.preferenceText ?? null)}
               />
               <SummaryRow
                 label="꼭 할 일"
                 value={session.mustDoItems?.length ? session.mustDoItems.join(' · ') : null}
                 onClick={() => {
+                  track('goal_review.slot_edit_open', {
+                    session_id: sessionId,
+                    slot_key: 'mustDo',
+                    was_empty: !session.mustDoItems?.length,
+                  })
                   setSaveError(null)
                   setMustDoDraft(session.mustDoItems ?? [])
                   setMustDoText('')
@@ -221,7 +283,10 @@ export function ReviewView({ session }: { session: SessionDetail }) {
                     type="button"
                     role="radio"
                     aria-checked={selected}
-                    onClick={() => setIntensity(value)}
+                    onClick={() => {
+                      track('goal_review.intensity_select', { session_id: sessionId, plan_intensity: value })
+                      setIntensity(value)
+                    }}
                     className={cn(
                       'rounded-2xl border p-4 text-left transition-colors',
                       selected ? 'border-brand bg-brand-soft' : 'border-line-strong hover:border-ink-4'
@@ -251,16 +316,37 @@ export function ReviewView({ session }: { session: SessionDetail }) {
 
       <Modal
         open={mustDoOpen}
-        onClose={() => !saving && setMustDoOpen(false)}
+        onClose={(method) => {
+          if (saving) return
+          cancelEdit('mustDo', method)
+          setMustDoOpen(false)
+        }}
         title="꼭 하고 싶은 일"
         description="고른 일은 계획에 꼭 루틴으로 넣어 드려요."
         dismissible={!saving}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setMustDoOpen(false)} disabled={saving}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                cancelEdit('mustDo', 'cancel_button')
+                setMustDoOpen(false)
+              }}
+              disabled={saving}
+            >
               취소
             </Button>
-            <Button onClick={() => save({ mustDoItems: withDraft(mustDoDraft, mustDoText) })} loading={saving}>
+            <Button
+              onClick={() => {
+                track('goal_review.slot_edit_save_click', {
+                  session_id: sessionId,
+                  slot_key: 'mustDo',
+                  submit_method: 'button',
+                })
+                save({ mustDoItems: withDraft(mustDoDraft, mustDoText) })
+              }}
+              loading={saving}
+            >
               저장
             </Button>
           </>
@@ -272,6 +358,8 @@ export function ReviewView({ session }: { session: SessionDetail }) {
           draft={mustDoText}
           onDraftChange={setMustDoText}
           disabled={saving}
+          surface="goal_review"
+          sessionId={sessionId}
         />
         {saveError && <p className="text-danger mt-2 text-[13px]">{saveError}</p>}
       </Modal>
@@ -280,8 +368,19 @@ export function ReviewView({ session }: { session: SessionDetail }) {
         slots={session.slots}
         saving={saving}
         serverError={saveError}
-        onClose={() => setEditing(null)}
+        onClose={(method) => {
+          if (editing) cancelEdit(editing, method)
+          setEditing(null)
+        }}
         onSave={save}
+        onSaveClick={(method) =>
+          track('goal_review.slot_edit_save_click', {
+            session_id: sessionId,
+            slot_key: editing ?? undefined,
+            submit_method: method,
+          })
+        }
+        onValidationError={(message) => slotResult({ result: 'fail', validation_error: message })}
       />
     </FlowShell>
   )

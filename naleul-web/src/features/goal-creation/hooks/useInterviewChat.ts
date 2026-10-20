@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { isApiError } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
 import { toast } from '@/stores/toastStore'
 import { goalCreationApi, goalCreationKeys } from '../api'
 import type { GoalMessage, GoalSlots, GoalSummary, SessionDetail, SessionStatus, TurnResponse } from '../types'
@@ -106,8 +107,11 @@ export function useInterviewChat({ initial, onResync, onNotFound }: Options) {
    * 공통 에러 처리.
    * @returns 다시 보내기로 남겨둘지 여부
    */
+  // 분석: 마지막 실패를 화면이 어떻게 처리했는지 (goal_chat.answer_result 의 fail_handling)
+  const lastHandling = useRef<'retry_shown' | 'dropped' | 'rejected' | 'resynced' | 'not_found'>('dropped')
   const handleError = useCallback(
     (error: unknown): 'retry' | 'drop' => {
+      lastHandling.current = 'retry_shown'
       if (!isApiError(error)) {
         toast.error('문제가 생겼어요. 다시 시도해 주세요.')
         return 'retry'
@@ -116,6 +120,8 @@ export function useInterviewChat({ initial, onResync, onNotFound }: Options) {
 
       if (isRetryable(httpStatus)) return 'retry'
 
+      lastHandling.current =
+        httpStatus === 422 ? 'rejected' : httpStatus === 404 ? 'not_found' : httpStatus === 409 ? 'resynced' : 'dropped'
       if (httpStatus === 422) {
         // 부적절한 목표 → 서버가 세션을 ABANDONED 로 바꿈
         setRejectedMessage(message)
@@ -141,9 +147,22 @@ export function useInterviewChat({ initial, onResync, onNotFound }: Options) {
     [onNotFound, onResync, queryClient]
   )
 
+  // 분석: 지금 질문 수 (콜백 안에서 최신 값을 읽으려고 ref)
+  const questionCountRef = useRef(initial.questionCount)
+  useEffect(() => {
+    questionCountRef.current = meta.questionCount
+  }, [meta.questionCount])
+  // "바로 계획 만들기"로 끝났는지 (goal_chat.interview_complete 의 complete_reason)
+  const finishedEarly = useRef(false)
+
   /** 답변 보내기 / 건너뛰기 / 다시 보내기 */
   const send = useCallback(
-    async (content: string | null, skip: boolean, retryKey?: string) => {
+    async (
+      content: string | null,
+      skip: boolean,
+      retryKey?: string,
+      answerType: 'text' | 'quick_reply' | 'skip' | 'retry' = skip ? 'skip' : 'text'
+    ) => {
       if (pendingRef.current) return
       const text = content?.trim() ?? null
       if (!skip && !text) return
@@ -164,10 +183,24 @@ export function useInterviewChat({ initial, onResync, onNotFound }: Options) {
 
       try {
         const turn = await goalCreationApi.answer(sessionId, { content: skip ? null : text, skip })
+        track('goal_chat.answer_result', {
+          session_id: sessionId,
+          answer_type: answerType,
+          result: 'success',
+          question_count: turn.questionCount,
+        })
         patchItem(key, { sendState: undefined })
         applyTurn(turn)
       } catch (error) {
         const result = handleError(error)
+        track('goal_chat.answer_result', {
+          session_id: sessionId,
+          answer_type: answerType,
+          result: 'fail',
+          error_status: isApiError(error) ? error.httpStatus : undefined,
+          fail_handling: lastHandling.current,
+          question_count: questionCountRef.current,
+        })
         if (result === 'retry') {
           const msg = isApiError(error) ? error.message : undefined
           patchItem(key, { sendState: 'failed', failedMessage: msg })
@@ -185,7 +218,7 @@ export function useInterviewChat({ initial, onResync, onNotFound }: Options) {
   )
 
   const sendText = useCallback(() => send(input, false), [send, input])
-  const sendQuickReply = useCallback((reply: string) => send(reply, false), [send])
+  const sendQuickReply = useCallback((reply: string) => send(reply, false, undefined, 'quick_reply'), [send])
   const skip = useCallback(() => send(null, true), [send])
 
   const retry = useCallback(
@@ -193,7 +226,7 @@ export function useInterviewChat({ initial, onResync, onNotFound }: Options) {
       const item = items.find((it) => it.key === key)
       if (!item) return
       // 502 는 서버에 사용자 메시지가 이미 저장된 상태. 같은 내용으로 보내면 중복 저장되지 않아요.
-      send(item.content, item.skip, key)
+      send(item.content, item.skip, key, 'retry')
     },
     [items, send]
   )
@@ -213,7 +246,9 @@ export function useInterviewChat({ initial, onResync, onNotFound }: Options) {
     pendingRef.current = true
     setPending(true)
     try {
-      applyTurn(await goalCreationApi.finishInterview(sessionId))
+      const turn = await goalCreationApi.finishInterview(sessionId)
+      finishedEarly.current = true
+      applyTurn(turn)
     } catch (error) {
       if (handleError(error) === 'retry') toast.error('계획 단계로 넘어가지 못했어요. 다시 시도해 주세요.')
     } finally {
@@ -246,6 +281,8 @@ export function useInterviewChat({ initial, onResync, onNotFound }: Options) {
     retry,
     discardFailed,
     finishEarly,
+    /** 분석: 인터뷰가 "바로 계획 만들기"로 끝났는지 */
+    finishedEarly,
   }
 }
 

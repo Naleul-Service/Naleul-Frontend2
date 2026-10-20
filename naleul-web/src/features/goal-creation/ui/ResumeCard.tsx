@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
 import { goalCreationApi, goalCreationKeys } from '../api'
 import { pathForStatus } from '../routes'
 import type { SessionStatus } from '../types'
@@ -29,6 +30,7 @@ export function ResumeCard({ className }: { className?: string }) {
   return (
     <Link
       href={href}
+      onClick={() => track('goal_new.resume_click', { session_id: session.sessionId, resume_status: session.status })}
       className={cn(
         'border-line bg-surface hover:border-line-strong flex items-center gap-4 rounded-2xl border p-4 transition-colors',
         className

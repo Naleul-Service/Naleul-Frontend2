@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
@@ -521,6 +521,15 @@ interface InlineItemEditorProps {
   /** 최소 개수 등으로 지울 수 없을 때 이유 */
   deleteDisabledReason?: string | null
   className?: string
+  /** 분석용 알림 (저장 · 취소 · 입력 오류 · 삭제) */
+  analytics?: {
+    onSaved?: (method: 'button' | 'enter') => void
+    onCancel?: (method: 'esc' | 'cancel_button') => void
+    onError?: (message: string) => void
+    onDeleteClick?: () => void
+    onDeleteBlocked?: (message: string) => void
+    onDeleteConfirm?: () => void
+  }
 }
 
 /**
@@ -536,16 +545,26 @@ export function InlineItemEditor({
   onDelete,
   deleteDisabledReason,
   className,
+  analytics,
 }: InlineItemEditorProps) {
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const formId = 'plan-item-form'
+  // 이번 저장이 Enter 로 된 건지 (form 제출만으론 구분이 안 돼서 keydown 에서 표시해 둬요)
+  const byEnter = useRef(false)
 
   const done = (result: EditResult) => {
+    analytics?.onSaved?.(byEnter.current ? 'enter' : 'button')
+    byEnter.current = false
     setError(null)
     onSave(result)
   }
-  const formProps = { plan, formId, onDone: done, onError: setError }
+  const showError = (message: string) => {
+    byEnter.current = false
+    analytics?.onError?.(message)
+    setError(message)
+  }
+  const formProps = { plan, formId, onDone: done, onError: showError }
   const canDelete = 'index' in target && target.index !== null && !!onDelete
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -554,9 +573,13 @@ export function InlineItemEditor({
       e.preventDefault()
       e.stopPropagation()
       if (confirmDelete) setConfirmDelete(false)
-      else onClose()
+      else {
+        analytics?.onCancel?.('esc')
+        onClose()
+      }
       return
     }
+    if (e.key === 'Enter' && !e.shiftKey) byEnter.current = true
     // 여러 줄 칸에서도 Enter 는 저장 (Shift+Enter 는 줄바꿈)
     if (e.key === 'Enter' && !e.shiftKey && e.target instanceof HTMLTextAreaElement) {
       e.preventDefault()
@@ -588,7 +611,15 @@ export function InlineItemEditor({
           <Button variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>
             취소
           </Button>
-          <Button variant="danger" size="sm" autoFocus onClick={() => onDelete?.()}>
+          <Button
+            variant="danger"
+            size="sm"
+            autoFocus
+            onClick={() => {
+              analytics?.onDeleteConfirm?.()
+              onDelete?.()
+            }}
+          >
             삭제
           </Button>
         </div>
@@ -600,7 +631,11 @@ export function InlineItemEditor({
               size="sm"
               className="text-danger hover:bg-danger-soft"
               onClick={() => {
-                if (deleteDisabledReason) return setError(deleteDisabledReason)
+                analytics?.onDeleteClick?.()
+                if (deleteDisabledReason) {
+                  analytics?.onDeleteBlocked?.(deleteDisabledReason)
+                  return setError(deleteDisabledReason)
+                }
                 setError(null)
                 setConfirmDelete(true)
               }}
@@ -610,7 +645,15 @@ export function InlineItemEditor({
             </Button>
           )}
           <span className="text-ink-4 ml-auto hidden text-[12px] sm:inline">Enter 저장 · Esc 취소</span>
-          <Button variant="ghost" size="sm" className="max-sm:ml-auto" onClick={onClose}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="max-sm:ml-auto"
+            onClick={() => {
+              analytics?.onCancel?.('cancel_button')
+              onClose()
+            }}
+          >
             취소
           </Button>
           <Button size="sm" type="submit" form={formId}>

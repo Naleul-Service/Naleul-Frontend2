@@ -17,12 +17,17 @@ export function GoalKindPicker({
   onChange,
   disabled,
   compact = false,
+  onPickType,
+  onPickSub,
 }: {
   value: GoalKindValue | null
   onChange: (v: GoalKindValue | null) => void
   disabled?: boolean
   /** 목표 헤더 수정처럼 좁은 곳 — 1단계를 칩으로 */
   compact?: boolean
+  /** 분석용: 1단계 · 2단계를 눌렀을 때 */
+  onPickType?: (t: GoalType) => void
+  onPickSub?: (t: GoalType, s: GoalSubType) => void
 }) {
   // 1단계만 고르고 2단계는 아직인 상태
   const [pendingType, setPendingType] = useState<GoalType | null>(value?.goalType ?? null)
@@ -30,6 +35,7 @@ export function GoalKindPicker({
   const type = GOAL_TYPES.find((t) => t.value === activeType)
 
   const pickType = (t: GoalType) => {
+    onPickType?.(t)
     setPendingType(t)
     const opt = GOAL_TYPES.find((o) => o.value === t)!
     // 2단계가 "기타" 하나뿐(1단계 기타)이면 바로 그걸로
@@ -38,6 +44,7 @@ export function GoalKindPicker({
   }
 
   const pickSub = (s: GoalSubType) => {
+    onPickSub?.(activeType!, s)
     onChange({
       goalType: activeType!,
       goalSubType: s,

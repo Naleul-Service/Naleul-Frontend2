@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, Check, Sparkles } from 'lucide-react'
@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { isApiError } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
 import { toast } from '@/stores/toastStore'
 import { goalCreationApi, goalCreationKeys } from '../../api'
 import { POLL_INTERVAL_MS, POLL_TIMEOUT_MS, PROGRESS_STEPS } from '../../constants'
 import { wasStyleSelectedByUser } from '../../planningStyleMemory'
-import { goalFlowPath } from '../../routes'
+import { goalFlowPath, type GenerateSource } from '../../routes'
 import { FlowShell } from '../SessionGate'
 
 const FAIL_MESSAGE = '계획을 만드는 데 실패했어요. 다시 시도해 주세요.'
@@ -26,11 +27,31 @@ const FAIL_MESSAGE = '계획을 만드는 데 실패했어요. 다시 시도해 
  *  - 90초 초과 → 에러 화면 (서버는 계속 만들 수도 있어요)
  * 화면을 벗어나면 컴포넌트가 사라지면서 폴링도 자동으로 멈춰요.
  */
-export function GeneratingView({ sessionId, draftId }: { sessionId: number; draftId: number }) {
+export function GeneratingView({
+  sessionId,
+  draftId,
+  source = 'resume',
+}: {
+  sessionId: number
+  draftId: number
+  source?: GenerateSource
+}) {
   const router = useRouter()
   const queryClient = useQueryClient()
   const [timedOut, setTimedOut] = useState(false)
   const [retrying, setRetrying] = useState(false)
+
+  // ── 분석 (노션 「목표 만들기」 goal_generating.*) ──
+  const startedAt = useRef(0)
+  const pollCount = useRef(0)
+  const elapsed = () => Math.round((Date.now() - startedAt.current) / 1000)
+  const ids = { session_id: sessionId, draft_id: draftId }
+  useEffect(() => {
+    startedAt.current = Date.now()
+    track('goal_generating.view', { session_id: sessionId, draft_id: draftId, generate_source: source })
+    // 화면이 그려질 때 한 번
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     const timer = setTimeout(() => setTimedOut(true), POLL_TIMEOUT_MS)
@@ -39,7 +60,10 @@ export function GeneratingView({ sessionId, draftId }: { sessionId: number; draf
 
   const draft = useQuery({
     queryKey: goalCreationKeys.draft(sessionId, draftId),
-    queryFn: () => goalCreationApi.getDraft(sessionId, draftId),
+    queryFn: () => {
+      pollCount.current++
+      return goalCreationApi.getDraft(sessionId, draftId)
+    },
     staleTime: 0,
     gcTime: 0,
     retry: 2, // 폴링 중 네트워크가 잠깐 끊겨도 바로 실패로 보지 않게
@@ -53,27 +77,64 @@ export function GeneratingView({ sessionId, draftId }: { sessionId: number; draf
 
   const status = draft.data?.status
 
+  // 생성 단계가 바뀔 때마다 (분석 → 세부 목표 → 마일스톤 → 루틴 → 점검)
+  const progressStep = draft.data?.progressStep
+  useEffect(() => {
+    if (!progressStep || status !== 'GENERATING') return
+    track('goal_generating.step_view', { ...ids, progress_step: progressStep, seconds_elapsed: elapsed() })
+    // 단계가 바뀔 때만
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progressStep])
+
   useEffect(() => {
     if (status !== 'READY') return
+    track('goal_generating.draft_ready', {
+      session_id: sessionId,
+      draft_id: draftId,
+      seconds_elapsed: elapsed(),
+      poll_count: pollCount.current,
+    })
     queryClient.invalidateQueries({ queryKey: goalCreationKeys.active() })
     router.replace(goalFlowPath.draft(sessionId))
-  }, [status, sessionId, router, queryClient])
+  }, [status, sessionId, draftId, router, queryClient])
+
+  // 실패 화면 (서버 FAILED · 90초 초과 · 상태 확인 요청 실패)
+  const failed = status === 'FAILED' || (timedOut && status !== 'READY') || (draft.isError && !draft.data)
+  const failReason = status === 'FAILED' ? 'server_failed' : draft.isError && !draft.data ? 'poll_error' : 'timeout'
+  useEffect(() => {
+    if (!failed) return
+    track('goal_generating.fail_view', {
+      ...ids,
+      fail_reason: failReason,
+      seconds_elapsed: elapsed(),
+      error_status: isApiError(draft.error) ? draft.error.httpStatus : undefined,
+    })
+    // 실패 화면이 뜨는 순간 한 번
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [failed])
 
   const retry = async () => {
+    track('goal_generating.retry_click', { ...ids, fail_reason: failReason })
     setRetrying(true)
     try {
       const style = draft.data?.planningStyle
       const body = wasStyleSelectedByUser(sessionId) && style ? { planningStyle: style } : {}
       const res = await goalCreationApi.requestDraft(sessionId, body)
-      router.replace(goalFlowPath.generating(sessionId, res.draftId))
+      track('goal_generating.retry_result', { session_id: sessionId, result: 'success', draft_id: res.draftId })
+      router.replace(goalFlowPath.generating(sessionId, res.draftId, 'retry'))
     } catch (error) {
+      track('goal_generating.retry_result', {
+        session_id: sessionId,
+        result: 'fail',
+        error_status: isApiError(error) ? error.httpStatus : undefined,
+      })
       setRetrying(false)
       if (isApiError(error) && error.httpStatus === 409) {
         // 아직 서버가 이전 요청을 만들고 있음 → 그 초안을 이어서 기다려요
         const session = await goalCreationApi.getSession(sessionId).catch(() => null)
         const latest = session?.latestDraft
         if (latest?.status === 'GENERATING') {
-          router.replace(goalFlowPath.generating(sessionId, latest.draftId))
+          router.replace(goalFlowPath.generating(sessionId, latest.draftId, 'retry'))
           return
         }
         if (latest?.status === 'READY') {
@@ -86,12 +147,16 @@ export function GeneratingView({ sessionId, draftId }: { sessionId: number; draf
   }
 
   const close = () => {
+    track('goal_generating.close_click', {
+      session_id: sessionId,
+      draft_status: failed ? 'FAILED' : (status ?? 'unknown'),
+      seconds_elapsed: elapsed(),
+    })
     if (status === 'GENERATING' || !status) toast.show('계획은 계속 만들어지고 있어요. 나중에 이어서 볼 수 있어요.')
     router.push('/goal')
   }
 
   // ── 실패 / 시간 초과 ──
-  const failed = status === 'FAILED' || (timedOut && status !== 'READY') || (draft.isError && !draft.data)
   if (failed) {
     const message =
       status === 'FAILED'
@@ -109,7 +174,13 @@ export function GeneratingView({ sessionId, draftId }: { sessionId: number; draf
             <p className="mt-5 text-lg font-bold">계획을 만들지 못했어요</p>
             <p className="text-ink-3 mt-2 text-sm leading-relaxed">{message}</p>
             <div className="mt-6 flex justify-center gap-2">
-              <Button variant="secondary" onClick={() => router.replace(goalFlowPath.review(sessionId))}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  track('goal_generating.edit_info_click', { session_id: sessionId, fail_reason: failReason })
+                  router.replace(goalFlowPath.review(sessionId))
+                }}
+              >
                 정보 수정하기
               </Button>
               <Button onClick={retry} loading={retrying}>

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Field, inputClass, textareaClass, toNumber } from '../formParts'
 import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { DAY_LABEL, DAYS } from '../../constants'
 import type { DayOfWeek, GoalSlots, SlotKey, SlotsPatch } from '../../types'
 
@@ -364,21 +364,40 @@ interface SlotEditModalProps {
   saving: boolean
   /** 서버에서 거절된 이유 (400 등) */
   serverError: string | null
-  onClose: () => void
+  /** method: 취소 버튼 · X · 바깥 · Esc (분석용) */
+  onClose: (method: ModalCloseMethod | 'cancel_button') => void
   onSave: (patch: SlotsPatch) => void
+  /** 분석: '저장'을 눌렀을 때 (Enter 로 제출해도) */
+  onSaveClick?: (method: 'button' | 'enter') => void
+  /** 분석: 화면 검사에서 막혔을 때 (앱이 정한 오류 문구) */
+  onValidationError?: (message: string) => void
 }
 
-export function SlotEditModal({ slot, slots, saving, serverError, onClose, onSave }: SlotEditModalProps) {
+export function SlotEditModal({
+  slot,
+  slots,
+  saving,
+  serverError,
+  onClose,
+  onSave,
+  onSaveClick,
+  onValidationError,
+}: SlotEditModalProps) {
   const [localError, setLocalError] = useState<string | null>(null)
   const formId = 'slot-edit-form'
+  // 이번 제출이 입력칸 Enter 로 된 건지 (form 제출만으론 구분이 안 돼서 keydown 에서 표시해 둬요)
+  const byEnter = useRef(false)
 
-  const close = () => {
+  const close = (method: ModalCloseMethod | 'cancel_button') => {
     setLocalError(null)
-    onClose()
+    onClose(method)
   }
 
   const handleResult = (result: BuildResult) => {
+    onSaveClick?.(byEnter.current ? 'enter' : 'button')
+    byEnter.current = false
     if ('error' in result) {
+      onValidationError?.(result.error)
       setLocalError(result.error)
       return
     }
@@ -397,7 +416,7 @@ export function SlotEditModal({ slot, slots, saving, serverError, onClose, onSav
       dismissible={!saving}
       footer={
         <>
-          <Button variant="secondary" onClick={close} disabled={saving}>
+          <Button variant="secondary" onClick={() => close('cancel_button')} disabled={saving}>
             취소
           </Button>
           <Button type="submit" form={formId} loading={saving}>
@@ -407,7 +426,14 @@ export function SlotEditModal({ slot, slots, saving, serverError, onClose, onSav
       }
     >
       {/* key: 다른 항목을 열 때마다 폼 상태를 새로 시작 */}
-      {Form && <Form key={slot} slots={slots} formId={formId} onSubmit={handleResult} />}
+      <div
+        onKeyDownCapture={(e) => {
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.target instanceof HTMLInputElement)
+            byEnter.current = true
+        }}
+      >
+        {Form && <Form key={slot} slots={slots} formId={formId} onSubmit={handleResult} />}
+      </div>
       {error && (
         <p role="alert" className="text-danger mt-3 text-sm font-medium">
           {error}

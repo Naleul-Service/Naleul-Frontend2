@@ -1,20 +1,21 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { ArrowRight, MessageCircle, NotebookPen, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge, Chip } from '@/components/ui/Chip'
 import { isApiError } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
 import { toast } from '@/stores/toastStore'
 import { useGoalCategories } from '@/features/goal/api'
 import { MUST_DO_SUGGESTIONS, isKindComplete, subOption, type GoalKindValue } from '@/features/goal/kind'
 import { GoalKindPicker } from '@/features/goal/ui/GoalKindPicker'
 import { useAiUsage, useRefreshUsage, usageItem } from '@/features/usage/api'
 import { UsageLine } from '@/features/usage/ui/UsageLine'
-import { goalCreationApi } from '../api'
+import { goalCreationApi, goalCreationKeys } from '../api'
 import { EXAMPLE_GOALS } from '../constants'
 import { MustDoPicker, withDraft } from './MustDoPicker'
 import { FlowHeader } from './FlowHeader'
@@ -43,20 +44,78 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
   const outOfWeek = weekLeft?.remaining === 0
   const outOfQuota = sessionLeft?.remaining === 0 || draftLeft?.remaining === 0 || outOfWeek
 
+  // ── 분석 (노션 Tracking Plan 「목표 만들기」) ──
+  const quotaState = outOfWeek
+    ? 'out_weekly'
+    : sessionLeft?.remaining === 0
+      ? 'out_daily'
+      : draftLeft?.remaining === 0
+        ? 'out_draft'
+        : 'ok'
+  // ResumeCard 와 같은 요청 (캐시를 같이 써서 한 번만 불러요)
+  const active = useQuery({ queryKey: goalCreationKeys.active(), queryFn: goalCreationApi.getActive, staleTime: 0 })
+  const sent = useRef({ pageview: false, quota: false })
+  useEffect(() => {
+    if (sent.current.pageview || usage.isPending || active.isPending) return
+    sent.current.pageview = true
+    track('goal_new.pageview', {
+      is_refine: !!sourceGoalId,
+      has_resume: !!active.data,
+      quota_state: quotaState,
+      remaining_sessions: sessionLeft?.remaining ?? undefined,
+    })
+  }, [usage.isPending, active.isPending, active.data, sourceGoalId, quotaState, sessionLeft?.remaining])
+  useEffect(() => {
+    if (!outOfQuota || sent.current.quota) return
+    sent.current.quota = true
+    track('goal_new.quota_block_view', { quota_state: quotaState })
+  }, [outOfQuota, quotaState])
+  const hasInput = !!kind || !!text.trim() || mustDo.length > 0 || !!mustDoDraft.trim()
+
   const start = useMutation({
-    mutationFn: (initialMessage?: string) =>
+    mutationFn: ({ initialMessage }: { initialMessage?: string; mode: 'typed' | 'ask_ai' | 'refine_name' }) =>
       goalCreationApi.start(initialMessage, sourceGoalId, kind, withDraft(mustDo, mustDoDraft)),
-    onSuccess: (turn) => {
+    onSuccess: (turn, { mode }) => {
+      track('goal_new.start_result', { result: 'success', session_id: turn.sessionId, start_mode: mode })
       refreshUsage()
       router.push(`/goal/new/${turn.sessionId}`)
     },
-    onError: (error) => toast.error(isApiError(error) ? error.message : '시작하지 못했어요. 다시 시도해 주세요.'),
+    onError: (error, { mode }) => {
+      track('goal_new.start_result', {
+        result: 'fail',
+        error_status: isApiError(error) ? error.httpStatus : undefined,
+        start_mode: mode,
+      })
+      toast.error(isApiError(error) ? error.message : '시작하지 못했어요. 다시 시도해 주세요.')
+    },
   })
 
   const goalText = text.trim()
-  const submit = () => {
-    if (goalText && kindReady && !start.isPending && !outOfQuota) start.mutate(goalText)
+  const begin = (mode: 'typed' | 'ask_ai' | 'refine_name') => {
+    track('goal_new.start_click', {
+      start_mode: mode,
+      goal_type: kind?.goalType,
+      goal_sub_type: kind?.goalSubType,
+      goal_text_length: mode === 'typed' ? goalText.length : 0,
+      must_do_count: withDraft(mustDo, mustDoDraft).length,
+      has_unadded_draft: !!mustDoDraft.trim(),
+      is_refine: !!sourceGoalId,
+    })
+    start.mutate({ initialMessage: mode === 'typed' ? goalText : undefined, mode })
   }
+  const submit = () => {
+    if (goalText && kindReady && !start.isPending && !outOfQuota) begin('typed')
+  }
+  // 막힌 시작 버튼을 누를 때 — 왜 막혔는지
+  const disabledReason = !kind
+    ? 'no_kind'
+    : !kindReady
+      ? 'no_label'
+      : !goalText
+        ? 'no_text'
+        : outOfQuota
+          ? 'quota'
+          : null
 
   // 이동 중에도 버튼이 다시 눌리지 않게 성공 후에도 막아둬요
   const busy = start.isPending || start.isSuccess
@@ -72,7 +131,13 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
 
   return (
     <div className="bg-surface flex min-h-dvh flex-col">
-      <FlowHeader title="새 목표" onClose={() => router.push('/goal')} />
+      <FlowHeader
+        title="새 목표"
+        onClose={() => {
+          track('goal_new.close_click', { has_input: hasInput })
+          router.push('/goal')
+        }}
+      />
 
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-12 pb-10 sm:px-6 sm:pt-20">
         <Badge tone="brand" className="self-start">
@@ -90,6 +155,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
         {!sourceGoalId && (
           <Link
             href="/goal/add?mode=record"
+            onClick={() => track('goal_new.record_mode_click', { has_input: hasInput })}
             className="border-line bg-surface hover:border-line-strong group mt-6 flex items-center gap-3 rounded-2xl border px-4 py-3"
           >
             <span className="bg-ink text-on-ink grid size-9 shrink-0 place-items-center rounded-xl">
@@ -117,7 +183,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             </p>
             <button
               type="button"
-              onClick={() => start.mutate(undefined)}
+              onClick={() => begin('refine_name')}
               disabled={busy || !kindReady}
               className="mt-2 font-semibold underline-offset-2 hover:underline disabled:opacity-40"
             >
@@ -130,7 +196,13 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
           <p className="mb-3 text-[14px] font-semibold">
             <span className="text-brand mr-1.5">1</span>카테고리
           </p>
-          <GoalKindPicker value={kind} onChange={setKind} disabled={busy} />
+          <GoalKindPicker
+            value={kind}
+            onChange={setKind}
+            disabled={busy}
+            onPickType={(t) => track('goal_new.kind_type_select', { goal_type: t })}
+            onPickSub={(t, s) => track('goal_new.kind_sub_select', { goal_type: t, goal_sub_type: s })}
+          />
         </section>
 
         <section className={kindReady ? 'mt-8' : 'pointer-events-none mt-8 opacity-40'}>
@@ -154,8 +226,16 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             className="border-line-strong bg-surface placeholder:text-ink-4 focus:border-ink-3 disabled:bg-subtle h-12 w-full rounded-2xl border px-4 text-[15px] outline-none"
           />
           <div className="mt-3 flex flex-wrap gap-2">
-            {examples.map((goal) => (
-              <Chip key={goal} size="sm" onClick={() => setText(goal)} disabled={busy || !kindReady}>
+            {examples.map((goal, i) => (
+              <Chip
+                key={goal}
+                size="sm"
+                onClick={() => {
+                  track('goal_new.example_click', { goal_sub_type: kind?.goalSubType, example_index: i })
+                  setText(goal)
+                }}
+                disabled={busy || !kindReady}
+              >
                 {goal}
               </Chip>
             ))}
@@ -188,20 +268,29 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             inputRef={mustDoInput}
             suggestions={kind ? (MUST_DO_SUGGESTIONS[kind.goalSubType] ?? []) : []}
             disabled={busy || !kindReady}
+            surface="goal_new"
           />
         </section>
 
-        <Button
-          size="lg"
-          variant="brand"
-          className="mt-8 w-full"
-          onClick={submit}
-          loading={start.isPending}
-          disabled={busy || !kindReady || !goalText || outOfQuota}
+        {/* disabled 버튼은 click 이 안 나서 감싼 요소의 pointerdown 으로 막힌 클릭을 잡아요 */}
+        <div
+          className="mt-8"
+          onPointerDown={() => {
+            if (!busy && disabledReason) track('goal_new.disabled_click', { disabled_reason: disabledReason })
+          }}
         >
-          <Sparkles className="size-4" />
-          AI와 목표 설계 시작하기
-        </Button>
+          <Button
+            size="lg"
+            variant="brand"
+            className="w-full"
+            onClick={submit}
+            loading={start.isPending}
+            disabled={busy || !kindReady || !goalText || outOfQuota}
+          >
+            <Sparkles className="size-4" />
+            AI와 목표 설계 시작하기
+          </Button>
+        </div>
         <UsageLine className="mt-2 justify-center" items={[sessionLeft, weekLeft, draftLeft]} />
         {outOfQuota && (
           <p className="text-danger mt-1 text-center text-[13px] font-semibold">
@@ -209,7 +298,11 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
               ? '이번 주 AI 목표 만들기를 모두 썼어요. 월요일 0시에 다시 채워져요'
               : '오늘 AI 목표 만들기 횟수를 모두 썼어요. 내일 0시에 다시 채워져요'}{' '}
             — 지금은 직접 만들기를 쓸 수 있어요.{' '}
-            <Link href="/settings/membership" className="text-brand underline">
+            <Link
+              href="/settings/membership"
+              onClick={() => track('goal_new.membership_click', { quota_state: quotaState })}
+              className="text-brand underline"
+            >
               Pro로 더 많이
             </Link>
           </p>
@@ -217,7 +310,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
 
         <button
           type="button"
-          onClick={() => start.mutate(undefined)}
+          onClick={() => begin('ask_ai')}
           disabled={busy || !kindReady || outOfQuota}
           className="text-ink-3 hover:text-ink mt-6 inline-flex items-center gap-1.5 self-start text-sm font-medium disabled:opacity-40"
         >

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
@@ -18,13 +18,14 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
 import { cn } from '@/lib/cn'
 import { isApiError } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
 import { toast } from '@/stores/toastStore'
 import { useUserColors } from '@/features/color/api'
 import { goalKeys } from '@/features/goal/api'
 import { goalCreationApi, goalCreationKeys } from '../../api'
 import { PLAN_INTENSITY_DESCRIPTION, PLAN_INTENSITY_LABEL, PLANNING_STYLE_LABEL } from '../../constants'
 import { markStyleSelectedByUser, wasStyleSelectedByUser } from '../../planningStyleMemory'
-import { goalFlowPath } from '../../routes'
+import { goalFlowPath, type GenerateSource } from '../../routes'
 import type {
   DraftResponse,
   GoalPlan,
@@ -133,6 +134,50 @@ export function DraftReviewView({ session, draft }: Props) {
   const oneTimes = plan.tasks.length - routines.length
   const busy = confirming || regenerating || cancelling
 
+  // ── 분석 (노션 「목표 만들기」 goal_draft.*) ──
+  const ids = { session_id: sessionId, draft_id: draft.draftId }
+  const sentPageview = useRef(false)
+  useEffect(() => {
+    // 남은 횟수를 같이 보내려고 사용량을 받은 뒤 한 번
+    if (sentPageview.current || usage.isPending) return
+    sentPageview.current = true
+    track('goal_draft.pageview', {
+      ...ids,
+      plan_routine_count: routines.length,
+      plan_one_time_count: oneTimes,
+      plan_subgoal_count: draft.plan.subGoals.length,
+      plan_milestone_count: draft.plan.milestones.length,
+      warning_count: draft.plan.warnings.length,
+      regen_remaining: regenRemaining ?? undefined,
+      planning_style: draft.plan.goal.planningStyle,
+      plan_intensity: draft.plan.fit?.intensity,
+      has_fit: !!draft.plan.fit,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usage.isPending])
+  /** 초안 항목 종류 (item_kind) */
+  const kindOf = (t: EditTarget) =>
+    t.kind === 'goal'
+      ? 'goal'
+      : t.kind === 'subGoal'
+        ? 'sub_goal'
+        : t.kind === 'milestone'
+          ? 'milestone'
+          : t.taskType === 'ROUTINE'
+            ? 'routine'
+            : 'one_time'
+  /** 카드의 줄·추가 버튼을 눌러 편집칸 열기 (다른 항목 편집칸은 저장 없이 닫혀요) */
+  const openEditor = (t: EditTarget) => {
+    const index = 'index' in t ? t.index : null
+    track('goal_draft.item_edit_open', {
+      ...ids,
+      item_kind: kindOf(t),
+      is_new: 'index' in t && t.index === null,
+      list_position: index ?? undefined,
+    })
+    setEditTarget(t)
+  }
+
   // ── 편집 ────────────────────────────────────────────────────
   const update = (next: GoalPlan) => {
     // 마일스톤 날짜·수치, 할 일 마감을 자동으로 맞춰요 → 하나 고쳤다고 다른 곳에 오류가 생기지 않게
@@ -196,6 +241,27 @@ export function DraftReviewView({ session, draft }: Props) {
         onSave={applyEdit}
         onDelete={deleteTarget}
         deleteDisabledReason={deleteBlockReason(editTarget)}
+        analytics={{
+          onSaved: (method) =>
+            track('goal_draft.item_edit_save', {
+              ...ids,
+              item_kind: kindOf(editTarget),
+              is_new: 'index' in editTarget && editTarget.index === null,
+              submit_method: method,
+            }),
+          onCancel: (method) =>
+            track('goal_draft.item_edit_cancel', { ...ids, item_kind: kindOf(editTarget), close_method: method }),
+          onError: (message) =>
+            track('goal_draft.item_edit_error', { ...ids, item_kind: kindOf(editTarget), validation_error: message }),
+          onDeleteClick: () => track('goal_draft.item_delete_click', { ...ids, item_kind: kindOf(editTarget) }),
+          onDeleteBlocked: (message) =>
+            track('goal_draft.item_delete_blocked', {
+              ...ids,
+              item_kind: kindOf(editTarget),
+              validation_error: message,
+            }),
+          onDeleteConfirm: () => track('goal_draft.item_delete_confirm', { ...ids, item_kind: kindOf(editTarget) }),
+        }}
       />
     ) : null
 
@@ -225,22 +291,32 @@ export function DraftReviewView({ session, draft }: Props) {
   }
 
   // ── 다시 생성 / 성향 변경 ──────────────────────────────────
-  const regenerate = async (body: {
-    feedback?: string
-    planningStyle?: PlanningStyle
-    intensity?: PlanIntensity
-    basePlan?: GoalPlan
-  }) => {
+  const regenerate = async (
+    body: {
+      feedback?: string
+      planningStyle?: PlanningStyle
+      intensity?: PlanIntensity
+      basePlan?: GoalPlan
+    },
+    source: GenerateSource
+  ) => {
     setRegenerating(true)
     try {
       const res = await goalCreationApi.requestDraft(sessionId, body)
+      track('goal_draft.regen_result', { ...ids, generate_source: source, result: 'success', draft_id: res.draftId })
       queryClient.removeQueries({ queryKey: goalCreationKeys.session(sessionId) })
       queryClient.invalidateQueries({ queryKey: usageKeys.all })
-      router.replace(goalFlowPath.generating(sessionId, res.draftId))
+      router.replace(goalFlowPath.generating(sessionId, res.draftId, source))
     } catch (error) {
+      track('goal_draft.regen_result', {
+        ...ids,
+        generate_source: source,
+        result: 'fail',
+        error_status: isApiError(error) ? error.httpStatus : undefined,
+      })
       setRegenerating(false)
       if (isApiError(error) && error.httpStatus === 409) {
-        router.replace(goalFlowPath.generating(sessionId))
+        router.replace(goalFlowPath.generating(sessionId, undefined, source))
         return
       }
       toast.error(isApiError(error) ? error.message : '다시 만들지 못했어요.')
@@ -250,29 +326,40 @@ export function DraftReviewView({ session, draft }: Props) {
   const submitFeedback = () => {
     const text = feedback.trim()
     const style = wasStyleSelectedByUser(sessionId) ? plan.goal.planningStyle : undefined
-    regenerate({ ...(text ? { feedback: text } : {}), ...(style ? { planningStyle: style } : {}) })
+    track('goal_draft.regen_submit', { ...ids, feedback_length: text.length, is_dirty: dirty })
+    regenerate({ ...(text ? { feedback: text } : {}), ...(style ? { planningStyle: style } : {}) }, 'regen')
   }
 
   /**
    * 말로 고치기 — 화면에서 고친 지금 초안(basePlan)을 기준으로 이 문장에 해당하는 부분만 AI 가 바꿔요.
    * "다시 생성"과 달리 직접 고친 내용이 사라지지 않아요.
    */
-  const submitQuickFix = () => {
+  const submitQuickFix = (method: 'button' | 'enter') => {
     const text = quickFix.trim()
     if (!text || busy) return
     const style = wasStyleSelectedByUser(sessionId) ? plan.goal.planningStyle : undefined
-    regenerate({
-      feedback: text,
-      basePlan: plan,
-      ...(style ? { planningStyle: style } : {}),
+    track('goal_draft.quick_fix_submit', {
+      ...ids,
+      feedback_length: text.length,
+      is_dirty: dirty,
+      submit_method: method,
     })
+    regenerate(
+      {
+        feedback: text,
+        basePlan: plan,
+        ...(style ? { planningStyle: style } : {}),
+      },
+      'quick_fix'
+    )
   }
 
   const changeStyle = () => {
     if (!pendingStyle) return
+    track('goal_draft.style_change_confirm', { ...ids, planning_style: pendingStyle })
     markStyleSelectedByUser(sessionId)
     setPendingStyle(null)
-    regenerate({ planningStyle: pendingStyle })
+    regenerate({ planningStyle: pendingStyle }, 'style_change')
   }
 
   /** 강도 변경 — 서버가 이 사용자 기준 상한을 다시 계산해서 처음부터 다시 만들어요 (강도 선택은 다음 재생성에도 유지돼요) */
@@ -280,14 +367,23 @@ export function DraftReviewView({ session, draft }: Props) {
     if (!pendingIntensity) return
     const style = wasStyleSelectedByUser(sessionId) ? plan.goal.planningStyle : undefined
     const next = pendingIntensity
+    track('goal_draft.intensity_change_confirm', { ...ids, plan_intensity: next, is_dirty: dirty })
     setPendingIntensity(null)
-    regenerate({ intensity: next, ...(style ? { planningStyle: style } : {}) })
+    regenerate({ intensity: next, ...(style ? { planningStyle: style } : {}) }, 'intensity_change')
   }
 
   // ── 확정 ────────────────────────────────────────────────────
   const confirm = async () => {
     if (busy) return
+    track('goal_draft.confirm_click', {
+      ...ids,
+      is_dirty: dirty,
+      color_id: colorId ?? undefined,
+      plan_routine_count: routines.length,
+      plan_one_time_count: oneTimes,
+    })
     if (clientIssues.length) {
+      track('goal_draft.confirm_blocked', { ...ids, issue_count: clientIssues.length })
       setShowClientIssues(true)
       setServerIssues(null)
       toast.error('수정이 필요한 항목이 있어요.')
@@ -303,6 +399,7 @@ export function DraftReviewView({ session, draft }: Props) {
         planningStyleSelectedByUser: wasStyleSelectedByUser(sessionId),
         ...(colorId !== null ? { colorId } : {}),
       })
+      track('goal_draft.confirm_result', { ...ids, result: 'success', goal_category_id: goalId })
       queryClient.removeQueries({ queryKey: goalCreationKeys.all })
       queryClient.invalidateQueries({ queryKey: goalKeys.all }) // 사이드바 · 목표 목록 갱신
       toast.success('목표가 만들어졌어요.')
@@ -310,6 +407,12 @@ export function DraftReviewView({ session, draft }: Props) {
       router.replace(`/goal/${goalId}?created=1`)
     } catch (error) {
       setConfirming(false)
+      track('goal_draft.confirm_result', {
+        ...ids,
+        result: 'fail',
+        error_status: isApiError(error) ? error.httpStatus : undefined,
+        issue_count: isApiError(error) && error.httpStatus === 422 ? error.violations.length : undefined,
+      })
       if (!isApiError(error)) return toast.error('목표를 만들지 못했어요. 다시 시도해 주세요.')
 
       if (error.httpStatus === 422 && error.violations.length) {
@@ -332,6 +435,7 @@ export function DraftReviewView({ session, draft }: Props) {
   }
 
   const cancelSession = async () => {
+    track('goal_draft.cancel_confirm', { session_id: sessionId })
     setCancelling(true)
     try {
       await goalCreationApi.cancel(sessionId)
@@ -353,16 +457,31 @@ export function DraftReviewView({ session, draft }: Props) {
   ].filter(Boolean)
 
   const currentIntensity: PlanIntensity = plan.fit?.intensity ?? 'STEADY'
+  const openIntensity = (entry: 'chip' | 'fit_card') => {
+    track('goal_draft.intensity_chip_click', {
+      session_id: sessionId,
+      plan_intensity: currentIntensity,
+      entry_point: entry,
+    })
+    setIntensityOpen(true)
+  }
   const chipClass =
     'border-line-strong text-ink-2 hover:border-ink-4 inline-flex h-6 items-center gap-1 rounded-full border px-2.5 text-xs font-semibold'
   const styleChip = (
     <>
-      <button type="button" onClick={() => setStyleOpen(true)} className={chipClass}>
+      <button
+        type="button"
+        onClick={() => {
+          track('goal_draft.style_chip_click', { session_id: sessionId, planning_style: plan.goal.planningStyle })
+          setStyleOpen(true)
+        }}
+        className={chipClass}
+      >
         {PLANNING_STYLE_LABEL[plan.goal.planningStyle]}
         <ChevronDown className="size-3" />
       </button>
       {plan.fit && (
-        <button type="button" onClick={() => setIntensityOpen(true)} className={chipClass}>
+        <button type="button" onClick={() => openIntensity('chip')} className={chipClass}>
           {PLAN_INTENSITY_LABEL[currentIntensity]}
           <ChevronDown className="size-3" />
         </button>
@@ -371,7 +490,14 @@ export function DraftReviewView({ session, draft }: Props) {
   )
 
   return (
-    <FlowShell wide>
+    <FlowShell
+      wide
+      onClose={() => {
+        // 확인창이 없어 직접 고친 내용이 그대로 사라져요 (세션 · 원래 초안은 남음)
+        track('goal_draft.close_click', { session_id: sessionId, is_dirty: dirty })
+        router.push('/goal')
+      }}
+    >
       <div className="bg-canvas flex-1 overflow-y-auto">
         <main className="mx-auto w-full max-w-[1280px] px-4 pt-6 pb-10 sm:px-6 lg:px-8">
           {/* 머리말 */}
@@ -385,7 +511,15 @@ export function DraftReviewView({ session, draft }: Props) {
                 AI가 만든 초안이에요. 항목을 누르면 그 자리에서 바로 고칠 수 있어요 (Enter 저장 · Esc 취소).
               </p>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => setCancelOpen(true)} disabled={busy}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                track('goal_draft.cancel_click', { session_id: sessionId, is_dirty: dirty })
+                setCancelOpen(true)
+              }}
+              disabled={busy}
+            >
               그만 만들기
             </Button>
           </div>
@@ -404,6 +538,7 @@ export function DraftReviewView({ session, draft }: Props) {
               ))}
               <Link
                 href={goalFlowPath.review(sessionId)}
+                onClick={() => track('goal_draft.condition_edit_click', { session_id: sessionId, is_dirty: dirty })}
                 className="text-ink-2 hover:text-ink px-2 text-[13px] font-semibold underline-offset-2 hover:underline"
               >
                 조건 수정
@@ -416,7 +551,7 @@ export function DraftReviewView({ session, draft }: Props) {
             <PlanFitCard
               fit={plan.fit}
               weeklyMinutes={weeklyRoutineMinutes(plan.tasks)}
-              onChangeIntensity={() => setIntensityOpen(true)}
+              onChangeIntensity={() => openIntensity('fit_card')}
             />
           )}
 
@@ -441,7 +576,10 @@ export function DraftReviewView({ session, draft }: Props) {
               <p className="text-danger text-sm font-bold">수정이 필요한 항목이 {issueMap.size}곳 있어요</p>
               <button
                 type="button"
-                onClick={() => scrollToIssue(shownIssues)}
+                onClick={() => {
+                  track('goal_draft.issue_jump_click', { session_id: sessionId, issue_count: issueMap.size })
+                  scrollToIssue(shownIssues)
+                }}
                 className="text-danger mt-1 text-[13px] font-semibold underline underline-offset-2"
               >
                 첫 번째 항목으로 이동
@@ -459,7 +597,7 @@ export function DraftReviewView({ session, draft }: Props) {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                     e.preventDefault()
-                    submitQuickFix()
+                    submitQuickFix('enter')
                   }
                 }}
                 disabled={busy}
@@ -470,7 +608,7 @@ export function DraftReviewView({ session, draft }: Props) {
               <Button
                 size="sm"
                 variant="brand"
-                onClick={submitQuickFix}
+                onClick={() => submitQuickFix('button')}
                 loading={regenerating}
                 disabled={!quickFix.trim() || busy}
               >
@@ -480,11 +618,14 @@ export function DraftReviewView({ session, draft }: Props) {
             </div>
             {!quickFix && (
               <div className="mt-1.5 flex flex-wrap gap-1.5 pl-7">
-                {QUICK_FIX_EXAMPLES.map((ex) => (
+                {QUICK_FIX_EXAMPLES.map((ex, i) => (
                   <button
                     key={ex}
                     type="button"
-                    onClick={() => setQuickFix(ex)}
+                    onClick={() => {
+                      track('goal_draft.quick_fix_example_click', { session_id: sessionId, example_index: i })
+                      setQuickFix(ex)
+                    }}
                     className="border-line text-ink-3 hover:border-line-strong hover:text-ink-2 h-6 rounded-full border px-2 text-[12px]"
                   >
                     {ex}
@@ -499,21 +640,24 @@ export function DraftReviewView({ session, draft }: Props) {
             <GoalHeroCard
               plan={plan}
               issues={issueMap}
-              onEdit={setEditTarget}
+              onEdit={openEditor}
               editor={editor}
               styleChip={styleChip}
               colors={colors.data}
               colorId={colorId}
-              onColor={setColorId}
+              onColor={(id) => {
+                track('goal_draft.color_select', { session_id: sessionId, color_id: id ?? undefined })
+                setColorId(id)
+              }}
               showMilestones={false}
             />
-            <MetricCard plan={plan} onEditGoal={() => setEditTarget({ kind: 'goal' })} />
+            <MetricCard plan={plan} onEditGoal={() => openEditor({ kind: 'goal' })} />
           </div>
 
           {/* 가운데: 실제로 할 일 — 루틴이 계획의 중심, 일회성 Task 는 꼭 필요한 것만 */}
           <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <RoutinesCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
-            <OneTimeTasksCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
+            <RoutinesCard plan={plan} issues={issueMap} onEdit={openEditor} editor={editor} />
+            <OneTimeTasksCard plan={plan} issues={issueMap} onEdit={openEditor} editor={editor} />
           </div>
 
           {/* 아래: 세부 구조 (접힘) — 세부 목표 · 마일스톤. 날짜·수치는 자동으로 맞춰져요
@@ -522,7 +666,12 @@ export function DraftReviewView({ session, draft }: Props) {
             <section className="border-line bg-surface mt-5 rounded-[20px] border">
               <button
                 type="button"
-                onClick={() => setStructureOpen((v) => !v)}
+                onClick={() => {
+                  // 고칠 곳이 있거나 그 안을 편집 중이면 접히지 않아요
+                  if (!structureHasIssue)
+                    track('goal_draft.structure_toggle', { session_id: sessionId, expanded: !structureOpen })
+                  setStructureOpen((v) => !v)
+                }}
                 aria-expanded={structureOpen || structureHasIssue}
                 className="flex w-full items-center gap-3 px-5 py-4 text-left sm:px-7"
               >
@@ -542,9 +691,9 @@ export function DraftReviewView({ session, draft }: Props) {
               </button>
               {(structureOpen || structureHasIssue) && (
                 <div className="border-line grid grid-cols-[minmax(0,1fr)] gap-5 border-t px-5 pt-2 pb-6 sm:px-7 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-                  <MilestoneTimeline plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
+                  <MilestoneTimeline plan={plan} issues={issueMap} onEdit={openEditor} editor={editor} />
                   <div className="pt-5">
-                    <SubGoalsCard plan={plan} issues={issueMap} onEdit={setEditTarget} editor={editor} />
+                    <SubGoalsCard plan={plan} issues={issueMap} onEdit={openEditor} editor={editor} />
                   </div>
                 </div>
               )}
@@ -565,16 +714,34 @@ export function DraftReviewView({ session, draft }: Props) {
             <UsageLine tone="onDark" className="mt-1" items={[regenLeft, draftLeft]} />
           </div>
           <div className="flex gap-2">
-            <Button
-              className="flex-1 bg-white/10 hover:bg-white/20 sm:flex-none"
-              onClick={() => setRegenOpen(true)}
-              disabled={busy || noRegen}
-              title={noRegen ? '오늘(또는 이 목표에서) 계획을 더 만들 수 없어요. 초안을 직접 고쳐 주세요.' : undefined}
+            {/* 한도를 다 써서 막힌 '다시 생성'을 누를 때 (disabled 라 감싼 요소의 pointerdown 으로) */}
+            <span
+              className="flex flex-1 sm:flex-none"
+              onPointerDown={() => {
+                if (noRegen && !busy)
+                  track('goal_draft.regen_disabled_click', { session_id: sessionId, regen_remaining: 0 })
+              }}
             >
-              <RefreshCw className="size-4" />
-              다시 생성
-              {regenRemaining != null && <span className="text-white/60">({regenRemaining}회 남음)</span>}
-            </Button>
+              <Button
+                className="flex-1 bg-white/10 hover:bg-white/20 sm:flex-none"
+                onClick={() => {
+                  track('goal_draft.regen_open', {
+                    session_id: sessionId,
+                    is_dirty: dirty,
+                    regen_remaining: regenRemaining ?? undefined,
+                  })
+                  setRegenOpen(true)
+                }}
+                disabled={busy || noRegen}
+                title={
+                  noRegen ? '오늘(또는 이 목표에서) 계획을 더 만들 수 없어요. 초안을 직접 고쳐 주세요.' : undefined
+                }
+              >
+                <RefreshCw className="size-4" />
+                다시 생성
+                {regenRemaining != null && <span className="text-white/60">({regenRemaining}회 남음)</span>}
+              </Button>
+            </span>
             <Button
               className="flex-1 bg-white text-[#111111] hover:bg-white/90 sm:flex-none"
               onClick={confirm}
@@ -590,7 +757,10 @@ export function DraftReviewView({ session, draft }: Props) {
       {/* 다시 생성 (피드백) */}
       <Modal
         open={regenOpen}
-        onClose={() => setRegenOpen(false)}
+        onClose={(method) => {
+          track('goal_draft.regen_cancel', { session_id: sessionId, close_method: method })
+          setRegenOpen(false)
+        }}
         title="계획을 다시 만들까요?"
         description={
           dirty
@@ -600,7 +770,14 @@ export function DraftReviewView({ session, draft }: Props) {
         dismissible={!regenerating}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setRegenOpen(false)} disabled={regenerating}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                track('goal_draft.regen_cancel', { session_id: sessionId, close_method: 'cancel_button' })
+                setRegenOpen(false)
+              }}
+              disabled={regenerating}
+            >
               취소
             </Button>
             <Button onClick={submitFeedback} loading={regenerating}>
@@ -624,7 +801,15 @@ export function DraftReviewView({ session, draft }: Props) {
       </Modal>
 
       {/* 실행 성향 변경 */}
-      <Modal open={styleOpen} onClose={() => setStyleOpen(false)} title="실행 성향" size="sm">
+      <Modal
+        open={styleOpen}
+        onClose={() => {
+          track('goal_draft.style_change_cancel', { session_id: sessionId })
+          setStyleOpen(false)
+        }}
+        title="실행 성향"
+        size="sm"
+      >
         <div className="space-y-2 pb-2">
           {(['PLANNER', 'SPONTANEOUS'] as const).map((value) => {
             const current = plan.goal.planningStyle === value
@@ -635,6 +820,8 @@ export function DraftReviewView({ session, draft }: Props) {
                 onClick={() => {
                   setStyleOpen(false)
                   if (!current) setPendingStyle(value)
+                  // 지금 성향을 다시 고르면 아무것도 안 바뀌어서 취소와 같아요
+                  else track('goal_draft.style_change_cancel', { session_id: sessionId })
                 }}
                 className={cn(
                   'w-full rounded-2xl border px-4 py-3.5 text-left text-[15px] font-semibold',
@@ -649,7 +836,15 @@ export function DraftReviewView({ session, draft }: Props) {
         </div>
       </Modal>
       {/* 계획 강도 변경 */}
-      <Modal open={intensityOpen} onClose={() => setIntensityOpen(false)} title="계획 강도" size="sm">
+      <Modal
+        open={intensityOpen}
+        onClose={() => {
+          track('goal_draft.intensity_change_cancel', { session_id: sessionId })
+          setIntensityOpen(false)
+        }}
+        title="계획 강도"
+        size="sm"
+      >
         <div className="space-y-2 pb-2">
           {(['STEADY', 'CHALLENGE'] as const).map((value) => {
             const current = currentIntensity === value
@@ -660,6 +855,7 @@ export function DraftReviewView({ session, draft }: Props) {
                 onClick={() => {
                   setIntensityOpen(false)
                   if (!current) setPendingIntensity(value)
+                  else track('goal_draft.intensity_change_cancel', { session_id: sessionId })
                 }}
                 className={cn(
                   'w-full rounded-2xl border px-4 py-3.5 text-left',
@@ -683,7 +879,10 @@ export function DraftReviewView({ session, draft }: Props) {
         confirmLabel="바꾸고 다시 만들기"
         loading={regenerating}
         onConfirm={changeIntensity}
-        onCancel={() => setPendingIntensity(null)}
+        onCancel={() => {
+          track('goal_draft.intensity_change_cancel', { session_id: sessionId })
+          setPendingIntensity(null)
+        }}
       />
       <ConfirmDialog
         open={!!pendingStyle}
@@ -692,7 +891,10 @@ export function DraftReviewView({ session, draft }: Props) {
         confirmLabel="바꾸고 다시 만들기"
         loading={regenerating}
         onConfirm={changeStyle}
-        onCancel={() => setPendingStyle(null)}
+        onCancel={() => {
+          track('goal_draft.style_change_cancel', { session_id: sessionId })
+          setPendingStyle(null)
+        }}
       />
 
       <ConfirmDialog
@@ -704,7 +906,10 @@ export function DraftReviewView({ session, draft }: Props) {
         cancelLabel="계속 만들기"
         loading={cancelling}
         onConfirm={cancelSession}
-        onCancel={() => setCancelOpen(false)}
+        onCancel={(method) => {
+          track('goal_draft.cancel_dismiss', { session_id: sessionId, close_method: method })
+          setCancelOpen(false)
+        }}
       />
     </FlowShell>
   )

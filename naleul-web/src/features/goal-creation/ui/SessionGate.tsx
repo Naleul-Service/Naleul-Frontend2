@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { isApiError } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
 import { goalCreationApi, goalCreationKeys } from '../api'
 import { goalFlowPath, pathForStatus } from '../routes'
 import type { SessionDetail, SessionStatus } from '../types'
@@ -50,6 +51,17 @@ export function CenterMessage({
   )
 }
 
+/** 화면 이름 (goal_flow.* 의 from_screen) — 이 화면이 받는 세션 상태로 정해요 */
+export type FlowScreen = 'chat' | 'review' | 'generating' | 'draft'
+const screenOf = (allow: SessionStatus[]): FlowScreen =>
+  allow.includes('INTERVIEWING')
+    ? 'chat'
+    : allow.includes('READY_TO_GENERATE')
+      ? 'review'
+      : allow.includes('GENERATING')
+        ? 'generating'
+        : 'draft'
+
 const ENDED_NOTICE: Partial<Record<SessionStatus, { title: string; description: string }>> = {
   CONFIRMED: { title: '이미 만들어진 목표예요', description: '목표 화면에서 확인할 수 있어요.' },
   ABANDONED: { title: '종료된 대화예요', description: '취소했거나 7일이 지나 더 이어갈 수 없어요.' },
@@ -78,12 +90,34 @@ export function SessionGate({
   const allowed = session ? allow.includes(session.status) : false
   const redirectTo = session && !allowed ? pathForStatus(sessionId, session.status) : null
 
+  const screen = screenOf(allow)
+  const ended = !!session && !allowed && !redirectTo
+  const sent = useRef({ redirect: false, ended: false })
   useEffect(() => {
-    if (redirectTo) router.replace(redirectTo)
-  }, [redirectTo, router])
+    if (!redirectTo) return
+    // 새로고침했더니 이미 생성 완료 등 — 주소의 화면과 세션 상태가 달라 맞는 화면으로 바뀜
+    if (!sent.current.redirect) {
+      sent.current.redirect = true
+      track('goal_flow.session_redirect', {
+        session_id: sessionId,
+        from_screen: screen,
+        session_status: session?.status,
+      })
+    }
+    router.replace(redirectTo)
+  }, [redirectTo, router, sessionId, screen, session?.status])
+  useEffect(() => {
+    if (!ended || sent.current.ended) return
+    sent.current.ended = true
+    track('goal_flow.session_ended_view', {
+      session_id: sessionId,
+      session_status: session?.status,
+      from_screen: screen,
+    })
+  }, [ended, sessionId, session?.status, screen])
 
   if (query.isError) {
-    return <GateError query={query} />
+    return <GateError query={query} sessionId={sessionId} screen={screen} />
   }
 
   if (!session || redirectTo) {
@@ -103,11 +137,27 @@ export function SessionGate({
       <FlowShell>
         <CenterMessage title={notice?.title ?? '이어갈 수 없어요'} description={notice?.description}>
           {session.status === 'ABANDONED' ? (
-            <Link href={goalFlowPath.start()} className={buttonClass('primary')}>
+            <Link
+              href={goalFlowPath.start()}
+              onClick={() =>
+                track('goal_flow.cta_click', {
+                  session_id: sessionId,
+                  cta: 'new_start',
+                  session_status: session.status,
+                })
+              }
+              className={buttonClass('primary')}
+            >
               새로 시작하기
             </Link>
           ) : (
-            <Link href="/goal" className={buttonClass('secondary')}>
+            <Link
+              href="/goal"
+              onClick={() =>
+                track('goal_flow.cta_click', { session_id: sessionId, cta: 'go_goal', session_status: session.status })
+              }
+              className={buttonClass('secondary')}
+            >
               목표로 가기
             </Link>
           )}
@@ -119,9 +169,32 @@ export function SessionGate({
   return <>{children(session, query.refetch)}</>
 }
 
-function GateError({ query }: { query: ReturnType<typeof useGoalSession> }) {
+/** 세션(또는 초안)을 못 불러왔을 때 화면에 한 번 남겨요 — 초안 화면에서 초안만 실패한 경우도 써요 */
+export function useSessionErrorView(show: boolean, sessionId: number, screen: FlowScreen, error: unknown) {
+  const sent = useRef(false)
+  useEffect(() => {
+    if (!show || sent.current) return
+    sent.current = true
+    track('goal_flow.session_error_view', {
+      session_id: sessionId,
+      error_status: isApiError(error) ? error.httpStatus : undefined,
+      from_screen: screen,
+    })
+  }, [show, sessionId, screen, error])
+}
+
+function GateError({
+  query,
+  sessionId,
+  screen,
+}: {
+  query: ReturnType<typeof useGoalSession>
+  sessionId: number
+  screen: FlowScreen
+}) {
   const error = query.error
   const notFound = isApiError(error) && error.httpStatus === 404
+  useSessionErrorView(true, sessionId, screen, error)
   return (
     <FlowShell>
       <CenterMessage
@@ -129,11 +202,22 @@ function GateError({ query }: { query: ReturnType<typeof useGoalSession> }) {
         description={notFound ? undefined : error?.message}
       >
         {notFound ? (
-          <Link href={goalFlowPath.start()} className={buttonClass('primary')}>
+          <Link
+            href={goalFlowPath.start()}
+            onClick={() => track('goal_flow.cta_click', { session_id: sessionId, cta: 'new_start' })}
+            className={buttonClass('primary')}
+          >
             새로 시작하기
           </Link>
         ) : (
-          <Button onClick={() => query.refetch()}>다시 시도</Button>
+          <Button
+            onClick={() => {
+              track('goal_flow.cta_click', { session_id: sessionId, cta: 'retry' })
+              query.refetch()
+            }}
+          >
+            다시 시도
+          </Button>
         )}
       </CenterMessage>
     </FlowShell>
