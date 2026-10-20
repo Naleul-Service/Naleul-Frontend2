@@ -7,7 +7,10 @@
 export const LOGIN_ERROR_PARAM = 'loginError'
 
 export const LOGIN_ERROR_MESSAGES: Record<string, string> = {
+  // 취소 문구는 로그인 방식마다 달라요 (cancelled 는 예전 카카오 링크 호환용)
   cancelled: '카카오 로그인이 취소됐어요.',
+  kakao_cancelled: '카카오 로그인이 취소됐어요.',
+  apple_cancelled: 'Apple 로그인이 취소됐어요.',
   no_code: '로그인 정보를 받지 못했어요. 다시 시도해 주세요.',
   login_failed: '로그인에 실패했어요. 잠시 후 다시 시도해 주세요.',
 }

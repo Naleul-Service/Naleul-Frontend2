@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  if (kakaoError) return toLogin('cancelled')
+  if (kakaoError) return toLogin('kakao_cancelled')
   if (!code) return toLogin('no_code')
 
   const result = await kakaoLogin(code)

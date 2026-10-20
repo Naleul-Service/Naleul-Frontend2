@@ -5,7 +5,7 @@
  *  - id_token : Apple 이 서명한 JWT → 백엔드가 검증하고 우리 서비스 JWT 를 발급해요 (iOS 앱과 같은 API)
  *  - state    : 로그인 전에 보던 경로
  *  - user     : 처음 로그인할 때만 오는 이름/이메일 JSON
- *  - error    : 사용자가 취소하면 user_cancelled_authorize
+ *  - error    : 사용자가 취소하면 user_cancelled_authorize → apple_cancelled 로 알려요
  *
  * 응답은 303 리다이렉트예요. (POST 다음에 GET 으로 화면을 열게 하는 상태코드 — 302 면 브라우저가 POST 를 다시 보낼 수 있어요)
  */
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.redirect(url, 303)
   }
 
-  if (field('error')) return fail('cancelled')
+  if (field('error')) return fail('apple_cancelled')
   const idToken = field('id_token')
   if (!idToken) return fail('no_code')
 
