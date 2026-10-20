@@ -980,7 +980,7 @@ export function useTimetableInteractions(
 
       {/* 묶음 드래그 안내 */}
       {groupIds.size > 0 && !ask && !proposals && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--tabbar-h)+16px)] z-40 flex justify-center px-4">
           <div
             role="status"
             className="bg-inverse pointer-events-auto flex max-w-[560px] items-center gap-2 rounded-full py-2 pr-2 pl-4 text-[13px] text-on-ink shadow-pop"

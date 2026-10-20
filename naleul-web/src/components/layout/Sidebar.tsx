@@ -36,7 +36,7 @@ const NAV: NavItem[] = [
   { href: '/patterns', label: '나의 패턴', icon: BarChart3, key: 'patterns' },
 ]
 
-const isActive = (pathname: string, href: string) =>
+export const isActive = (pathname: string, href: string) =>
   href === '/' ? pathname === '/' : pathname === href || pathname.startsWith(`${href}/`)
 
 const PLAN_LABEL: Record<string, string> = { FREE: 'Free plan', PRO: 'Pro plan', ADMIN: 'Admin', GUEST: '로그인 전' }

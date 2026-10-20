@@ -173,7 +173,7 @@ export function CarryProposalBar({
   )
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(var(--tabbar-h)+16px)] z-40 flex justify-center px-4">
       {/* 제안 바 (명세 6D) — AI 그라데이션 테두리 · 넓은 화면 한 줄 / 좁은 화면 3줄 */}
       <div
         role="dialog"

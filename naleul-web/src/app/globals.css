@@ -543,6 +543,19 @@ svg.lucide:is(.size-3, .size-3\.5, .size-4, .size-2\.5) {
   stroke-width: 1.25px;
 }
 
+/* 모바일 탭바(MobileTabBar) 높이 — 본문 여백 · 아래 떠 있는 바 · 토스트가 이만큼 비켜요 (탭바 없는 화면 · lg 이상은 0) */
+:root {
+  --tabbar-h: 0px;
+}
+:root:has([data-mobile-tabbar]) {
+  --tabbar-h: calc(66px + env(safe-area-inset-bottom));
+}
+@media (width >= 64rem) {
+  :root:has([data-mobile-tabbar]) {
+    --tabbar-h: 0px;
+  }
+}
+
 /* Tailwind dark: 변형 (dark:bg-…) 도 같은 기준으로 */
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 

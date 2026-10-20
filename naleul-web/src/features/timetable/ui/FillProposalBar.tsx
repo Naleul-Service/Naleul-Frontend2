@@ -36,7 +36,7 @@ export function FillProposalBar({
   return (
     <div
       className={cn(
-        'pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4',
+        'pointer-events-none fixed inset-x-0 bottom-[calc(var(--tabbar-h)+16px)] z-40 flex justify-center px-4',
         sidePanel && 'xl:pr-[436px]'
       )}
     >
