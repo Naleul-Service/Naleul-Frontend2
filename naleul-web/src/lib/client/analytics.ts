@@ -28,6 +28,7 @@ export const EVENTS = {
   loginIosAppDownloadClick: 'login.ios_app_download_click',
   loginComplete: 'login.complete',
   loginFail: 'login.fail',
+  loginOauthBack: 'login.oauth_back',
 
   loginModalView: 'login_modal.view',
   loginModalClose: 'login_modal.close',
@@ -69,7 +70,7 @@ function clean(props?: EventProps) {
 
 /**
  * SDK 초기화 — 여러 번 불러도 한 번만 돼요. track 등 모든 함수가 먼저 부르므로 직접 부를 일은 거의 없어요.
- * autocapture 는 수동 이벤트와 겹치지 않게 sessions · attribution 만 켜요.
+ * autocapture 는 수동 이벤트와 겹치지 않게 sessions · attribution · frustration(rage/dead click) 만 켜요.
  */
 export function initAnalytics() {
   if (initialized || !enabled()) return
@@ -83,7 +84,7 @@ export function initAnalytics() {
       elementInteractions: false,
       formInteractions: false,
       fileDownloads: false,
-      frustrationInteractions: false,
+      frustrationInteractions: true, // rage click · dead click (노션 규칙: 화면 전체 UX 신호)
       networkTracking: false,
       webVitals: false,
     },

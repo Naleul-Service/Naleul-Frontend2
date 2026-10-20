@@ -1,11 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Modal } from '@/components/ui/Modal'
+import { useEffect, useRef, useState } from 'react'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { buttonClass } from '@/components/ui/Button'
 import { LOGIN_REQUIRED_EVENT } from '@/lib/client/api'
 import { EVENTS, track, type EventProps } from '@/lib/client/analytics'
-import { LOGIN_PROVIDER_PARAM, loginErrorCodeOf, loginProviderOf, takeLoginAttempt } from '@/lib/loginAnalytics'
+import {
+  LOGIN_PROVIDER_PARAM,
+  loginErrorCodeOf,
+  loginProviderOf,
+  secondsSince,
+  takeLoginAttempt,
+} from '@/lib/loginAnalytics'
 import { safeRedirectPath } from '@/lib/redirectPath'
 import { KakaoLoginButton } from './KakaoLoginButton'
 import { AppleLoginButton } from './AppleLoginButton'
@@ -38,6 +44,18 @@ interface DialogState {
   blockedApiPath?: string
 }
 
+/** 이번 탭(세션)에서 로그인 모달이 몇 번째 뜨는지 (prompt_count_session) */
+const PROMPT_COUNT_KEY = 'naleul.login_prompt_count'
+function nextPromptCount() {
+  try {
+    const n = Number(sessionStorage.getItem(PROMPT_COUNT_KEY) ?? '0') + 1
+    sessionStorage.setItem(PROMPT_COUNT_KEY, String(n))
+    return n
+  } catch {
+    return undefined
+  }
+}
+
 /** 모달 이벤트(view · close · 버튼 클릭)에 공통으로 붙는 속성 */
 function modalProps(s: DialogState): EventProps {
   return { modal_reason: s.reason, trigger_source: s.source, blocked_api_path: s.blockedApiPath }
@@ -56,6 +74,8 @@ function modalProps(s: DialogState): EventProps {
  */
 export function LoginRequiredDialog() {
   const [state, setState] = useState<DialogState>({ open: false, reason: 'save', next: '/', error: null })
+  // 열린 시각 → 닫을 때 open_duration_seconds
+  const openedAt = useRef(0)
 
   useEffect(() => {
     const onRequired = (e: Event) => {
@@ -69,7 +89,8 @@ export function LoginRequiredDialog() {
         blockedApiPath: detail?.blockedApiPath,
       }
       setState(next)
-      track(EVENTS.loginModalView, modalProps(next))
+      openedAt.current = Date.now()
+      track(EVENTS.loginModalView, { ...modalProps(next), prompt_count_session: nextPromptCount() })
     }
     window.addEventListener(LOGIN_REQUIRED_EVENT, onRequired)
 
@@ -87,6 +108,7 @@ export function LoginRequiredDialog() {
         login_provider: provider ?? attempt?.provider,
         login_error_code: loginErrorCodeOf(error),
         login_surface: attempt?.surface,
+        seconds_since_click: secondsSince(attempt),
       })
       openLoginDialog({ reason: 'login', error, source: 'login_error_return' })
     }
@@ -94,9 +116,15 @@ export function LoginRequiredDialog() {
     return () => window.removeEventListener(LOGIN_REQUIRED_EVENT, onRequired)
   }, [])
 
-  // X · 바깥 클릭 · '계속 둘러보기' 모두 같은 login_modal.close (Tracking Plan 7번 핀)
-  const close = () => {
-    if (state.open) track(EVENTS.loginModalClose, modalProps(state))
+  // X · 바깥 클릭 · ESC · '계속 둘러보기' 모두 같은 login_modal.close, 방법은 close_method 로 구분 (Tracking Plan 7번 핀)
+  const close = (method: ModalCloseMethod | 'continue_browsing') => {
+    if (state.open) {
+      track(EVENTS.loginModalClose, {
+        ...modalProps(state),
+        close_method: method,
+        open_duration_seconds: Math.round((Date.now() - openedAt.current) / 1000),
+      })
+    }
     setState((s) => ({ ...s, open: false }))
   }
   const copy = COPY[state.reason]
@@ -113,7 +141,7 @@ export function LoginRequiredDialog() {
         <div className="flex w-full flex-col gap-2">
           <KakaoLoginButton next={state.next} surface="login_modal" trackProps={trackProps} />
           <AppleLoginButton next={state.next} surface="login_modal" trackProps={trackProps} />
-          <button type="button" onClick={close} className={buttonClass('ghost', 'md', true)}>
+          <button type="button" onClick={() => close('continue_browsing')} className={buttonClass('ghost', 'md', true)}>
             계속 둘러보기
           </button>
         </div>

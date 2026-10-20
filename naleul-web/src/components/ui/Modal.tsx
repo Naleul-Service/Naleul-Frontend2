@@ -5,9 +5,13 @@ import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
+/** 모달을 닫은 방법 (Amplitude close_method) */
+export type ModalCloseMethod = 'x_button' | 'backdrop' | 'esc'
+
 interface ModalProps {
   open: boolean
-  onClose: () => void
+  /** method: 어떻게 닫혔는지 (필요한 곳만 받아서 써요) */
+  onClose: (method: ModalCloseMethod) => void
   title?: ReactNode
   description?: ReactNode
   children?: ReactNode
@@ -42,7 +46,7 @@ export function Modal({
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && dismissible) onCloseRef.current()
+      if (e.key === 'Escape' && dismissible) onCloseRef.current('esc')
     }
     const prevOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -60,7 +64,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div
         className="absolute inset-0 animate-[fade-in_150ms_ease-out] bg-black/40"
-        onClick={dismissible ? onClose : undefined}
+        onClick={dismissible ? () => onClose('backdrop') : undefined}
         aria-hidden
       />
       <div
@@ -88,7 +92,7 @@ export function Modal({
             {dismissible && (
               <button
                 type="button"
-                onClick={onClose}
+                onClick={() => onClose('x_button')}
                 aria-label="닫기"
                 className="text-ink-3 hover:bg-subtle hover:text-ink -mt-1 -mr-2 rounded-lg p-1.5"
               >

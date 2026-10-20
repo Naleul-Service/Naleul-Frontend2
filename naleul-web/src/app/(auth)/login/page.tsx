@@ -5,6 +5,7 @@ import { KakaoLoginButton } from '@/components/auth/KakaoLoginButton'
 import { AppleLoginButton } from '@/components/auth/AppleLoginButton'
 import { IosAppDownloadLink } from '@/components/auth/IosAppDownloadLink'
 import { loginErrorMessage } from '@/components/auth/kakaoAuth'
+import { loginErrorCodeOf } from '@/lib/loginAnalytics'
 import { TrackOnMount } from '@/components/analytics/TrackOnMount'
 
 export const metadata: Metadata = { title: '로그인' }
@@ -24,7 +25,10 @@ export default async function LoginPage({
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-12">
       {/* 서버 컴포넌트라 analytics.ts(브라우저 SDK)를 import 하지 않고 이벤트 이름을 문자열로 넘겨요 (타입은 그대로 검사돼요) */}
-      <TrackOnMount event="login.pageview" props={{ redirect_path: next, entry_source: from ?? 'direct' }} />
+      <TrackOnMount
+        event="login.pageview"
+        props={{ redirect_path: next, entry_source: from ?? 'direct', login_error_code: loginErrorCodeOf(error) }}
+      />
       <div className="w-full max-w-[400px]">
         <Logo size="lg" />
 

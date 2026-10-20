@@ -83,6 +83,10 @@ export function saveLoginAttempt(provider: LoginProvider, surface: LoginSurface)
   }
 }
 
+/** 버튼을 누른 뒤 지난 초 (seconds_since_click) */
+export const secondsSince = (attempt: LoginAttempt | null) =>
+  attempt ? Math.max(0, Math.round((Date.now() - attempt.at) / 1000)) : undefined
+
 /** 시도 정보를 꺼내고 지워요 (한 번만 쓰도록) */
 export function takeLoginAttempt(): LoginAttempt | null {
   try {
