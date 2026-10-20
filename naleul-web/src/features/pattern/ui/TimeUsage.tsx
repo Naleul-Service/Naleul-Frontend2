@@ -1,10 +1,15 @@
+'use client'
+
 import type { PatternTimeUsage } from '../types'
+import { useChartInteract, useDeadClick } from '../analytics'
 import { hours1 } from '../format'
 import { NotEnough, Section } from './Section'
 
 /** 어디에 시간을 쓰고 있나요? — 목표별 주 평균 실제 시간 (세로선 = 계획) */
 export function TimeUsage({ usage }: { usage?: PatternTimeUsage | null }) {
   const goals = usage?.goals ?? []
+  const chartProps = useChartInteract('time_usage')
+  const onRowClick = useDeadClick('time_usage_row')
   const max = Math.max(1, ...goals.map((g) => Math.max(g.actualHoursPerWeek, g.plannedHoursPerWeek)))
   return (
     <Section
@@ -14,11 +19,11 @@ export function TimeUsage({ usage }: { usage?: PatternTimeUsage | null }) {
       {!goals.length ? (
         <NotEnough>목표에 연결된 Task를 실행하면 보여드려요</NotEnough>
       ) : (
-        <ul className="flex flex-col gap-5">
+        <ul className="flex flex-col gap-5" {...chartProps}>
           {goals.map((g) => {
             const color = g.colorCode ?? '#3d5afe'
             return (
-              <li key={g.goalCategoryId}>
+              <li key={g.goalCategoryId} onClick={onRowClick}>
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="min-w-0 truncate text-[15px] font-bold">
                     {g.emoji && <span className="mr-1">{g.emoji}</span>}

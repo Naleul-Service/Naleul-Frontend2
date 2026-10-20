@@ -24,6 +24,7 @@ import type { WorkGoalEventName } from './workGoalEvents'
 import type { TaskAddEventName } from './taskAddEvents'
 import type { CalendarEventName } from './calendarEvents'
 import type { ReflectionEventName } from './reflectionEvents'
+import type { PatternEventName } from './patternEvents'
 
 /** 화면별 이벤트 이름 모음 (홈은 개수가 많아 homeEvents.ts 로 나눴어요) */
 export { HOME_EVENTS, COMMON_EVENTS }
@@ -62,6 +63,7 @@ export type AnalyticsEventName =
   | TaskAddEventName
   | CalendarEventName
   | ReflectionEventName
+  | PatternEventName
 
 /** event property. Tracking Plan 의 varchar → string, int → number, boolean → boolean */
 export type EventProps = Record<string, string | number | boolean | null | undefined>

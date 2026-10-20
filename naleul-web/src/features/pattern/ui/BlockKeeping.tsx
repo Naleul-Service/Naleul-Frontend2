@@ -5,9 +5,14 @@ import { Repeat } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { hexOf } from '@/features/timetable/layout'
 import type { BlockKeepItem, PatternBlockKeeping } from '../types'
+import { track } from '@/lib/client/analytics'
+import { useDeadClick, usePatternAnalytics } from '../analytics'
 import { NotEnough, Section } from './Section'
 
 type KeepKind = 'onTime' | 'late' | 'missed'
+
+/** keep_kind 이벤트 값 */
+const KEEP_KIND_PROP: Record<KeepKind, string> = { onTime: 'on_time', late: 'late', missed: 'missed' }
 
 const KINDS: { kind: KeepKind; label: string; color: string; text: string }[] = [
   { kind: 'onTime', label: '제시간 시작', color: 'bg-success', text: 'text-success' },
@@ -18,6 +23,7 @@ const KINDS: { kind: KeepKind; label: string; color: string; text: string }[] = 
 /** 블록을 어떻게 지키나요? — 제시간 / 늦게 / 놓침 + 자주 옮기는 블록 */
 export function BlockKeeping({ block }: { block?: PatternBlockKeeping | null }) {
   const hasRatio = block && block.total > 0 && block.onTime != null
+  const onMoveClick = useDeadClick('moved_routine')
   return (
     <Section
       title="블록을 어떻게 지키나요?"
@@ -43,7 +49,11 @@ export function BlockKeeping({ block }: { block?: PatternBlockKeeping | null }) 
       {block?.frequentMoves.length ? (
         <ul className="divide-line mt-2 divide-y">
           {block.frequentMoves.map((m) => (
-            <li key={`${m.routineId ?? m.title}`} className="flex items-center justify-between gap-3 py-3">
+            <li
+              key={`${m.routineId ?? m.title}`}
+              className="flex items-center justify-between gap-3 py-3"
+              onClick={onMoveClick}
+            >
               <div className="min-w-0">
                 <p className="truncate text-[15px] font-semibold">
                   {m.emoji && <span className="mr-1">{m.emoji}</span>}
@@ -76,6 +86,17 @@ export function BlockKeeping({ block }: { block?: PatternBlockKeeping | null }) 
 function KeepFilter({ block }: { block: PatternBlockKeeping }) {
   const [kind, setKind] = useState<KeepKind | null>(null)
   const items = block.items ?? []
+  const { period } = usePatternAnalytics()
+  const toggle = (k: KeepKind) => {
+    const expanded = kind !== k
+    track('pattern.keep_filter_click', {
+      keep_kind: KEEP_KIND_PROP[k],
+      expanded,
+      item_count: items.filter((i) => i[k] > 0).length,
+      period,
+    })
+    setKind(expanded ? k : null)
+  }
   const picked = kind ? KINDS.find((k) => k.kind === kind)! : null
   const list: BlockKeepItem[] = kind
     ? items
@@ -92,7 +113,7 @@ function KeepFilter({ block }: { block: PatternBlockKeeping }) {
               key={k.kind}
               type="button"
               aria-pressed={on}
-              onClick={() => setKind(on ? null : k.kind)}
+              onClick={() => toggle(k.kind)}
               className={cn(
                 'flex h-8 items-center gap-1.5 rounded-full border px-3 text-[13px] transition-colors',
                 on ? 'border-ink bg-ink text-surface' : 'border-line text-ink-2 hover:border-line-strong'

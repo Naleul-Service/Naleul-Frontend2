@@ -1,4 +1,7 @@
+'use client'
+
 import { useId } from 'react'
+import { useChartInteract } from '../analytics'
 import type { PatternWeekly } from '../types'
 import { NotEnough, Section } from './Section'
 
@@ -9,6 +12,7 @@ const PAD = { left: 36, right: 16, top: 24, bottom: 30 }
 /** 주차별 실행률 선 그래프 (SVG 로 직접 그림 — 차트 라이브러리를 추가하지 않으려고) */
 export function WeeklyTrend({ weekly }: { weekly?: PatternWeekly | null }) {
   const gradientId = useId()
+  const chartProps = useChartInteract('weekly')
   const points = weekly?.points ?? []
   const valued = points.filter((p) => p.rate != null)
 
@@ -49,7 +53,13 @@ export function WeeklyTrend({ weekly }: { weekly?: PatternWeekly | null }) {
 
   return (
     <Section title="주차별 흐름" aside="실행률 %">
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="주차별 실행률 그래프">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="h-auto w-full"
+        role="img"
+        aria-label="주차별 실행률 그래프"
+        {...chartProps}
+      >
         <defs>
           <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="0.16" />
@@ -74,7 +84,15 @@ export function WeeklyTrend({ weekly }: { weekly?: PatternWeekly | null }) {
               {seg.length > 1 && <path d={area} fill={`url(#${gradientId})`} />}
               <path d={line} fill="none" stroke="var(--color-brand)" strokeWidth="2.5" strokeLinejoin="round" />
               {seg.map((p) => (
-                <circle key={p.i} cx={x(p.i)} cy={y(p.r)} r="4.5" fill="var(--color-brand)" stroke="var(--color-surface)" strokeWidth="2" />
+                <circle
+                  key={p.i}
+                  cx={x(p.i)}
+                  cy={y(p.r)}
+                  r="4.5"
+                  fill="var(--color-brand)"
+                  stroke="var(--color-surface)"
+                  strokeWidth="2"
+                />
               ))}
             </g>
           )

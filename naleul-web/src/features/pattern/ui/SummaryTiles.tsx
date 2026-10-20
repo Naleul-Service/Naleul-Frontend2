@@ -1,4 +1,7 @@
+'use client'
+
 import type { ReactNode } from 'react'
+import { useDeadClick } from '../analytics'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import type { PatternSummary } from '../types'
@@ -15,8 +18,9 @@ function Tile({
   sub?: ReactNode
   subTone?: 'up' | 'down'
 }) {
+  const onClick = useDeadClick('summary_tile')
   return (
-    <Card className="flex min-h-[132px] flex-col justify-between p-5">
+    <Card className="flex min-h-[132px] flex-col justify-between p-5" onClick={onClick}>
       <p className="text-ink-3 text-[13px]">{label}</p>
       <div>
         <p className="text-[30px] leading-none font-extrabold tracking-tight">{value}</p>

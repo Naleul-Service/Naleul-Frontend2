@@ -1,17 +1,22 @@
+'use client'
+
 import type { PatternRoutines } from '../types'
+import { useDeadClick } from '../analytics'
 import { Card } from '@/components/ui/Card'
 
 /** 잘 지키는 루틴 / 자주 놓치는 블록 */
 export function RoutineLists({ routines }: { routines?: PatternRoutines | null }) {
   const kept = routines?.kept ?? []
   const missed = routines?.missed ?? []
+  const onKeptClick = useDeadClick('kept_routine')
+  const onMissedClick = useDeadClick('missed_block')
   return (
     <Card className="p-5 sm:p-6">
       <h2 className="text-[16px] font-bold">💪 잘 지키는 루틴</h2>
       {kept.length ? (
         <ul className="mt-3 flex flex-col gap-3">
           {kept.map((r) => (
-            <li key={r.routineId} className="flex items-center justify-between gap-3">
+            <li key={r.routineId} className="flex items-center justify-between gap-3" onClick={onKeptClick}>
               <span className="min-w-0 truncate text-[15px] font-semibold">
                 {r.emoji && <span className="mr-2">{r.emoji}</span>}
                 {r.title}
@@ -30,7 +35,11 @@ export function RoutineLists({ routines }: { routines?: PatternRoutines | null }
       {missed.length ? (
         <ul className="mt-3 flex flex-col gap-4">
           {missed.map((r) => (
-            <li key={`${r.routineId}-${r.label}`} className="flex items-center justify-between gap-3">
+            <li
+              key={`${r.routineId}-${r.label}`}
+              className="flex items-center justify-between gap-3"
+              onClick={onMissedClick}
+            >
               <div className="min-w-0">
                 <p className="truncate text-[15px] font-semibold">
                   {r.emoji && <span className="mr-2">{r.emoji}</span>}

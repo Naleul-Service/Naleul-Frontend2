@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { PageHeader } from '@/components/layout/PageHeader'
@@ -9,9 +9,19 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { RefreshCw } from 'lucide-react'
+import { track } from '@/lib/client/analytics'
+import { referrerType } from '@/lib/client/commonEvents'
+import { errorStatusOf } from '@/features/home/analytics'
 import { usePatternReport, useRecalculatePattern } from '../api'
 import type { PatternPeriod } from '../types'
 import { rangeLabel, updatedLabel } from '../format'
+import {
+  emptySectionsOf,
+  minutesSince,
+  PatternAnalyticsProvider,
+  suggestionTypesOf,
+  usePatternAnalytics,
+} from '../analytics'
 import { BlockKeeping } from './BlockKeeping'
 import { Heatmap } from './Heatmap'
 import { RoutineLists } from './RoutineLists'
@@ -32,14 +42,125 @@ const PERIODS: { value: PatternPeriod; label: string }[] = [
 /** /patterns?period=RECENT_4W|ALL */
 export function PatternView() {
   const params = useSearchParams()
+  const period: PatternPeriod = params.get('period') === 'ALL' ? 'ALL' : 'RECENT_4W'
+  return (
+    <PatternAnalyticsProvider period={period}>
+      <PatternScreen period={period} />
+    </PatternAnalyticsProvider>
+  )
+}
+
+function PatternScreen({ period }: { period: PatternPeriod }) {
+  const params = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const period: PatternPeriod = params.get('period') === 'ALL' ? 'ALL' : 'RECENT_4W'
-  const { data, isPending, isError, error, refetch, isFetching } = usePatternReport(period)
+  const { data, isPending, isError, error, refetch, isFetching, isPlaceholderData } = usePatternReport(period)
   const recalc = useRecalculatePattern(period)
   const reportRef = useRef<HTMLDivElement>(null)
+  const { once } = usePatternAnalytics()
+
+  // ── 분석 ──
+  // pattern.pageview — /patterns 를 불러온 직후 한 번 (기간을 바꿔도 다시 안 보냄)
+  const pageviewSent = useRef(false)
+  useEffect(() => {
+    if (pageviewSent.current) return
+    pageviewSent.current = true
+    track('pattern.pageview', { period, referrer_type: referrerType() })
+  }, [period])
+
+  // 리포트를 받아 그린 직후 — 처음 · 기간을 바꿀 때마다 한 번 (기간을 바꾸는 동안 보이는 이전 리포트는 빼요)
+  const current = data && !isPlaceholderData ? data : null
+  const reportedPeriod = useRef<PatternPeriod | null>(null)
+  useEffect(() => {
+    if (!current || reportedPeriod.current === period) return
+    reportedPeriod.current = period
+    const styleReady = !!current.style?.title
+    const hasSuggestion = current.evaluatedCount > 0 && !!current.suggestion?.items.length
+    track('pattern.report_view', {
+      period,
+      range_days: current.range.days,
+      evaluated_count: current.evaluatedCount,
+      style_ready: styleReady,
+      ai_status: current.aiStatus,
+      empty_sections: emptySectionsOf(current),
+      has_suggestion: hasSuggestion,
+      minutes_since_update: minutesSince(current.generatedAt),
+    })
+    if (!styleReady) {
+      const p = current.style?.progress
+      track('pattern.locked_view', {
+        period,
+        evaluated_count: current.evaluatedCount,
+        remaining_tasks: p?.remainingTasks,
+        remaining_days: p?.remainingDays,
+      })
+    }
+  }, [current, period])
+
+  // 제안 바가 보일 때 — 리포트를 받을 때마다 (기간이 바뀌거나 제안 항목이 바뀌면 다시)
+  const suggestion =
+    current && current.evaluatedCount > 0 && current.suggestion?.items.length ? current.suggestion : null
+  const suggestionKey = suggestion ? `${period}|${suggestion.items.map((i) => i.key).join(',')}` : null
+  const lastSuggestionKey = useRef<string | null>(null)
+  useEffect(() => {
+    if (!suggestion || !suggestionKey || lastSuggestionKey.current === suggestionKey) return
+    lastSuggestionKey.current = suggestionKey
+    track('pattern.suggestion_view', {
+      period,
+      item_count: suggestion.items.length,
+      suggestion_types: suggestionTypesOf(suggestion),
+      expected_gain: suggestion.expectedGain ?? undefined,
+    })
+  }, [suggestion, suggestionKey, period])
+
+  // '패턴을 불러오지 못했어요' 카드가 보일 때 (실패할 때마다 한 번)
+  const failShown = !isPending && (isError || !data)
+  const lastFail = useRef<unknown>(null)
+  useEffect(() => {
+    if (!failShown || lastFail.current === error) return
+    lastFail.current = error
+    track('pattern.load_fail', { period, error_status: errorStatusOf(error) })
+  }, [failShown, error, period])
+
+  // 스크롤 깊이 25 / 50 / 75 / 100% — 기간마다 한 번
+  const showReport = !!data && data.evaluatedCount > 0 && !isError
+  const hasSuggestionShown = showReport && !!data?.suggestion?.items.length
+  useEffect(() => {
+    if (!showReport) return
+    const onScroll = () => {
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      if (max <= 0) return
+      const pct = (window.scrollY / max) * 100
+      for (const mark of [25, 50, 75, 100]) {
+        if (pct >= mark - 1)
+          once(`scroll:${period}:${mark}`, () =>
+            track('pattern.scroll_depth', { scroll_percent: mark, period, has_suggestion: hasSuggestionShown })
+          )
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [showReport, hasSuggestionShown, period, once])
+
+  const onRecalc = () => {
+    const prevVersion = data?.dataVersion
+    track('pattern.recalc_click', {
+      period,
+      minutes_since_update: data ? minutesSince(data.generatedAt) : undefined,
+    })
+    recalc.mutate(undefined, {
+      onSuccess: (next) =>
+        track('pattern.recalc_result', {
+          period,
+          result: 'success',
+          data_changed: prevVersion != null && next.dataVersion != null ? prevVersion !== next.dataVersion : undefined,
+        }),
+      onError: (e) => track('pattern.recalc_result', { period, result: 'fail', error_status: errorStatusOf(e) }),
+    })
+  }
 
   const setPeriod = (p: PatternPeriod) => {
+    if (p !== period) track('pattern.period_change', { period: p, from_period: period })
     const next = new URLSearchParams(params)
     if (p === 'RECENT_4W') next.delete('period')
     else next.set('period', p)
@@ -59,7 +180,7 @@ export function PatternView() {
               최근 업데이트 {updatedLabel(data.generatedAt)} · 오늘 완료한 일까지 반영
               <button
                 type="button"
-                onClick={() => recalc.mutate()}
+                onClick={onRecalc}
                 disabled={recalc.isPending}
                 className="text-brand inline-flex items-center gap-1 font-semibold disabled:opacity-50"
               >
@@ -95,7 +216,14 @@ export function PatternView() {
               </button>
             ))}
           </div>
-          {data && data.evaluatedCount > 0 && <ShareButton targetRef={reportRef} fileDate={data.range.end} />}
+          {data && data.evaluatedCount > 0 && (
+            <ShareButton
+              targetRef={reportRef}
+              fileDate={data.range.end}
+              evaluatedCount={data.evaluatedCount}
+              styleReady={!!data.style?.title}
+            />
+          )}
         </>
       }
     />
@@ -120,7 +248,13 @@ export function PatternView() {
           <div>
             <p className="text-[17px] font-bold">패턴을 불러오지 못했어요</p>
             <p className="text-ink-3 mt-1.5 text-sm">{error?.message}</p>
-            <button className={cn(buttonClass('secondary'), 'mt-4')} onClick={() => refetch()}>
+            <button
+              className={cn(buttonClass('secondary'), 'mt-4')}
+              onClick={() => {
+                track('pattern.retry_click', { period, error_status: errorStatusOf(error) })
+                refetch()
+              }}
+            >
               다시 시도
             </button>
           </div>
@@ -141,7 +275,11 @@ export function PatternView() {
           <p className="text-ink-2 min-w-0 flex-1 text-sm">
             Task를 완료하면 바로 패턴이 쌓이기 시작해요. 시간대별 실행률·요일별 패턴은 기록이 조금 더 모이면 열려요.
           </p>
-          <Link href="/calendar" className={buttonClass('primary', 'sm')}>
+          <Link
+            href="/calendar"
+            className={buttonClass('primary', 'sm')}
+            onClick={() => track('pattern.empty_cta_click', { period })}
+          >
             캘린더로 가기
           </Link>
         </Card>

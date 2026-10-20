@@ -1,4 +1,7 @@
+'use client'
+
 import type { PatternHeatmap } from '../types'
+import { useChartInteract, useDeadClick } from '../analytics'
 import { DAY_SHORT, HATCH, HEAT_BG, heatText, windowLabel } from '../format'
 import { NotEnough, Section } from './Section'
 
@@ -9,6 +12,8 @@ import { NotEnough, Section } from './Section'
  */
 export function Heatmap({ heatmap }: { heatmap?: PatternHeatmap | null }) {
   const hasValue = heatmap?.rows.some((r) => r.cells.some((c) => c.state === 'VALUE'))
+  const chartProps = useChartInteract('heatmap')
+  const onGoldenClick = useDeadClick('golden_time')
   return (
     <Section title="언제 가장 잘 실행하나요?" aside="요일 × 시간 · 한 횟수">
       {!heatmap || !hasValue ? (
@@ -16,7 +21,7 @@ export function Heatmap({ heatmap }: { heatmap?: PatternHeatmap | null }) {
       ) : (
         <>
           {/* 좁은 화면에서는 카드 안에서만 가로 스크롤 */}
-          <div className="-mx-1 overflow-x-auto px-1 pb-1">
+          <div className="-mx-1 overflow-x-auto px-1 pb-1" {...chartProps}>
             <table className="w-full min-w-[560px] border-separate border-spacing-[3px] text-center">
               <thead>
                 <tr>
@@ -92,7 +97,7 @@ export function Heatmap({ heatmap }: { heatmap?: PatternHeatmap | null }) {
           {(heatmap.goldenTime || heatmap.weakTime) && (
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {heatmap.goldenTime && (
-                <div className="bg-brand-soft flex items-center gap-3 rounded-2xl px-4 py-3.5">
+                <div className="bg-brand-soft flex items-center gap-3 rounded-2xl px-4 py-3.5" onClick={onGoldenClick}>
                   <span className="text-brand text-[13px] font-bold whitespace-nowrap">🌟 골든 타임</span>
                   <div>
                     <p className="text-[16px] font-bold">{windowLabel(heatmap.goldenTime)}</p>

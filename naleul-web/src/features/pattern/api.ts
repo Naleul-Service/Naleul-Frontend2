@@ -52,12 +52,12 @@ export function useApplySuggestions() {
   return useMutation({
     mutationFn: async (keys: string[]) => {
       const applied: SuggestionApplyResult[] = []
-      const failed: { key: string; message: string }[] = []
+      const failed: { key: string; message: string; status?: number }[] = []
       for (const key of keys) {
         try {
           applied.push(await api.post<SuggestionApplyResult>(suggestionPath(key, 'apply')))
         } catch (e) {
-          failed.push({ key, message: errorMessage(e) })
+          failed.push({ key, message: errorMessage(e), status: isApiError(e) ? e.httpStatus : undefined })
         }
       }
       return { applied, failed }

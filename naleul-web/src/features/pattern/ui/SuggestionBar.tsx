@@ -1,9 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
+import { suggestionTypesOf, usePatternAnalytics } from '../analytics'
 import { useApplySuggestions, useDismissSuggestions } from '../api'
 import type { PatternSuggestionBar, PatternSuggestionItem } from '../types'
 import { DAY_SHORT } from '../format'
@@ -14,8 +17,58 @@ export function SuggestionBar({ suggestion }: { suggestion?: PatternSuggestionBa
   const [open, setOpen] = useState(false)
   const apply = useApplySuggestions()
   const dismiss = useDismissSuggestions()
+  const { period } = usePatternAnalytics()
+  const openedAt = useRef(0)
   if (!suggestion || !suggestion.items.length) return null
   const keys = suggestion.items.map((i) => i.key)
+  const itemCount = keys.length
+  const types = suggestionTypesOf(suggestion)
+
+  const openModal = () => {
+    openedAt.current = Date.now()
+    track('pattern.suggestion_apply_open', { item_count: itemCount, suggestion_types: types })
+    setOpen(true)
+  }
+  const cancel = (method: ModalCloseMethod | 'cancel_button') => {
+    track('pattern.suggestion_apply_cancel', {
+      item_count: itemCount,
+      close_method: method,
+      open_duration_seconds: Math.round((Date.now() - openedAt.current) / 1000),
+    })
+    setOpen(false)
+  }
+  const applyAll = () => {
+    track('pattern.suggestion_apply_click', { item_count: itemCount, suggestion_types: types })
+    apply.mutate(keys, {
+      onSuccess: ({ applied, failed }) =>
+        track('pattern.suggestion_apply_result', {
+          result: failed.length ? 'fail' : 'success',
+          applied_count: applied.length,
+          skipped_count: failed.length,
+          error_status: failed[0]?.status,
+        }),
+      onError: (e) =>
+        track('pattern.suggestion_apply_result', {
+          result: 'fail',
+          applied_count: 0,
+          skipped_count: itemCount,
+          error_status: errorStatusOf(e),
+        }),
+      onSettled: () => setOpen(false),
+    })
+  }
+  const dismissAll = () => {
+    track('pattern.suggestion_dismiss_click', { item_count: itemCount, suggestion_types: types, period })
+    dismiss.mutate(keys, {
+      onSuccess: () => track('pattern.suggestion_dismiss_result', { result: 'success', item_count: itemCount }),
+      onError: (e) =>
+        track('pattern.suggestion_dismiss_result', {
+          result: 'fail',
+          error_status: errorStatusOf(e),
+          item_count: itemCount,
+        }),
+    })
+  }
 
   return (
     <>
@@ -30,10 +83,10 @@ export function SuggestionBar({ suggestion }: { suggestion?: PatternSuggestionBa
           <Emphasis text={suggestion.text} className="text-brand" />
         </p>
         <div className="flex shrink-0 gap-2">
-          <Button size="lg" onClick={() => setOpen(true)}>
+          <Button size="lg" onClick={openModal}>
             TimeBlock에 반영하기
           </Button>
-          <Button size="lg" variant="secondary" loading={dismiss.isPending} onClick={() => dismiss.mutate(keys)}>
+          <Button size="lg" variant="secondary" loading={dismiss.isPending} onClick={dismissAll}>
             다음에
           </Button>
         </div>
@@ -41,20 +94,16 @@ export function SuggestionBar({ suggestion }: { suggestion?: PatternSuggestionBa
 
       <Modal
         open={open}
-        onClose={() => setOpen(false)}
+        onClose={cancel}
         dismissible={!apply.isPending}
         title="이렇게 바꿀게요"
         description="내일부터 적용돼요. 지난 기록과 오늘 일정은 그대로예요."
         footer={
           <>
-            <Button variant="secondary" onClick={() => setOpen(false)} disabled={apply.isPending}>
+            <Button variant="secondary" onClick={() => cancel('cancel_button')} disabled={apply.isPending}>
               취소
             </Button>
-            <Button
-              variant="brand"
-              loading={apply.isPending}
-              onClick={() => apply.mutate(keys, { onSettled: () => setOpen(false) })}
-            >
+            <Button variant="brand" loading={apply.isPending} onClick={applyAll}>
               반영하기
             </Button>
           </>

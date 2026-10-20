@@ -1,4 +1,7 @@
+'use client'
+
 import { cn } from '@/lib/cn'
+import { useChartInteract } from '../analytics'
 import type { PatternWeekday } from '../types'
 import { DAY_SHORT } from '../format'
 import { Emphasis } from './Emphasis'
@@ -9,13 +12,19 @@ const BAR_MAX_PX = 128
 /** 요일별 실행률 막대 — 가장 낮은 요일만 파란색 */
 export function WeekdayBars({ weekday }: { weekday?: PatternWeekday | null }) {
   const hasData = weekday?.days.some((d) => d.rate != null)
+  const chartProps = useChartInteract('weekday')
   return (
     <Section title="요일별 실행률" aside={weekday?.average != null ? `평균 ${weekday.average}%` : undefined}>
       {!weekday || !hasData ? (
         <NotEnough />
       ) : (
         <>
-          <div className="flex items-end justify-between gap-2 pt-6" role="list" aria-label="요일별 실행률">
+          <div
+            className="flex items-end justify-between gap-2 pt-6"
+            role="list"
+            aria-label="요일별 실행률"
+            {...chartProps}
+          >
             {weekday.days.map((d) => {
               const low = d.dayOfWeek === weekday.lowest
               return (
