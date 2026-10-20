@@ -4,11 +4,19 @@ import { useEffect, useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { buttonClass } from '@/components/ui/Button'
 import { LOGIN_REQUIRED_EVENT } from '@/lib/client/api'
+import { EVENTS, track, type EventProps } from '@/lib/client/analytics'
+import { LOGIN_PROVIDER_PARAM, loginErrorCodeOf, loginProviderOf, takeLoginAttempt } from '@/lib/loginAnalytics'
 import { safeRedirectPath } from '@/lib/redirectPath'
 import { KakaoLoginButton } from './KakaoLoginButton'
 import { AppleLoginButton } from './AppleLoginButton'
 import { LOGIN_ERROR_PARAM, loginErrorMessage } from './kakaoAuth'
-import { currentPath, openLoginDialog, type LoginDialogDetail, type LoginDialogReason } from './loginHref'
+import {
+  currentPath,
+  openLoginDialog,
+  type LoginDialogDetail,
+  type LoginDialogReason,
+  type LoginTriggerSource,
+} from './loginHref'
 
 const COPY: Record<LoginDialogReason, { title: string; description: string }> = {
   save: {
@@ -26,6 +34,13 @@ interface DialogState {
   reason: LoginDialogReason
   next: string
   error: string | null
+  source?: LoginTriggerSource
+  blockedApiPath?: string
+}
+
+/** 모달 이벤트(view · close · 버튼 클릭)에 공통으로 붙는 속성 */
+function modalProps(s: DialogState): EventProps {
+  return { modal_reason: s.reason, trigger_source: s.source, blocked_api_path: s.blockedApiPath }
 }
 
 /**
@@ -45,12 +60,16 @@ export function LoginRequiredDialog() {
   useEffect(() => {
     const onRequired = (e: Event) => {
       const detail = (e as CustomEvent<LoginDialogDetail | undefined>).detail
-      setState({
+      const next: DialogState = {
         open: true,
         reason: detail?.reason ?? 'save',
         next: safeRedirectPath(currentPath()),
         error: loginErrorMessage(detail?.error),
-      })
+        source: detail?.source,
+        blockedApiPath: detail?.blockedApiPath,
+      }
+      setState(next)
+      track(EVENTS.loginModalView, modalProps(next))
     }
     window.addEventListener(LOGIN_REQUIRED_EVENT, onRequired)
 
@@ -58,16 +77,30 @@ export function LoginRequiredDialog() {
     const url = new URL(window.location.href)
     const error = url.searchParams.get(LOGIN_ERROR_PARAM)
     if (error) {
+      const provider = loginProviderOf(url.searchParams.get(LOGIN_PROVIDER_PARAM))
       url.searchParams.delete(LOGIN_ERROR_PARAM)
+      url.searchParams.delete(LOGIN_PROVIDER_PARAM)
       window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
-      openLoginDialog({ reason: 'login', error })
+      // 로그인 실패 → 어느 화면 버튼으로 시도했는지는 시도 때 저장해둔 값에서 꺼내요
+      const attempt = takeLoginAttempt()
+      track(EVENTS.loginFail, {
+        login_provider: provider ?? attempt?.provider,
+        login_error_code: loginErrorCodeOf(error),
+        login_surface: attempt?.surface,
+      })
+      openLoginDialog({ reason: 'login', error, source: 'login_error_return' })
     }
 
     return () => window.removeEventListener(LOGIN_REQUIRED_EVENT, onRequired)
   }, [])
 
-  const close = () => setState((s) => ({ ...s, open: false }))
+  // X · 바깥 클릭 · '계속 둘러보기' 모두 같은 login_modal.close (Tracking Plan 7번 핀)
+  const close = () => {
+    if (state.open) track(EVENTS.loginModalClose, modalProps(state))
+    setState((s) => ({ ...s, open: false }))
+  }
   const copy = COPY[state.reason]
+  const trackProps = modalProps(state)
 
   return (
     <Modal
@@ -78,8 +111,8 @@ export function LoginRequiredDialog() {
       description={copy.description}
       footer={
         <div className="flex w-full flex-col gap-2">
-          <KakaoLoginButton next={state.next} />
-          <AppleLoginButton next={state.next} />
+          <KakaoLoginButton next={state.next} surface="login_modal" trackProps={trackProps} />
+          <AppleLoginButton next={state.next} surface="login_modal" trackProps={trackProps} />
           <button type="button" onClick={close} className={buttonClass('ghost', 'md', true)}>
             계속 둘러보기
           </button>
@@ -102,7 +135,10 @@ export function GuestBanner() {
       <span>둘러보는 중이에요 · 로그인하면 내 목표와 계획이 저장돼요</span>
       <button
         type="button"
-        onClick={() => openLoginDialog({ reason: 'login' })}
+        onClick={() => {
+          track(EVENTS.guestBannerLoginClick)
+          openLoginDialog({ reason: 'login', source: 'guest_banner' })
+        }}
         className="bg-brand rounded-full px-3 py-1 text-[12px] text-white hover:opacity-90"
       >
         로그인

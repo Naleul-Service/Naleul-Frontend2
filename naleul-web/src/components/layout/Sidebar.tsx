@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { logout } from '@/lib/client/api'
+import { EVENTS, track } from '@/lib/client/analytics'
 import { Logo } from '@/components/brand/Logo'
 import { buttonClass } from '@/components/ui/Button'
 import { GoalNavList } from '@/features/goal/ui/GoalNavList'
@@ -118,7 +119,8 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
             type="button"
             onClick={() => {
               onNavigate?.() // 모바일 서랍은 닫고 모달을 띄워요
-              openLoginDialog({ reason: 'login' })
+              track(EVENTS.sidebarGuestLoginClick)
+              openLoginDialog({ reason: 'login', source: 'sidebar' })
             }}
             className={cn(buttonClass('primary', 'md', true), 'mt-3')}
           >
@@ -137,7 +139,8 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
           </div>
           <button
             type="button"
-            onClick={logout}
+            // logout 을 그대로 넘기면 클릭 이벤트 객체가 trackEvent 자리에 들어가요 → 화살표 함수로 감싸요
+            onClick={() => void logout(EVENTS.sidebarLogoutClick)}
             aria-label="로그아웃"
             title="로그아웃"
             className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-2"

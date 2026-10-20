@@ -3,26 +3,28 @@ import { Logo } from '@/components/brand/Logo'
 import { safeRedirectPath } from '@/lib/redirectPath'
 import { KakaoLoginButton } from '@/components/auth/KakaoLoginButton'
 import { AppleLoginButton } from '@/components/auth/AppleLoginButton'
+import { IosAppDownloadLink } from '@/components/auth/IosAppDownloadLink'
 import { loginErrorMessage } from '@/components/auth/kakaoAuth'
+import { TrackOnMount } from '@/components/analytics/TrackOnMount'
 
 export const metadata: Metadata = { title: '로그인' }
 
 // 평소엔 로그인 모달(LoginRequiredDialog)로 로그인해요.
 // 이 페이지는 주소로 직접 들어오거나, 둘러보기 토큰을 못 받았을 때(proxy.ts)만 보여요.
 
-const IOS_APP_URL = 'https://apps.apple.com/kr/app/%EB%82%98%EB%A5%BC-naleul/id6780154075'
-
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string; error?: string }>
+  searchParams: Promise<{ redirect?: string; error?: string; from?: string }>
 }) {
-  const { redirect, error } = await searchParams
+  const { redirect, error, from } = await searchParams
   const next = safeRedirectPath(redirect)
   const errorMessage = loginErrorMessage(error)
 
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-12">
+      {/* 서버 컴포넌트라 analytics.ts(브라우저 SDK)를 import 하지 않고 이벤트 이름을 문자열로 넘겨요 (타입은 그대로 검사돼요) */}
+      <TrackOnMount event="login.pageview" props={{ redirect_path: next, entry_source: from ?? 'direct' }} />
       <div className="w-full max-w-[400px]">
         <Logo size="lg" />
 
@@ -44,16 +46,9 @@ export default async function LoginPage({
         )}
 
         <div className="mt-8 flex flex-col gap-3">
-          <KakaoLoginButton next={next} />
-          <AppleLoginButton next={next} />
-          <a
-            href={IOS_APP_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="border-line-strong bg-surface hover:bg-subtle flex h-14 items-center justify-center rounded-2xl border text-[15px] font-semibold transition"
-          >
-            iOS 앱 다운로드
-          </a>
+          <KakaoLoginButton next={next} surface="login_page" />
+          <AppleLoginButton next={next} surface="login_page" />
+          <IosAppDownloadLink className="border-line-strong bg-surface hover:bg-subtle flex h-14 items-center justify-center rounded-2xl border text-[15px] font-semibold transition" />
         </div>
 
         <p className="text-ink-4 mt-10 text-center text-xs">© 2026 나를(Naleul)</p>
