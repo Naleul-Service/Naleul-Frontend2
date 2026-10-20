@@ -13,10 +13,14 @@ export function LogoutButton({ className }: { className?: string }) {
 
   return (
     <>
-      <button type="button" onClick={() => {
+      <button
+        type="button"
+        onClick={() => {
           setOpen(true)
           track(EVENTS.settingsLogoutClick)
-        }} className={className}>
+        }}
+        className={className}
+      >
         <LogOut className="text-ink-3 size-[18px]" />
         <span className="text-ink-2 flex-1 text-[15px] font-semibold">로그아웃</span>
       </button>
