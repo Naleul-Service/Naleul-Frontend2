@@ -1,13 +1,31 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { track, type EventProps } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { formatDuration, hm, timeToMinutes, todayKst } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
 import type { GoalCategory } from '../api'
 import { useCreateGoalTask, useUpdateGoalTask } from '../edit/mutations'
-import { Field, InlineForm, inlineInput, toNum } from '../edit/inline'
+import { Field, InlineForm, inlineInput, toNum, type InlineCloseMethod, type InlineSubmitMethod } from '../edit/inline'
 import { areasOf } from './SubGoalsSection'
+
+/** goal_task_list.* 이벤트의 surface — 같은 Task 목록이 쓰인 화면 */
+export type GoalTaskSurface = 'goal_detail' | 'habit'
+
+/** goal_task_list.* 전송 (surface 가 없으면 — 예: 브레인 덤프의 직접 추가 — 보내지 않아요) */
+export function trackTaskList(
+  surface: GoalTaskSurface | undefined,
+  event: Parameters<typeof track>[0],
+  props?: EventProps
+) {
+  if (surface) track(event, { surface, ...props })
+}
+
+/** 오늘부터 며칠 뒤 (내일 1, 어제 -1) */
+export const daysFromToday = (ymd: string | null | undefined, today = todayKst()) =>
+  ymd ? Math.round((Date.parse(ymd) - Date.parse(today)) / 86_400_000) : undefined
 
 /**
  * 목표 상세에서 Task 추가·수정.
@@ -19,6 +37,7 @@ export function GoalTaskForm({
   task,
   onDone,
   onCreated,
+  surface,
 }: {
   goal: GoalCategory
   /** 없으면 새로 추가 */
@@ -26,6 +45,8 @@ export function GoalTaskForm({
   onDone: () => void
   /** 새로 만든 Task (추가일 때만) — 예: "이날 빈 시간에 배치하기" 안내 */
   onCreated?: (t: TimeBlockTask) => void
+  /** 분석용 — 넘기면 goal_task_list.* 이벤트를 보내요 */
+  surface?: GoalTaskSurface
 }) {
   // 영역은 선택 — 안 고르면 서버가 목표의 "기타 할 일"에 넣어요
   const subs = areasOf(goal)
@@ -65,8 +86,43 @@ export function GoalTaskForm({
             ? '소요 시간은 5~720분으로 입력해 주세요.'
             : null
   const valid = !!f.name.trim() && !error
+  const isNew = !task
+  const goalId = goal.goalCategoryId
 
-  const submit = () => {
+  // 빨간 입력 오류 문구가 (새로) 보일 때
+  const lastError = useRef<string | null>(null)
+  useEffect(() => {
+    if (error && error !== lastError.current) {
+      trackTaskList(surface, 'goal_task_list.edit_error', { is_new: isNew, validation_error: error })
+    }
+    lastError.current = error
+  }, [error, surface, isNew])
+
+  const cancel = (method: InlineCloseMethod) => {
+    trackTaskList(surface, 'goal_task_list.edit_cancel', { is_new: isNew, close_method: method })
+    onDone()
+  }
+
+  const sendResult = (action: 'create' | 'update', err?: unknown) =>
+    trackTaskList(surface, 'goal_task_list.result', {
+      goal_category_id: goalId,
+      task_action: action,
+      result: err === undefined ? 'success' : 'fail',
+      error_status: err === undefined ? undefined : errorStatusOf(err),
+    })
+
+  const submit = (method: InlineSubmitMethod) => {
+    trackTaskList(surface, 'goal_task_list.save_click', {
+      goal_category_id: goalId,
+      is_new: isNew,
+      days_from_today: daysFromToday(f.date),
+      has_time: hasTime,
+      has_duration: !hasTime && duration !== null,
+      has_due_date: !!f.dueDate,
+      has_milestone: f.milestone !== null,
+      has_sub_goal: f.sub !== null,
+      submit_method: method,
+    })
     const body = {
       taskName: f.name.trim(),
       emoji: f.emoji.trim() || null,
@@ -78,20 +134,32 @@ export function GoalTaskForm({
       durationMinutes: hasTime ? null : duration,
       dueDate: f.dueDate || null,
     }
-    if (task) update.mutate({ taskId: task.taskId, ...body }, { onSuccess: onDone })
+    if (task)
+      update.mutate(
+        { taskId: task.taskId, ...body },
+        {
+          onSuccess: () => {
+            sendResult('update')
+            onDone()
+          },
+          onError: (e) => sendResult('update', e),
+        }
+      )
     else
       create.mutate(body, {
         onSuccess: (created) => {
+          sendResult('create')
           if (created) onCreated?.(created)
           onDone()
         },
+        onError: (e) => sendResult('create', e),
       })
   }
 
   return (
     <InlineForm
       onSubmit={submit}
-      onCancel={onDone}
+      onCancel={cancel}
       saving={create.isPending || update.isPending}
       valid={valid}
       error={error}
@@ -99,7 +167,10 @@ export function GoalTaskForm({
       extra={
         <button
           type="button"
-          onClick={() => setMore((v) => !v)}
+          onClick={() => {
+            trackTaskList(surface, 'goal_task_list.more_toggle', { is_new: isNew, expanded: !more })
+            setMore(!more)
+          }}
           className="text-ink-3 hover:bg-subtle flex items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold"
         >
           <ChevronDown className={more ? 'size-3.5 rotate-180' : 'size-3.5'} />

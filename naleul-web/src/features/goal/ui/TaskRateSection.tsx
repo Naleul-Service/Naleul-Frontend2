@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Chip } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
 import { addDays, startOfWeek, todayKst } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
 import { useGoalTasks, type GoalCategory } from '../api'
@@ -56,6 +57,11 @@ export function TaskRateSection({ goal }: { goal: GoalCategory }) {
   const tasks = kind === 'ALL' ? all : all.filter((t) => t.sourceType !== 'ROUTINE')
   const bars = useMemo(() => weekly(tasks, today), [tasks, today])
 
+  const selectKind = (k: Kind) => {
+    track('goal_detail.task_rate_kind_select', { goal_category_id: goal.goalCategoryId, task_kind: k })
+    setKind(k)
+  }
+
   if (!data || !all.length) return null
   const due = bars.reduce((n, b) => n + b.due, 0)
   const done = bars.reduce((n, b) => n + b.done, 0)
@@ -75,10 +81,10 @@ export function TaskRateSection({ goal }: { goal: GoalCategory }) {
         </div>
         {hasRoutine && (
           <div className="flex gap-1.5">
-            <Chip size="sm" selected={kind === 'ONE_TIME'} onClick={() => setKind('ONE_TIME')}>
+            <Chip size="sm" selected={kind === 'ONE_TIME'} onClick={() => selectKind('ONE_TIME')}>
               할 일만
             </Chip>
-            <Chip size="sm" selected={kind === 'ALL'} onClick={() => setKind('ALL')}>
+            <Chip size="sm" selected={kind === 'ALL'} onClick={() => selectKind('ALL')}>
               루틴 포함
             </Chip>
           </div>

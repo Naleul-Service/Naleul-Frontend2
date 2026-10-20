@@ -4,8 +4,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { useUserColors } from '@/features/color/api'
-import { ColorSwatches, Field, InlineForm, inlineInput } from '@/features/goal/edit/inline'
+import {
+  ColorSwatches,
+  Field,
+  InlineForm,
+  inlineInput,
+  type InlineCloseMethod,
+  type InlineSubmitMethod,
+} from '@/features/goal/edit/inline'
 import { useCreateRecordGoal } from '../api'
 
 /** 이름 예시 — 누르면 이름과 이모지가 같이 채워져요. 업무형은 종류를 나누지 않아요 (회사 · 취업 · 동아리 …) */
@@ -35,18 +44,47 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
   const [emoji, setEmoji] = useState(EXAMPLES[0].emoji)
   const [colorId, setColorId] = useState<number | null>(null)
   const [styleOpen, setStyleOpen] = useState(false)
+  /** 마지막으로 누른 예시 칩의 이름 (분석용 name_from_example) */
+  const [exampleName, setExampleName] = useState<string | null>(null)
   const value = name.trim()
 
-  const submit = () =>
+  const cancel = (method: InlineCloseMethod) => {
+    track('goal_add.record_cancel', {
+      close_method: method,
+      has_input: !!name.trim() || !!description.trim() || emoji !== EXAMPLES[0].emoji || colorId !== null,
+    })
+    onCancel()
+  }
+
+  const submit = (method: InlineSubmitMethod) => {
+    track('goal_add.record_submit', {
+      name_from_example: exampleName !== null && name === exampleName,
+      has_description: !!description.trim(),
+      emoji_changed: emoji !== EXAMPLES[0].emoji,
+      color_changed: colorId !== null,
+      submit_method: method,
+    })
     create.mutate(
       { name: value, emoji, colorId, description: description.trim() || null },
-      { onSuccess: (goal) => router.push(`/goal/${goal.goalCategoryId}`) }
+      {
+        onSuccess: (goal) => {
+          track('goal_add.create_result', {
+            goal_mode: 'RECORD',
+            result: 'success',
+            goal_category_id: goal.goalCategoryId,
+          })
+          router.push(`/goal/${goal.goalCategoryId}`)
+        },
+        onError: (e) =>
+          track('goal_add.create_result', { goal_mode: 'RECORD', result: 'fail', error_status: errorStatusOf(e) }),
+      }
     )
+  }
 
   return (
     <InlineForm
       onSubmit={submit}
-      onCancel={onCancel}
+      onCancel={cancel}
       saving={create.isPending}
       valid={!!value}
       error={null}
@@ -65,11 +103,13 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
         />
       </Field>
       <div className="-mt-1 flex flex-wrap gap-1.5">
-        {EXAMPLES.map((ex) => (
+        {EXAMPLES.map((ex, i) => (
           <button
             key={ex.name}
             type="button"
             onClick={() => {
+              track('goal_add.record_example_click', { example_index: i })
+              setExampleName(ex.name)
               setName(ex.name)
               setEmoji(ex.emoji)
             }}
@@ -95,7 +135,10 @@ export function RecordGoalForm({ onCancel, className }: { onCancel: () => void; 
       <div>
         <button
           type="button"
-          onClick={() => setStyleOpen((v) => !v)}
+          onClick={() => {
+            track('goal_add.record_style_toggle', { expanded: !styleOpen })
+            setStyleOpen(!styleOpen)
+          }}
           aria-expanded={styleOpen}
           className="text-ink-2 hover:text-ink flex items-center gap-1.5 text-[13px] font-semibold"
         >

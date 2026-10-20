@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Flame } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
 import { addDays, addMonths, weekdayIndex, WEEKDAY_LABEL } from '@/features/timetable/time'
 import { useHabitHeatmap, type Habit, type HabitDayState } from '../api'
 
@@ -74,6 +75,13 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
   const from = firstOfMonth(earliest) < limit ? limit : firstOfMonth(earliest)
   const { data, isPending } = useHabitHeatmap(from, shown.length > 0)
   const [month, setMonth] = useState(thisMonth)
+  const changeMonth = (next: string, action: 'prev' | 'next' | 'today') => {
+    const monthsAgo =
+      (Number(thisMonth.slice(0, 4)) - Number(next.slice(0, 4))) * 12 +
+      (Number(thisMonth.slice(5, 7)) - Number(next.slice(5, 7)))
+    track('habit.heatmap_month_click', { date_action: action, months_ago: monthsAgo })
+    setMonth(next)
+  }
 
   const stateOf = useMemo(() => {
     const map = new Map<number, Map<string, HabitDayState>>()
@@ -98,7 +106,7 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
         <div className="ml-auto flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setMonth(addMonths(month, -1))}
+            onClick={() => changeMonth(addMonths(month, -1), 'prev')}
             disabled={!canPrev}
             aria-label="지난달"
             className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-1 disabled:opacity-30"
@@ -111,7 +119,7 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
           </span>
           <button
             type="button"
-            onClick={() => setMonth(addMonths(month, 1))}
+            onClick={() => changeMonth(addMonths(month, 1), 'next')}
             disabled={!canNext}
             aria-label="다음 달"
             className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-1 disabled:opacity-30"
@@ -121,7 +129,7 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
           {month !== thisMonth && (
             <button
               type="button"
-              onClick={() => setMonth(thisMonth)}
+              onClick={() => changeMonth(thisMonth, 'today')}
               className="text-brand ml-1 text-[13px] font-semibold"
             >
               이번 달

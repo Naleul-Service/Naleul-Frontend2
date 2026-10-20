@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CalendarMinus, CalendarPlus, Flag, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
+import { track } from '@/lib/client/analytics'
 import { cn } from '@/lib/cn'
+import { errorStatusOf } from '@/features/home/analytics'
 import {
   useApplyAdjustment,
   useCompleteGoal,
@@ -83,6 +85,8 @@ export function GoalWrapUpSection({ goal }: { goal: GoalCategory }) {
   const today = todayYmd()
   const metricDone = progress.data?.metric?.status === 'ACHIEVED'
   const periodOver = !!goal.goalCategoryEndDate && goal.goalCategoryEndDate < today
+  const gid = goal.goalCategoryId
+  const wrapupPrompt = metricDone ? 'metric_done' : periodOver ? 'period_over' : 'normal'
   const lead = metricDone
     ? '목표값에 도달했어요! 결과를 남기고 마무리해 볼까요?'
     : periodOver
@@ -90,17 +94,51 @@ export function GoalWrapUpSection({ goal }: { goal: GoalCategory }) {
       : '목표를 끝냈다면 결과를 남겨 주세요. 다음 목표를 짤 때 참고해요.'
 
   const openModal = () => {
+    track('goal_detail.wrapup_open', { goal_category_id: gid, wrapup_prompt: wrapupPrompt })
     setResult(metricDone ? 'ACHIEVED' : null)
     setAchievement('')
     setOpen(true)
   }
 
+  const close = (method: ModalCloseMethod | 'cancel_button') => {
+    if (complete.isPending) return
+    track('goal_detail.wrapup_cancel', {
+      goal_category_id: gid,
+      close_method: method,
+      outcome_result: result ?? undefined,
+    })
+    setOpen(false)
+  }
+
+  const pick = (r: OutcomeResult) => {
+    track('goal_detail.wrapup_outcome_select', { goal_category_id: gid, outcome_result: r })
+    setResult(r)
+  }
+
   const submit = () => {
     if (!result) return
-    complete.mutate(
-      { goalCategoryEndDate: today, achievement: achievement.trim() || null, result },
-      { onSuccess: () => setOpen(false) }
-    )
+    const note = achievement.trim()
+    track('goal_detail.wrapup_submit', {
+      goal_category_id: gid,
+      outcome_result: result,
+      achievement_length: note.length,
+      was_preselected: metricDone && result === 'ACHIEVED',
+      wrapup_prompt: wrapupPrompt,
+    })
+    complete
+      .mutateAsync({ goalCategoryEndDate: today, achievement: note || null, result })
+      .then(() => {
+        track('goal_detail.wrapup_result', { goal_category_id: gid, result: 'success', outcome_result: result })
+        setOpen(false)
+      })
+      .catch((e: unknown) =>
+        track('goal_detail.wrapup_result', {
+          goal_category_id: gid,
+          result: 'fail',
+          error_status: errorStatusOf(e),
+          outcome_result: result,
+        })
+      )
   }
 
   return (
@@ -118,13 +156,13 @@ export function GoalWrapUpSection({ goal }: { goal: GoalCategory }) {
 
       <Modal
         open={open}
-        onClose={() => !complete.isPending && setOpen(false)}
+        onClose={close}
         title="이 목표, 어땠나요?"
         description="오늘 날짜로 마무리해요. 남은 기간의 루틴과 예정된 할 일은 캘린더에서 빠지고, 지난 기록과 완료한 일은 그대로 남아요."
         dismissible={!complete.isPending}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setOpen(false)} disabled={complete.isPending}>
+            <Button variant="secondary" onClick={() => close('cancel_button')} disabled={complete.isPending}>
               취소
             </Button>
             <Button onClick={submit} disabled={!result} loading={complete.isPending}>
@@ -133,7 +171,7 @@ export function GoalWrapUpSection({ goal }: { goal: GoalCategory }) {
           </>
         }
       >
-        <OutcomePicker value={result} onChange={setResult} disabled={complete.isPending} />
+        <OutcomePicker value={result} onChange={pick} disabled={complete.isPending} />
         <label className="mt-4 block">
           <span className="text-ink-2 text-[13px] font-semibold">한 줄 소감 (선택)</span>
           <textarea
@@ -188,7 +226,45 @@ export function GoalOutcomeSection({ goal }: { goal: GoalCategory }) {
   const outcome = progress.data?.outcome ?? null
 
   const ask = !outcome || outcome.source === 'AUTO' || editing
-  const choose = (r: OutcomeResult) => update.mutate(r, { onSuccess: () => setEditing(false) })
+  const gid = goal.goalCategoryId
+  const source = outcome?.source ?? 'none'
+
+  // '이 목표 어땠나요?' 칸이 보일 때 한 번 (결과를 불러온 뒤, 다시 고르기는 제외)
+  const askVisible = progress.isSuccess && ask && !editing
+  const askSent = useRef(false)
+  useEffect(() => {
+    if (!askVisible || askSent.current) return
+    askSent.current = true
+    track('goal_detail.outcome_ask_view', { goal_category_id: gid, outcome_source: source })
+  }, [askVisible, source, gid])
+
+  const toggleEditing = (next: boolean) => {
+    track('goal_detail.outcome_change_click', { goal_category_id: gid, outcome_action: next ? 'open' : 'cancel' })
+    setEditing(next)
+  }
+
+  const choose = (r: OutcomeResult) => {
+    track('goal_detail.outcome_select', {
+      goal_category_id: gid,
+      outcome_result: r,
+      outcome_source: source,
+      is_change: editing,
+    })
+    update
+      .mutateAsync(r)
+      .then(() => {
+        track('goal_detail.outcome_result', { goal_category_id: gid, result: 'success', outcome_result: r })
+        setEditing(false)
+      })
+      .catch((e: unknown) =>
+        track('goal_detail.outcome_result', {
+          goal_category_id: gid,
+          result: 'fail',
+          error_status: errorStatusOf(e),
+          outcome_result: r,
+        })
+      )
+  }
 
   return (
     <Section
@@ -196,7 +272,7 @@ export function GoalOutcomeSection({ goal }: { goal: GoalCategory }) {
       aside={
         outcome?.source === 'USER' &&
         !editing && (
-          <button type="button" onClick={() => setEditing(true)} className="hover:text-ink font-semibold">
+          <button type="button" onClick={() => toggleEditing(true)} className="hover:text-ink font-semibold">
             바꾸기
           </button>
         )
@@ -222,7 +298,7 @@ export function GoalOutcomeSection({ goal }: { goal: GoalCategory }) {
           {editing && (
             <button
               type="button"
-              onClick={() => setEditing(false)}
+              onClick={() => toggleEditing(false)}
               className="text-ink-3 hover:text-ink mt-2 text-[13px] font-semibold"
             >
               취소
@@ -242,7 +318,52 @@ export function GoalAdjustmentBanner({ goal }: { goal: GoalCategory }) {
   const apply = useApplyAdjustment(goal.goalCategoryId)
   const dismiss = useDismissAdjustment(goal.goalCategoryId)
   const adj: GoalAdjustment | null | undefined = progress.data?.adjustment
+  const gid = goal.goalCategoryId
+
+  // 제안이 보일 때 제안마다 한 번
+  const sentKey = useRef<string | null>(null)
+  const adjKey = adj?.key ?? null
+  const adjDirection = adj?.direction
+  const previousRate = adj?.previousWeekRate
+  const lastRate = adj?.lastWeekRate
+  useEffect(() => {
+    if (!adjKey || sentKey.current === adjKey) return
+    sentKey.current = adjKey
+    track('goal_detail.adjust_banner_view', {
+      goal_category_id: gid,
+      adjust_direction: adjDirection,
+      previous_rate: previousRate,
+      last_rate: lastRate,
+    })
+  }, [adjKey, adjDirection, previousRate, lastRate, gid])
+
   if (!adj) return null
+
+  const trackResult = (action: 'apply' | 'dismiss', p: Promise<unknown>) =>
+    p
+      .then(() =>
+        track('goal_detail.adjust_result', { goal_category_id: gid, adjust_action: action, result: 'success' })
+      )
+      .catch((e: unknown) =>
+        track('goal_detail.adjust_result', {
+          goal_category_id: gid,
+          adjust_action: action,
+          result: 'fail',
+          error_status: errorStatusOf(e),
+        })
+      )
+  const doApply = () => {
+    track('goal_detail.adjust_apply_click', { goal_category_id: gid, adjust_direction: adj.direction })
+    trackResult('apply', apply.mutateAsync(adj.key))
+  }
+  const doDismiss = (method: 'x_button' | 'cancel_button') => {
+    track('goal_detail.adjust_dismiss_click', {
+      goal_category_id: gid,
+      adjust_direction: adj.direction,
+      close_method: method,
+    })
+    trackResult('dismiss', dismiss.mutateAsync(adj.key))
+  }
 
   const down = adj.direction === 'DOWN'
   const Icon = down ? CalendarMinus : CalendarPlus
@@ -259,7 +380,7 @@ export function GoalAdjustmentBanner({ goal }: { goal: GoalCategory }) {
       <button
         type="button"
         aria-label="이번엔 넘기기"
-        onClick={() => dismiss.mutate(adj.key)}
+        onClick={() => doDismiss('x_button')}
         disabled={busy}
         className="text-ink-3 hover:text-ink absolute top-3 right-3 rounded-lg p-1"
       >
@@ -274,10 +395,10 @@ export function GoalAdjustmentBanner({ goal }: { goal: GoalCategory }) {
         지난 2주 실천률 {adj.previousWeekRate}% → {adj.lastWeekRate}% · 주 {adj.fromDays}회 → {adj.toDays}회
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => apply.mutate(adj.key)} loading={apply.isPending} disabled={busy}>
+        <Button size="sm" onClick={doApply} loading={apply.isPending} disabled={busy}>
           {down ? `${day}요일 빼기` : `${day}요일 더하기`}
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => dismiss.mutate(adj.key)} disabled={busy}>
+        <Button size="sm" variant="ghost" onClick={() => doDismiss('cancel_button')} disabled={busy}>
           지금 그대로 할게요
         </Button>
       </div>

@@ -1,11 +1,12 @@
 'use client'
 
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Check, ChevronDown, Repeat, Sparkles } from 'lucide-react'
 import { Card } from '@/components/ui/Card'
 import { Badge, Chip } from '@/components/ui/Chip'
 import { Spinner } from '@/components/ui/Spinner'
+import { errorStatusOf } from '@/features/home/analytics'
 import { cn } from '@/lib/cn'
 import { hexOf, shownTime } from '@/features/timetable/layout'
 import { WEEKDAY_LABEL, addDays, hm, startOfWeek, todayKst, weekdayIndex } from '@/features/timetable/time'
@@ -13,7 +14,7 @@ import type { TimeBlockTask } from '@/features/timetable/types'
 import { useGoalTasks, useToggleGoalTask, type GoalCategory } from '../api'
 import { useDeleteGoalTask } from '../edit/mutations'
 import { AddButton, InlineConfirm, RowActions, useEditing } from '../edit/inline'
-import { GoalTaskForm } from './GoalTaskForm'
+import { GoalTaskForm, daysFromToday, trackTaskList, type GoalTaskSurface } from './GoalTaskForm'
 
 type StatusFilter = 'ALL' | 'TODO' | 'DONE'
 type KindFilter = 'ALL' | 'ONE_TIME' | 'ROUTINE'
@@ -33,6 +34,18 @@ const matchStatus = (t: TimeBlockTask, s: StatusFilter) => s === 'ALL' || (s ===
 export const dayOf = (t: TimeBlockTask) =>
   shownTime(t)?.startAt.slice(0, 10) ?? t.date ?? t.scheduledDate ?? t.dueDate ?? null
 
+/** 열려 있던 입력창(key)이 다른 입력창이 열려서 닫히면 goal_task_list.edit_cancel (close_method: other_open) */
+function useOtherOpenCancel(key: string, current: string | null, surface: GoalTaskSurface, isNew: boolean) {
+  const prev = useRef(current)
+  useEffect(() => {
+    const was = prev.current
+    prev.current = current
+    if (was === key && current !== null && current !== key) {
+      trackTaskList(surface, 'goal_task_list.edit_cancel', { is_new: isNew, close_method: 'other_open' })
+    }
+  }, [key, current, surface, isNew])
+}
+
 /** "오늘" · "내일" · "어제" · "10.08 (목)" (해가 다르면 "2027.01.03 (일)") */
 function dayLabel(ymd: string, today: string) {
   if (ymd === today) return '오늘'
@@ -44,23 +57,36 @@ function dayLabel(ymd: string, today: string) {
 }
 
 /** 한 줄 — 수정(일회성 Task 만)·삭제(미션 제외)는 그 줄이 입력창/확인창으로 바뀌어요 */
-function TaskItem(props: {
+function TaskItem({
+  surface,
+  ...props
+}: {
   goal: GoalCategory
   task: TimeBlockTask
   today: string
   onToggle: (t: TimeBlockTask) => void
   toggling: boolean
+  surface: GoalTaskSurface
 }) {
   const t = props.task
   const key = `task:${t.taskId}`
   const edit = useEditing(key)
   const del = useEditing(`del:${key}`)
   const remove = useDeleteGoalTask()
+  useOtherOpenCancel(key, edit.current, surface, false)
+  const taskProps = { task_id: t.taskId, source_type: t.sourceType }
+  const sendDeleteResult = (err?: unknown) =>
+    trackTaskList(surface, 'goal_task_list.result', {
+      goal_category_id: props.goal.goalCategoryId,
+      task_action: 'delete',
+      result: err === undefined ? 'success' : 'fail',
+      error_status: err === undefined ? undefined : errorStatusOf(err),
+    })
 
   if (edit.isOpen) {
     return (
       <li className="py-2">
-        <GoalTaskForm goal={props.goal} task={t} onDone={edit.close} />
+        <GoalTaskForm goal={props.goal} task={t} onDone={edit.close} surface={surface} />
       </li>
     )
   }
@@ -71,8 +97,20 @@ function TaskItem(props: {
           message={`'${t.taskName}'을 삭제할까요?`}
           detail={t.sourceType === 'ROUTINE' ? '이 날짜의 루틴 Task 하나만 지워져요. 루틴은 그대로예요.' : undefined}
           loading={remove.isPending}
-          onCancel={del.close}
-          onConfirm={() => remove.mutate(t.taskId, { onSuccess: del.close })}
+          onCancel={() => {
+            trackTaskList(surface, 'goal_task_list.delete_cancel', taskProps)
+            del.close()
+          }}
+          onConfirm={() => {
+            trackTaskList(surface, 'goal_task_list.delete_confirm', taskProps)
+            remove.mutate(t.taskId, {
+              onSuccess: () => {
+                sendDeleteResult()
+                del.close()
+              },
+              onError: (e) => sendDeleteResult(e),
+            })
+          }}
         />
       </li>
     )
@@ -80,8 +118,31 @@ function TaskItem(props: {
   return (
     <TaskRow
       {...props}
-      onEdit={t.sourceType === 'MANUAL' ? edit.open : undefined}
-      onDelete={t.sourceType !== 'MISSION' ? del.open : undefined}
+      onNameClick={() =>
+        trackTaskList(surface, 'goal_task_list.task_name_click', {
+          task_id: t.taskId,
+          days_from_today: daysFromToday(dayOf(t), props.today),
+        })
+      }
+      onEdit={
+        t.sourceType === 'MANUAL'
+          ? () => {
+              trackTaskList(surface, 'goal_task_list.edit_open', {
+                goal_category_id: props.goal.goalCategoryId,
+                ...taskProps,
+              })
+              edit.open()
+            }
+          : undefined
+      }
+      onDelete={
+        t.sourceType !== 'MISSION'
+          ? () => {
+              trackTaskList(surface, 'goal_task_list.delete_click', taskProps)
+              del.open()
+            }
+          : undefined
+      }
     />
   )
 }
@@ -93,11 +154,13 @@ function TaskRow({
   toggling,
   onEdit,
   onDelete,
+  onNameClick,
 }: {
   task: TimeBlockTask
   today: string
   onToggle: (t: TimeBlockTask) => void
   toggling: boolean
+  onNameClick?: () => void
   onEdit?: () => void
   onDelete?: () => void
 }) {
@@ -145,6 +208,7 @@ function TaskRow({
         {day ? (
           <Link
             href={`/calendar?view=day&date=${day}`}
+            onClick={onNameClick}
             className={cn(
               'block truncate text-[15px] font-semibold hover:underline',
               done && 'text-ink-4 line-through'
@@ -195,6 +259,7 @@ export function GoalTaskList({
   addLabel = 'Task 추가',
   emptyText = '이 목표에 연결된 Task가 아직 없어요. 위에서 바로 추가해 보세요.',
   initialPeriod = 'WEEK',
+  surface = 'goal_detail',
 }: {
   goal: GoalCategory
   title?: string
@@ -203,10 +268,13 @@ export function GoalTaskList({
   addLabel?: string
   emptyText?: string
   initialPeriod?: PeriodFilter
+  /** 분석용 — 이 목록이 쓰인 화면 (goal_task_list.* 의 surface) */
+  surface?: GoalTaskSurface
 }) {
   const goalId = goal.goalCategoryId
-  const { data, isPending, isError, refetch } = useGoalTasks(goalId)
+  const { data, isPending, isError, error, refetch } = useGoalTasks(goalId)
   const add = useEditing('task:new')
+  useOtherOpenCancel('task:new', add.current, surface, true)
   const toggle = useToggleGoalTask(goalId)
   const [period, setPeriod] = useState<PeriodFilter>(initialPeriod)
   const [status, setStatus] = useState<StatusFilter>('ALL')
@@ -239,18 +307,76 @@ export function GoalTaskList({
   const hasRoutine = all.some((t) => t.sourceType === 'ROUTINE')
   const firstDoneId = status === 'ALL' ? visible.find(isDone)?.taskId : undefined
 
+  /** 필터를 바꾼 뒤 보이는(조건에 맞는) Task 수 */
+  const countWith = (p: PeriodFilter, k: KindFilter, s: StatusFilter) =>
+    all.filter((t) => inPeriod(t, p) && matchKind(t, k) && matchStatus(t, s)).length
+  const send = (event: Parameters<typeof trackTaskList>[1], props?: Parameters<typeof trackTaskList>[2]) =>
+    trackTaskList(surface, event, props)
+
   const pickStatus = (s: StatusFilter) => {
+    send('goal_task_list.status_filter_select', { task_filter: s, result_count: countWith(period, kind, s) })
     setStatus(s)
     setLimit(PAGE)
   }
   const pickPeriod = (p: PeriodFilter) => {
+    send('goal_task_list.period_select', { period: p, result_count: countWith(p, kind, status) })
     setPeriod(p)
     setLimit(PAGE)
   }
   const pickKind = (k: KindFilter) => {
+    send('goal_task_list.kind_filter_select', { task_kind: k, result_count: countWith(period, k, status) })
     setKind(k)
     setLimit(PAGE)
   }
+  const onToggle = (t: TimeBlockTask) => {
+    send('goal_task_list.toggle_complete', {
+      goal_category_id: goalId,
+      task_id: t.taskId,
+      check_action: isDone(t) ? 'uncomplete' : 'complete',
+      source_type: t.sourceType,
+      is_missed: !!t.missed,
+      days_from_today: daysFromToday(dayOf(t), today),
+    })
+    const sendResult = (err?: unknown) =>
+      send('goal_task_list.result', {
+        goal_category_id: goalId,
+        task_action: 'toggle',
+        result: err === undefined ? 'success' : 'fail',
+        error_status: err === undefined ? undefined : errorStatusOf(err),
+      })
+    toggle.mutate(t, { onSuccess: () => sendResult(), onError: (e) => sendResult(e) })
+  }
+
+  // 'Task를 불러오지 못했어요'가 보일 때 (실패할 때마다 1회)
+  const failSent = useRef(false)
+  useEffect(() => {
+    if (!isError) {
+      failSent.current = false
+      return
+    }
+    if (failSent.current) return
+    failSent.current = true
+    trackTaskList(surface, 'goal_task_list.load_fail', { error_status: errorStatusOf(error) })
+  }, [isError, error, surface])
+
+  // 기간·필터 때문에 0개가 보일 때 (조건 조합마다 1회)
+  const emptyFiltered = !isPending && !isError && all.length > 0 && shown.length === 0
+  const unfilteredCount = all.length
+  const emptySent = useRef<string | null>(null)
+  useEffect(() => {
+    if (!emptyFiltered) {
+      emptySent.current = null
+      return
+    }
+    const k = `${period}|${status}|${kind}`
+    if (emptySent.current === k) return
+    emptySent.current = k
+    trackTaskList(surface, 'goal_task_list.empty_filter_view', {
+      period,
+      task_filter: status,
+      unfiltered_count: unfilteredCount,
+    })
+  }, [emptyFiltered, period, status, kind, unfilteredCount, surface])
 
   return (
     <Card className="p-5 sm:p-6">
@@ -268,9 +394,19 @@ export function GoalTaskList({
       {/* 추가: 이름·날짜만 넣고 Enter */}
       <div className="mb-4">
         {add.isOpen ? (
-          <GoalTaskForm goal={goal} onDone={add.close} />
+          <GoalTaskForm goal={goal} onDone={add.close} surface={surface} />
         ) : (
-          <AddButton onClick={add.open}>{addLabel}</AddButton>
+          <AddButton
+            onClick={() => {
+              send('goal_task_list.add_click', {
+                goal_category_id: goalId,
+                task_count: all.filter((t) => t.sourceType !== 'ROUTINE').length,
+              })
+              add.open()
+            }}
+          >
+            {addLabel}
+          </AddButton>
         )}
       </div>
 
@@ -281,7 +417,14 @@ export function GoalTaskList({
       ) : isError ? (
         <div className="text-ink-3 py-6 text-center text-sm">
           Task를 불러오지 못했어요.{' '}
-          <button type="button" className="text-ink-2 font-semibold underline" onClick={() => refetch()}>
+          <button
+            type="button"
+            className="text-ink-2 font-semibold underline"
+            onClick={() => {
+              send('goal_task_list.retry_click')
+              refetch()
+            }}
+          >
             다시 시도
           </button>
         </div>
@@ -369,8 +512,9 @@ export function GoalTaskList({
                     goal={goal}
                     task={t}
                     today={today}
-                    onToggle={(x) => toggle.mutate(x)}
+                    onToggle={onToggle}
                     toggling={toggle.isPending && toggle.variables?.taskId === t.taskId}
+                    surface={surface}
                   />
                 </Fragment>
               ))}
@@ -380,7 +524,13 @@ export function GoalTaskList({
           {shown.length > visible.length && (
             <button
               type="button"
-              onClick={() => setLimit((n) => n + PAGE)}
+              onClick={() => {
+                send('goal_task_list.load_more_click', {
+                  shown_count: visible.length,
+                  remaining_count: shown.length - visible.length,
+                })
+                setLimit((n) => n + PAGE)
+              }}
               className="text-ink-2 hover:bg-subtle mt-2 flex w-full items-center justify-center gap-1 rounded-xl py-2.5 text-sm font-semibold"
             >
               더 보기 ({shown.length - visible.length}개 남음)

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   Bell,
@@ -19,6 +19,8 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { JAVA_DAYS, JAVA_DAY_LABEL } from '@/features/goal/format'
 import { InlineConfirm } from '@/features/goal/edit/inline'
 import type { GoalCategory } from '@/features/goal/api'
@@ -59,6 +61,27 @@ function dayTitle(ymd: string, today: string) {
   return `${Number(ymd.slice(5, 7))}월 ${Number(ymd.slice(8, 10))}일 (${WEEKDAY_LABEL[weekdayIndex(ymd)]})`
 }
 
+/** 오늘부터 며칠 전인지 (오늘 0) */
+const daysAgoOf = (day: string, today: string) =>
+  Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000)
+
+/**
+ * 추가 · 수정 · 삭제 · 쉬기 · 다시 시작 요청이 끝나면 habit.result.
+ * 삭제하면 그 줄이 사라져서 mutate 콜백이 안 불릴 수 있어 mutateAsync 의 promise 로 보내요. 성공하면 true.
+ */
+function trackHabitResult(p: Promise<unknown>, habitAction: 'create' | 'update' | 'delete' | 'pause' | 'resume') {
+  return p.then(
+    () => {
+      track('habit.result', { habit_action: habitAction, result: 'success' })
+      return true
+    },
+    (e: unknown) => {
+      track('habit.result', { habit_action: habitAction, result: 'fail', error_status: errorStatusOf(e) })
+      return false
+    }
+  )
+}
+
 const DOT: Record<HabitDayState, string> = {
   DONE: 'bg-brand',
   MISSED: 'bg-line-strong',
@@ -71,7 +94,7 @@ const DOT: Record<HabitDayState, string> = {
 
 // ─── 습관 한 줄 ────────────────────────────────────────────────
 
-function HabitRow({ habit, day, isToday }: { habit: Habit; day: string; isToday: boolean }) {
+function HabitRow({ habit, day, isToday, daysAgo }: { habit: Habit; day: string; isToday: boolean; daysAgo: number }) {
   const toggle = useToggleHabitCheck(isToday ? undefined : day)
   const update = useUpdateHabit()
   const pause = usePauseHabit()
@@ -88,11 +111,18 @@ function HabitRow({ habit, day, isToday }: { habit: Habit; day: string; isToday:
           saving={update.isPending}
           submitLabel="저장"
           onCancel={() => setMode('view')}
-          onSubmit={(v) => update.mutate({ habitId: habit.habitId, ...v }, { onSuccess: () => setMode('view') })}
+          onSubmit={(v) =>
+            void trackHabitResult(update.mutateAsync({ habitId: habit.habitId, ...v }), 'update').then(
+              (ok) => ok && setMode('view')
+            )
+          }
           extra={
             <button
               type="button"
-              onClick={() => setMode('delete')}
+              onClick={() => {
+                track('habit.delete_click', { habit_id: habit.habitId, streak: habit.streak })
+                setMode('delete')
+              }}
               className="text-danger hover:bg-danger-soft flex items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold"
             >
               <Trash2 className="size-3.5" />
@@ -110,8 +140,14 @@ function HabitRow({ habit, day, isToday }: { habit: Habit; day: string; isToday:
           message={`'${habit.name}' 습관을 지울까요?`}
           detail="지금까지 체크한 기록도 화면에서 사라져요. 잠깐 쉬려면 '쉬기'를 써 주세요."
           loading={remove.isPending}
-          onCancel={() => setMode('view')}
-          onConfirm={() => remove.mutate(habit.habitId)}
+          onCancel={() => {
+            track('habit.delete_cancel', { habit_id: habit.habitId })
+            setMode('view')
+          }}
+          onConfirm={() => {
+            track('habit.delete_confirm', { habit_id: habit.habitId, streak: habit.streak })
+            void trackHabitResult(remove.mutateAsync(habit.habitId), 'delete')
+          }}
         />
       </li>
     )
@@ -121,7 +157,27 @@ function HabitRow({ habit, day, isToday }: { habit: Habit; day: string; isToday:
     <li className={cn('group flex items-center gap-3 py-3', paused && 'opacity-60')}>
       <button
         type="button"
-        onClick={() => toggle.mutate({ habit, day })}
+        onClick={() => {
+          const checkAction = habit.checked ? 'uncomplete' : 'complete'
+          track('habit.check_toggle', {
+            habit_id: habit.habitId,
+            check_action: checkAction,
+            days_ago: daysAgo,
+            is_due_day: habit.scheduled,
+            streak: habit.streak,
+          })
+          toggle.mutateAsync({ habit, day }).then(
+            () =>
+              track('habit.check_result', { habit_id: habit.habitId, check_action: checkAction, result: 'success' }),
+            (e: unknown) =>
+              track('habit.check_result', {
+                habit_id: habit.habitId,
+                check_action: checkAction,
+                result: 'fail',
+                error_status: errorStatusOf(e),
+              })
+          )
+        }}
         disabled={paused}
         aria-pressed={habit.checked}
         aria-label={`${habit.name} ${habit.checked ? '체크 풀기' : '했어요'}`}
@@ -175,15 +231,33 @@ function HabitRow({ habit, day, isToday }: { habit: Habit; day: string; isToday:
       </span>
 
       <span className="flex shrink-0 items-center transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within:opacity-100 [@media(hover:hover)]:group-hover:opacity-100">
-        <IconButton label={`${habit.name} 수정`} onClick={() => setMode('edit')}>
+        <IconButton
+          label={`${habit.name} 수정`}
+          onClick={() => {
+            track('habit.edit_open', { habit_id: habit.habitId })
+            setMode('edit')
+          }}
+        >
           <Pencil className="size-3.5" />
         </IconButton>
         {paused ? (
-          <IconButton label={`${habit.name} 다시 시작`} onClick={() => resume.mutate(habit.habitId)}>
+          <IconButton
+            label={`${habit.name} 다시 시작`}
+            onClick={() => {
+              track('habit.pause_toggle', { habit_id: habit.habitId, pause_action: 'resume', streak: habit.streak })
+              void trackHabitResult(resume.mutateAsync(habit.habitId), 'resume')
+            }}
+          >
             <Play className="size-3.5" />
           </IconButton>
         ) : (
-          <IconButton label={`${habit.name} 쉬기`} onClick={() => pause.mutate(habit.habitId)}>
+          <IconButton
+            label={`${habit.name} 쉬기`}
+            onClick={() => {
+              track('habit.pause_toggle', { habit_id: habit.habitId, pause_action: 'pause', streak: habit.streak })
+              void trackHabitResult(pause.mutateAsync(habit.habitId), 'pause')
+            }}
+          >
             <Pause className="size-3.5" />
           </IconButton>
         )}
@@ -208,7 +282,8 @@ function IconButton({ label, onClick, children }: { label: string; onClick: () =
 
 // ─── 추가 ─────────────────────────────────────────────────────
 
-function AddHabit({ existing }: { existing: Habit[] }) {
+/** dueCount: 그날 예정된 습관 수 (habit_count) */
+function AddHabit({ existing, dueCount }: { existing: Habit[]; dueCount: number }) {
   const [open, setOpen] = useState(false)
   const create = useCreateHabit()
   const names = new Set(existing.map((h) => h.name))
@@ -221,12 +296,19 @@ function AddHabit({ existing }: { existing: Habit[] }) {
           saving={create.isPending}
           submitLabel="습관 추가"
           onCancel={() => setOpen(false)}
-          onSubmit={(v) => create.mutate(v, { onSuccess: () => setOpen(false) })}
+          onSubmit={(v) => {
+            // [UX] 같은 이름도 막지 않고 만들어져요
+            if (names.has(v.name)) track('habit.duplicate_add', { habit_count: dueCount })
+            void trackHabitResult(create.mutateAsync(v), 'create').then((ok) => ok && setOpen(false))
+          }}
         />
       ) : (
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            track('habit.add_click', { habit_count: dueCount })
+            setOpen(true)
+          }}
           className="border-line-strong text-ink-3 hover:border-ink-4 hover:text-ink-2 flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed py-2.5 text-sm font-semibold transition-colors"
         >
           <Plus className="size-4" />
@@ -237,12 +319,18 @@ function AddHabit({ existing }: { existing: Habit[] }) {
         <div className="mt-3">
           <p className="text-ink-3 mb-1.5 text-[12px] font-medium">눌러서 바로 추가</p>
           <div className="flex flex-wrap gap-1.5">
-            {suggestions.slice(0, 10).map((s) => (
+            {suggestions.slice(0, 10).map((s, i) => (
               <button
                 key={s.name}
                 type="button"
                 disabled={create.isPending}
-                onClick={() => create.mutate({ name: s.name, emoji: s.emoji, repeatDays: s.repeatDays ?? [] })}
+                onClick={() => {
+                  track('habit.suggestion_click', { suggestion_index: i, habit_count: dueCount })
+                  void trackHabitResult(
+                    create.mutateAsync({ name: s.name, emoji: s.emoji, repeatDays: s.repeatDays ?? [] }),
+                    'create'
+                  )
+                }}
                 className="border-line hover:border-line-strong hover:bg-subtle h-8 rounded-full border px-3 text-[13px] disabled:opacity-50"
               >
                 {s.emoji} {s.name}
@@ -268,7 +356,8 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
   const today = todayKst()
   const [day, setDay] = useState(today)
   const isToday = day === today
-  const { data, isPending, isError, error, refetch } = useHabitHome(isToday ? undefined : day)
+  const { data, isPending, isError, error, errorUpdatedAt, refetch } = useHabitHome(isToday ? undefined : day)
+  const daysAgo = daysAgoOf(day, today)
   const [showOff, setShowOff] = useState(false)
 
   const habits = data?.habits ?? []
@@ -278,10 +367,53 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
   const done = due.filter((h) => h.checked).length
   const ratio = due.length ? done / due.length : 0
 
+  // ── 분석 ──
+  // 습관을 처음 다 불러온 뒤 한 번
+  const viewed = useRef(false)
+  useEffect(() => {
+    if (!data || viewed.current) return
+    viewed.current = true
+    track('habit.pageview', {
+      goal_category_id: goal.goalCategoryId,
+      habit_count: due.length,
+      due_today_count: due.length,
+      done_count: done,
+      paused_count: paused.length,
+    })
+  }, [data, goal.goalCategoryId, due.length, done, paused.length])
+
+  // '모두 챙겼어요' — 그날 화면에서 체크해서 다 채웠을 때 처음 한 번 (불러올 때 이미 다 한 날은 빼요)
+  const allDone = data ? due.length > 0 && done === due.length : null
+  const lastAllDone = useRef<string | null>(null)
+  const allDoneSent = useRef(new Set<string>())
+  useEffect(() => {
+    if (allDone === null) return
+    if (allDone && lastAllDone.current === `${day}:false` && !allDoneSent.current.has(day)) {
+      allDoneSent.current.add(day)
+      track('habit.all_done_view', { days_ago: daysAgo, due_today_count: due.length })
+    }
+    lastAllDone.current = `${day}:${allDone}`
+  }, [allDone, day, daysAgo, due.length])
+
+  // '습관을 불러오지 못했어요' 가 보일 때 (날짜를 바꿔 다시 실패해도 한 번씩)
+  const lastFail = useRef('')
+  useEffect(() => {
+    if (!isError) return
+    const key = `${day}:${errorUpdatedAt}`
+    if (lastFail.current === key) return
+    lastFail.current = key
+    track('habit.load_fail', { error_status: errorStatusOf(error), days_ago: daysAgo })
+  }, [isError, error, errorUpdatedAt, day, daysAgo])
+
+  const changeDay = (next: string, action: 'prev' | 'next' | 'today') => {
+    track('habit.date_change', { date_action: action, days_ago: daysAgoOf(next, today) })
+    setDay(next)
+  }
+
   return (
     <>
       <p className="text-ink-3 text-[13px]">
-        <Link href="/goal" className="hover:text-ink">
+        <Link href="/goal" className="hover:text-ink" onClick={() => track('habit.breadcrumb_click')}>
           목표
         </Link>{' '}
         › {goal.goalCategoryName}
@@ -300,7 +432,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setDay(addDays(day, -1))}
+              onClick={() => changeDay(addDays(day, -1), 'prev')}
               aria-label="전날"
               className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-1.5"
             >
@@ -309,7 +441,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
             <h2 className="min-w-[96px] text-center text-[17px] font-bold">{dayTitle(day, today)}</h2>
             <button
               type="button"
-              onClick={() => setDay(addDays(day, 1))}
+              onClick={() => changeDay(addDays(day, 1), 'next')}
               disabled={isToday}
               aria-label="다음 날"
               className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-1.5 disabled:opacity-30"
@@ -317,7 +449,11 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
               <ChevronRight className="size-5" />
             </button>
             {!isToday && (
-              <button type="button" onClick={() => setDay(today)} className="text-brand text-[13px] font-semibold">
+              <button
+                type="button"
+                onClick={() => changeDay(today, 'today')}
+                className="text-brand text-[13px] font-semibold"
+              >
                 오늘로
               </button>
             )}
@@ -343,7 +479,13 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
             <div className="py-10 text-center">
               <p className="font-bold">습관을 불러오지 못했어요</p>
               <p className="text-ink-3 mt-1 text-sm">{error.message}</p>
-              <Button className="mt-4" onClick={() => refetch()}>
+              <Button
+                className="mt-4"
+                onClick={() => {
+                  track('habit.retry_click', { days_ago: daysAgo })
+                  refetch()
+                }}
+              >
                 다시 시도
               </Button>
             </div>
@@ -357,7 +499,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
               {due.length > 0 ? (
                 <ul className="divide-line mt-2 divide-y">
                   {due.map((h) => (
-                    <HabitRow key={h.habitId} habit={h} day={day} isToday={isToday} />
+                    <HabitRow key={h.habitId} habit={h} day={day} isToday={isToday} daysAgo={daysAgo} />
                   ))}
                 </ul>
               ) : (
@@ -368,7 +510,10 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
                 <div className="border-line mt-2 border-t pt-3">
                   <button
                     type="button"
-                    onClick={() => setShowOff((v) => !v)}
+                    onClick={() => {
+                      track('habit.off_list_toggle', { days_ago: daysAgo, expanded: !showOff, item_count: off.length })
+                      setShowOff((v) => !v)
+                    }}
                     aria-expanded={showOff}
                     className="text-ink-3 hover:text-ink-2 flex items-center gap-1 text-[13px] font-semibold"
                   >
@@ -378,7 +523,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
                   {showOff && (
                     <ul className="divide-line divide-y">
                       {off.map((h) => (
-                        <HabitRow key={h.habitId} habit={h} day={day} isToday={isToday} />
+                        <HabitRow key={h.habitId} habit={h} day={day} isToday={isToday} daysAgo={daysAgo} />
                       ))}
                     </ul>
                   )}
@@ -390,7 +535,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
                   <p className="text-ink-3 text-[13px] font-semibold">쉬는 중 {paused.length}</p>
                   <ul className="divide-line divide-y">
                     {paused.map((h) => (
-                      <HabitRow key={h.habitId} habit={h} day={day} isToday={isToday} />
+                      <HabitRow key={h.habitId} habit={h} day={day} isToday={isToday} daysAgo={daysAgo} />
                     ))}
                   </ul>
                 </div>
@@ -398,7 +543,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
             </>
           )}
 
-          {!isPending && !isError && <AddHabit existing={habits} />}
+          {!isPending && !isError && <AddHabit existing={habits} dueCount={due.length} />}
         </Card>
 
         {/* 오른쪽: 습관별 잔디 (한 달씩) — 할 일은 많아지면 길어져서 아래로 */}
@@ -413,6 +558,7 @@ export function HabitView({ goal }: { goal: GoalCategory }) {
           addLabel="할 일 추가"
           emptyText="아직 할 일이 없어요. 위에서 바로 추가해 보세요."
           initialPeriod="ALL"
+          surface="habit"
         />
       </div>
     </>

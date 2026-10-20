@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { TrendingDown, TrendingUp } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
@@ -40,6 +42,15 @@ const md = (iso: string) => {
 }
 const daysBetween = (a: string, b: string) => dayNum(b) - dayNum(a)
 const addDaysIso = (iso: string, n: number) => new Date((dayNum(iso) + n) * 86_400_000).toISOString().slice(0, 10)
+
+/** 수치 기록 요청 결과 (지난 기록 저장 = record · 삭제 = delete) */
+const trackMetricResult = (goalId: number, action: 'record' | 'delete', err?: unknown) =>
+  track('goal_detail.metric_result', {
+    goal_category_id: goalId,
+    metric_action: action,
+    result: err === undefined ? 'success' : 'fail',
+    error_status: err === undefined ? undefined : errorStatusOf(err),
+  })
 
 const STATUS: Record<ProgressStatus, { label: string; tone: string }> = {
   ACHIEVED: { label: '목표 달성 🎉', tone: 'bg-success-soft text-success' },
@@ -156,11 +167,13 @@ export function Insight({ m, endDate }: { m: MetricProgress; endDate: string | n
 
 function RecentLogs({
   goalId,
+  today,
   m,
   notes,
   onEdit,
 }: {
   goalId: number
+  today: string
   m: MetricProgress
   /** 날짜별 회고 — 수치 옆에 그날 무엇을 했는지 같이 보여줘요 */
   notes: Record<string, GoalReflection>
@@ -185,6 +198,7 @@ function RecentLogs({
           const delta = l.value - prev
           const good = delta * dir > 0
           const key = `del:metriclog:${l.date}`
+          const daysAgo = daysBetween(l.date, today)
           if (editing.current === key) {
             return (
               <li key={l.date} className="py-2">
@@ -192,8 +206,18 @@ function RecentLogs({
                   message={`${md(l.date)} 기록(${withUnit(l.value, m.unit)})을 지울까요?`}
                   detail="그래프와 현재 값이 바로 바뀌어요."
                   loading={del.isPending}
-                  onCancel={editing.close}
-                  onConfirm={() => del.mutate(l.date, { onSettled: editing.close })}
+                  onCancel={() => {
+                    track('goal_detail.metric_log_delete_cancel', { goal_category_id: goalId })
+                    editing.close()
+                  }}
+                  onConfirm={() => {
+                    track('goal_detail.metric_log_delete_confirm', { goal_category_id: goalId, days_ago: daysAgo })
+                    del.mutate(l.date, {
+                      onSuccess: () => trackMetricResult(goalId, 'delete'),
+                      onError: (e) => trackMetricResult(goalId, 'delete', e),
+                      onSettled: editing.close,
+                    })
+                  }}
                 />
               </li>
             )
@@ -220,8 +244,14 @@ function RecentLogs({
               </span>
               <RowActions
                 label={`${md(l.date)} 기록`}
-                onEdit={() => onEdit(l.date, l.value)}
-                onDelete={() => editing.openOther(key)}
+                onEdit={() => {
+                  track('goal_detail.metric_log_edit_click', { goal_category_id: goalId, days_ago: daysAgo })
+                  onEdit(l.date, l.value)
+                }}
+                onDelete={() => {
+                  track('goal_detail.metric_log_delete_click', { goal_category_id: goalId, days_ago: daysAgo })
+                  editing.openOther(key)
+                }}
               />
             </li>
           )
@@ -230,7 +260,14 @@ function RecentLogs({
       {rows.length > 5 && (
         <button
           type="button"
-          onClick={() => setShowAll((v) => !v)}
+          onClick={() => {
+            track('goal_detail.metric_logs_more_toggle', {
+              goal_category_id: goalId,
+              expanded: !showAll,
+              log_count: rows.length,
+            })
+            setShowAll(!showAll)
+          }}
           className="text-ink-3 hover:text-ink mt-1 text-[13px] font-medium"
         >
           {showAll ? '접기' : `기록 ${rows.length - 5}개 더 보기`}
@@ -291,6 +328,9 @@ function MetricView({ goalId, p, m }: { goalId: number; p: GoalProgress; m: Metr
         target={{ value: m.targetValue, label: `목표 ${withUnit(m.targetValue, m.unit)}` }}
         current={{ date: currentDate, value: m.currentValue, label: `지금 ${withUnit(m.currentValue, m.unit)}` }}
         format={(v) => withUnit(v, m.unit)}
+        onFirstInteract={() =>
+          track('goal_detail.chart_interact', { goal_category_id: goalId, chart_kind: 'main_metric' })
+        }
       />
       <Legend
         items={[
@@ -301,6 +341,7 @@ function MetricView({ goalId, p, m }: { goalId: number; p: GoalProgress; m: Metr
 
       <RecentLogs
         goalId={goalId}
+        today={p.today}
         m={m}
         notes={Object.fromEntries((p.reflections ?? []).map((r) => [r.date, r]))}
         onEdit={(date, value) => setLoaded({ date, value, n: Date.now() })}
@@ -333,7 +374,25 @@ function CheckInPrefilled({
     e.preventDefault()
     const v = Number(value)
     if (value.trim() === '' || !Number.isFinite(v) || record.isPending) return
-    record.mutate({ date, value: v }, { onSuccess: onDone })
+    track('goal_detail.metric_log_edit_save', {
+      goal_category_id: goalId,
+      days_ago: daysBetween(initialDate, today),
+      date_changed: date !== initialDate,
+    })
+    record.mutate(
+      { date, value: v },
+      {
+        onSuccess: () => {
+          trackMetricResult(goalId, 'record')
+          onDone()
+        },
+        onError: (err) => trackMetricResult(goalId, 'record', err),
+      }
+    )
+  }
+  const cancel = (method: 'esc' | 'cancel_button') => {
+    track('goal_detail.metric_log_edit_cancel', { goal_category_id: goalId, close_method: method })
+    onDone()
   }
   return (
     <form
@@ -341,7 +400,7 @@ function CheckInPrefilled({
       onKeyDown={(e) => {
         if (e.key === 'Escape') {
           e.preventDefault()
-          onDone()
+          cancel('esc')
         }
       }}
       className="border-brand/30 bg-brand-soft/50 mt-4 rounded-2xl border px-4 py-3"
@@ -374,7 +433,7 @@ function CheckInPrefilled({
         <Button type="submit" size="sm" loading={record.isPending} disabled={value.trim() === ''}>
           저장
         </Button>
-        <Button type="button" variant="ghost" size="sm" onClick={onDone}>
+        <Button type="button" variant="ghost" size="sm" onClick={() => cancel('cancel_button')}>
           취소
         </Button>
       </div>
@@ -427,7 +486,7 @@ function TaskLine({ t }: { t: TaskProgress }) {
 
 // ─── 수치 없는 목표: Task 누적 ───────────────────────────────────
 
-function TaskView({ p }: { p: GoalProgress }) {
+function TaskView({ goalId, p }: { goalId: number; p: GoalProgress }) {
   const t = p.tasks
   const edit = useEditing('goal')
   const behind = Math.max(t.dueByToday - t.completed, 0)
@@ -498,6 +557,9 @@ function TaskView({ p }: { p: GoalProgress }) {
             }
             format={(v) => `${fmtNum(v)}개`}
             height={200}
+            onFirstInteract={() =>
+              track('goal_detail.chart_interact', { goal_category_id: goalId, chart_kind: 'task_cumulative' })
+            }
           />
           <Legend
             items={[
@@ -517,6 +579,12 @@ function TaskView({ p }: { p: GoalProgress }) {
           size="sm"
           variant="secondary"
           onClick={() => {
+            // 헤더 '수정'과 같은 목표 수정 입력창이 열려요 (수치 없는 목표 = 목표형)
+            track('goal_detail.edit_open', {
+              goal_category_id: goalId,
+              goal_mode: 'ACHIEVEMENT',
+              entry_point: 'progress_metric',
+            })
             edit.open()
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }}
@@ -547,7 +615,7 @@ export function ProgressSection({ goal }: { goal: GoalCategory }) {
   const m = p.metric
   return (
     <Section title="지금 어디쯤?" aside={m ? <StatusChip status={m.status} /> : undefined}>
-      {m ? <MetricView goalId={goal.goalCategoryId} p={p} m={m} /> : <TaskView p={p} />}
+      {m ? <MetricView goalId={goal.goalCategoryId} p={p} m={m} /> : <TaskView goalId={goal.goalCategoryId} p={p} />}
     </Section>
   )
 }

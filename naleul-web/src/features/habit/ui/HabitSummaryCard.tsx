@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { ArrowRight, Check } from 'lucide-react'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
 import { useHabitHome } from '../api'
 
 /**
@@ -22,6 +23,13 @@ export function HabitSummaryCard({ className }: { className?: string }) {
   return (
     <Link
       href={`/goal/${data.goalCategoryId}`}
+      onClick={() =>
+        track('goal_list.habit_card_click', {
+          habit_count: data.habits.length,
+          due_today_count: due.length,
+          done_count: done,
+        })
+      }
       className={cn(
         'border-line bg-surface hover:border-line-strong group block rounded-[20px] border p-5 transition-colors',
         className

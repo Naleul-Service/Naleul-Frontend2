@@ -1,17 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, BriefcaseBusiness, ListChecks, MessageCircle, PenLine, Target } from 'lucide-react'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { useUserColors } from '@/features/color/api'
 import { addDays, todayKst } from '@/features/timetable/time'
 import { useCreateGoal } from '../edit/mutations'
-import { ColorSwatches, Field, InlineForm, colorIdOf, inlineInput, toNum } from '../edit/inline'
+import {
+  ColorSwatches,
+  Field,
+  InlineForm,
+  colorIdOf,
+  inlineInput,
+  toNum,
+  type InlineCloseMethod,
+  type InlineSubmitMethod,
+} from '../edit/inline'
 import { isKindComplete, kindBody, type GoalKindValue } from '../kind'
+import { periodProgress } from '../format'
 import { RecordGoalForm } from '@/features/record/ui/RecordGoalForm'
 import { useHabitHome } from '@/features/habit/api'
 import { GoalKindPicker } from './GoalKindPicker'
@@ -54,7 +66,45 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
             : null
   const valid = !!f.name.trim() && !error && colorId !== null
 
-  const submit = () =>
+  // ── 분석: 폼 아래 빨간 문구가 새로 뜰 때마다 1회 ──
+  const lastError = useRef<string | null>(null)
+  useEffect(() => {
+    if (error === lastError.current) return
+    lastError.current = error
+    if (error) track('goal_add.manual_error', { validation_error: error })
+  }, [error])
+
+  const hasInput =
+    !!f.name.trim() ||
+    !!f.emoji.trim() ||
+    !!f.motive.trim() ||
+    !!f.metricName.trim() ||
+    !!f.metricUnit.trim() ||
+    !!f.startValue.trim() ||
+    !!f.targetValue.trim() ||
+    kind !== null ||
+    f.colorId !== null ||
+    f.start !== today ||
+    f.end !== addDays(today, 90)
+
+  const cancel = (method: InlineCloseMethod) => {
+    track('goal_add.manual_cancel', { close_method: method, has_input: hasInput })
+    onCancel()
+  }
+
+  const submit = (method: InlineSubmitMethod) => {
+    const hasMetric = showMetric && !!f.metricName.trim()
+    track('goal_add.manual_submit', {
+      goal_type: kind?.goalType,
+      goal_sub_type: kind?.goalSubType,
+      period_days: periodProgress(f.start, f.end)?.total,
+      has_metric: hasMetric,
+      metric_dropped: showMetric && !hasMetric && (!!f.startValue.trim() || !!f.targetValue.trim()),
+      has_motive: !!f.motive.trim(),
+      has_emoji: !!f.emoji.trim(),
+      color_changed: f.colorId !== null && f.colorId !== colorIdOf(colors.data, null),
+      submit_method: method,
+    })
     create.mutate(
       {
         goalCategoryName: f.name.trim(),
@@ -75,13 +125,25 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
         // V52: 세부 목표는 화면에서 숨겨서 직접 만들 때도 받지 않아요
         subGoals: [],
       },
-      { onSuccess: ({ goal }) => router.push(`/goal/${goal.goalCategoryId}`) }
+      {
+        onSuccess: ({ goal }) => {
+          track('goal_add.create_result', {
+            goal_mode: 'ACHIEVEMENT',
+            result: 'success',
+            goal_category_id: goal.goalCategoryId,
+          })
+          router.push(`/goal/${goal.goalCategoryId}`)
+        },
+        onError: (e) =>
+          track('goal_add.create_result', { goal_mode: 'ACHIEVEMENT', result: 'fail', error_status: errorStatusOf(e) }),
+      }
     )
+  }
 
   return (
     <InlineForm
       onSubmit={submit}
-      onCancel={onCancel}
+      onCancel={cancel}
       saving={create.isPending}
       valid={valid}
       error={error}
@@ -177,7 +239,10 @@ function ManualGoalForm({ onCancel }: { onCancel: () => void }) {
       ) : (
         <button
           type="button"
-          onClick={() => setShowMetric(true)}
+          onClick={() => {
+            track('goal_add.manual_metric_add_click')
+            setShowMetric(true)
+          }}
           className="text-brand self-start text-[13px] font-semibold"
         >
           + 수치 목표 추가 (예: 체중 80 → 72kg)
@@ -214,6 +279,7 @@ function HabitCardAction() {
   return (
     <Link
       href={`/goal/${data.goalCategoryId}`}
+      onClick={() => track('goal_add.habit_click', { habit_count: data.habits.length })}
       className="text-success group flex items-center gap-1 text-sm font-semibold"
     >
       {data.habits.length ? `습관 ${data.habits.length}개 보러 가기` : '습관 추가하러 가기'}
@@ -230,11 +296,36 @@ function HabitCardAction() {
  */
 export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | 'record' | null }) {
   const [open, setOpen] = useState<'manual' | 'record' | null>(initialMode)
+  const formOpen = open ?? 'none'
+
+  // ── 분석 (노션 Tracking Plan 「목표 추가」) ──
+  const pageviewSent = useRef(false)
+  useEffect(() => {
+    if (pageviewSent.current) return
+    pageviewSent.current = true
+    track('goal_add.pageview', { initial_mode: initialMode ?? 'none' })
+  }, [initialMode])
+
+  /** 직접 만들기 폼 열기 — 다른 폼이 열려 있었으면 바뀌어요 (적던 내용 사라짐) */
+  const openForm = (mode: 'manual' | 'record') => {
+    if (open === mode) return
+    track('goal_add.mode_open', { goal_mode: mode === 'record' ? 'RECORD' : 'ACHIEVEMENT', from_mode: formOpen })
+    setOpen(mode)
+  }
+
   const card = 'border-line bg-surface flex flex-col rounded-[20px] border p-5 text-left transition-colors sm:p-6'
 
   return (
     <>
-      <PageHeader breadcrumb={<Link href="/goal">목표</Link>} title="목표 추가" description="어떤 성격의 목표인가요?" />
+      <PageHeader
+        breadcrumb={
+          <Link href="/goal" onClick={() => track('goal_add.breadcrumb_click', { form_open: formOpen })}>
+            목표
+          </Link>
+        }
+        title="목표 추가"
+        description="어떤 성격의 목표인가요?"
+      />
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {/* 기본 생활 습관 */}
@@ -271,7 +362,7 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
           <div className="mt-auto pt-5">
             <button
               type="button"
-              onClick={() => setOpen('record')}
+              onClick={() => openForm('record')}
               aria-expanded={open === 'record'}
               className="text-ink group flex items-center gap-1 text-sm font-semibold"
             >
@@ -300,14 +391,18 @@ export function GoalAddView({ initialMode = null }: { initialMode?: 'manual' | '
           </p>
           <Examples items={GOAL_EXAMPLES} />
           <div className="mt-auto flex flex-wrap items-center gap-x-5 gap-y-2 pt-5">
-            <Link href="/goal/new" className="text-brand group flex items-center gap-1 text-sm font-semibold">
+            <Link
+              href="/goal/new"
+              onClick={() => track('goal_add.ai_click', { form_open: formOpen })}
+              className="text-brand group flex items-center gap-1 text-sm font-semibold"
+            >
               <MessageCircle className="size-4" />
               AI와 계획 세우기
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <button
               type="button"
-              onClick={() => setOpen('manual')}
+              onClick={() => openForm('manual')}
               aria-expanded={open === 'manual'}
               className="text-ink-3 hover:text-ink-2 flex items-center gap-1 text-[13px] font-medium"
             >

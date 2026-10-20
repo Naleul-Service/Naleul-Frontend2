@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CalendarCheck, Sparkles } from 'lucide-react'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { useFillTimetable, type FillResponse } from '@/features/timetable/api'
 import { addDays, todayKst } from '@/features/timetable/time'
 import type { GoalCategory } from '../api'
@@ -24,7 +26,41 @@ export function PlaceAfterCreateCard({ goal, className }: { goal: GoalCategory; 
   const fill = useFillTimetable()
   const [result, setResult] = useState<FillResponse | null>(null)
   const today = todayKst()
-  const dismiss = () => router.replace(`/goal/${goal.goalCategoryId}`, { scroll: false })
+  const gid = goal.goalCategoryId
+  const dismiss = (cardState: 'before_fill' | 'after_fill') => {
+    track('goal_detail.place_dismiss_click', { goal_category_id: gid, card_state: cardState })
+    router.replace(`/goal/${gid}`, { scroll: false })
+  }
+
+  // 카드가 보일 때 한 번 (새로고침해도 ?created=1 이 남아 있으면 다시)
+  const viewSent = useRef(false)
+  useEffect(() => {
+    if (viewSent.current) return
+    viewSent.current = true
+    track('goal_detail.place_card_view', { goal_category_id: gid })
+  }, [gid])
+
+  const doFill = () => {
+    track('goal_detail.place_fill_click', { goal_category_id: gid })
+    fill
+      .mutateAsync({ startDate: today, endDate: addDays(today, DAYS - 1) })
+      .then((r) => {
+        track('goal_detail.place_fill_result', {
+          goal_category_id: gid,
+          result: 'success',
+          placed_count: r?.placedCount,
+          unscheduled_count: r?.unscheduledCount,
+        })
+        setResult(r)
+      })
+      .catch((e: unknown) =>
+        track('goal_detail.place_fill_result', {
+          goal_category_id: gid,
+          result: 'fail',
+          error_status: errorStatusOf(e),
+        })
+      )
+  }
 
   return (
     <section
@@ -49,10 +85,16 @@ export function PlaceAfterCreateCard({ goal, className }: { goal: GoalCategory; 
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button variant="ghost" onClick={dismiss}>
+            <Button variant="ghost" onClick={() => dismiss('after_fill')}>
               닫기
             </Button>
-            <Link href={`/calendar?view=week&date=${today}`} className={buttonClass('primary')}>
+            <Link
+              href={`/calendar?view=week&date=${today}`}
+              onClick={() =>
+                track('goal_detail.place_calendar_click', { goal_category_id: gid, placed_count: result.placedCount })
+              }
+              className={buttonClass('primary')}
+            >
               캘린더에서 보기
             </Link>
           </div>
@@ -69,16 +111,10 @@ export function PlaceAfterCreateCard({ goal, className }: { goal: GoalCategory; 
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Button variant="ghost" onClick={dismiss} disabled={fill.isPending}>
+            <Button variant="ghost" onClick={() => dismiss('before_fill')} disabled={fill.isPending}>
               나중에
             </Button>
-            <Button
-              variant="brand"
-              loading={fill.isPending}
-              onClick={() =>
-                fill.mutate({ startDate: today, endDate: addDays(today, DAYS - 1) }, { onSuccess: (r) => setResult(r) })
-              }
-            >
+            <Button variant="brand" loading={fill.isPending} onClick={doFill}>
               <Sparkles className="size-4" />
               AI로 이번 주 배치하기
             </Button>

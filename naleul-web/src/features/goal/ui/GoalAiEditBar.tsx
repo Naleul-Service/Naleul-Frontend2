@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { CornerDownLeft, MessageSquareText } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Chip'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { cn } from '@/lib/cn'
 import type { GoalCategory } from '../api'
 import { useGoalEditApply, useGoalEditPreview, type GoalEditPreview } from '../edit/mutations'
@@ -18,6 +20,8 @@ const EXAMPLES = [
   '아침 7시에 스트레칭 10분 추가해줘',
 ]
 const ACTION_TONE: Record<string, 'brand' | 'neutral' | 'danger'> = { 추가: 'brand', 변경: 'neutral', 삭제: 'danger' }
+/** 분석용 change_action */
+const ACTION_KEY: Record<string, string> = { 추가: 'add', 변경: 'update', 삭제: 'delete' }
 
 /**
  * 목표 상세 "말로 고치기".
@@ -33,6 +37,9 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
   const ask = useGoalEditPreview(goal.goalCategoryId)
   const apply = useGoalEditApply(goal.goalCategoryId)
   const inputRef = useRef<HTMLInputElement>(null)
+  const gid = goal.goalCategoryId
+  /** 예시 칩 · "오늘 기록" 카드가 채워 준 문장 (is_prefilled 비교용) */
+  const prefilled = useRef<string | null>(null)
 
   // "오늘 기록" 카드의 "최근 기록 보고 계획 조정받기" → 문장을 채우고 이 칸으로 이동
   useEffect(() => {
@@ -40,6 +47,7 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
       const v = (e as CustomEvent<string>).detail
       if (!v) return
       setText(v.slice(0, MAX))
+      prefilled.current = v.slice(0, MAX)
       inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       inputRef.current?.focus()
     }
@@ -47,30 +55,74 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
     return () => window.removeEventListener(AI_EDIT_PREFILL_EVENT, onPrefill)
   }, [])
 
-  const submit = () => {
+  const submit = (method: 'button' | 'enter') => {
     const value = text.trim()
     if (!value || ask.isPending) return
-    ask.mutate(value, {
-      onSuccess: (res) => {
+    track('goal_detail.ai_edit_submit', {
+      goal_category_id: gid,
+      text_length: value.length,
+      is_prefilled: prefilled.current != null && text === prefilled.current,
+      submit_method: method,
+    })
+    ask
+      .mutateAsync(value)
+      .then((res) => {
+        track('goal_detail.ai_edit_preview_result', {
+          goal_category_id: gid,
+          result: 'success',
+          change_count: res.changes.length,
+        })
         setPreview(res)
         setPicked(res.changes.map(() => true))
-      },
-    })
+      })
+      .catch((e: unknown) =>
+        track('goal_detail.ai_edit_preview_result', {
+          goal_category_id: gid,
+          result: 'fail',
+          error_status: errorStatusOf(e),
+        })
+      )
   }
 
-  const close = () => {
+  const close = (method: ModalCloseMethod | 'cancel_button') => {
     if (apply.isPending) return
+    track('goal_detail.ai_edit_cancel', {
+      goal_category_id: gid,
+      close_method: method,
+      change_count: preview?.changes.length ?? 0,
+    })
     setPreview(null)
   }
 
   const chosen = preview ? preview.changes.filter((_, i) => picked[i]).map((c) => c.op) : []
-  const doApply = () =>
-    apply.mutate(chosen, {
-      onSuccess: () => {
+  const doApply = () => {
+    const selected = chosen.length
+    track('goal_detail.ai_edit_apply_click', {
+      goal_category_id: gid,
+      selected_count: selected,
+      change_count: preview?.changes.length ?? 0,
+    })
+    apply
+      .mutateAsync(chosen)
+      .then(() => {
+        track('goal_detail.ai_edit_apply_result', {
+          goal_category_id: gid,
+          result: 'success',
+          selected_count: selected,
+        })
         setPreview(null)
         setText('')
-      },
-    })
+        prefilled.current = null
+      })
+      .catch((e: unknown) =>
+        track('goal_detail.ai_edit_apply_result', {
+          goal_category_id: gid,
+          result: 'fail',
+          error_status: errorStatusOf(e),
+          selected_count: selected,
+        })
+      )
+  }
 
   return (
     <section className="border-line bg-surface rounded-[20px] border px-4 py-3 sm:px-5">
@@ -83,7 +135,7 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
               e.preventDefault()
-              submit()
+              submit('enter')
             }
           }}
           disabled={ask.isPending}
@@ -91,18 +143,28 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
           aria-label="말로 고치기"
           className="placeholder:text-ink-4 h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
         />
-        <Button size="sm" variant="brand" onClick={submit} loading={ask.isPending} disabled={!text.trim()}>
+        <Button
+          size="sm"
+          variant="brand"
+          onClick={() => submit('button')}
+          loading={ask.isPending}
+          disabled={!text.trim()}
+        >
           <CornerDownLeft className="size-3.5" />
           고치기
         </Button>
       </div>
       {!text && (
         <div className="mt-1.5 flex flex-wrap gap-1.5 pl-7">
-          {EXAMPLES.map((ex) => (
+          {EXAMPLES.map((ex, i) => (
             <button
               key={ex}
               type="button"
-              onClick={() => setText(ex)}
+              onClick={() => {
+                track('goal_detail.ai_edit_example_click', { goal_category_id: gid, example_index: i })
+                prefilled.current = ex
+                setText(ex)
+              }}
               className="border-line text-ink-3 hover:border-line-strong hover:text-ink-2 h-6 rounded-full border px-2 text-[12px]"
             >
               {ex}
@@ -121,7 +183,7 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
         footer={
           preview?.changes.length ? (
             <>
-              <Button variant="secondary" onClick={close} disabled={apply.isPending}>
+              <Button variant="secondary" onClick={() => close('cancel_button')} disabled={apply.isPending}>
                 취소
               </Button>
               <Button onClick={doApply} loading={apply.isPending} disabled={!chosen.length}>
@@ -129,7 +191,7 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
               </Button>
             </>
           ) : (
-            <Button variant="secondary" onClick={close}>
+            <Button variant="secondary" onClick={() => close('cancel_button')}>
               다시 적기
             </Button>
           )
@@ -150,7 +212,15 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
                     <input
                       type="checkbox"
                       checked={!!picked[i]}
-                      onChange={(e) => setPicked((p) => p.map((v, j) => (j === i ? e.target.checked : v)))}
+                      onChange={(e) => {
+                        const checked = e.target.checked
+                        track('goal_detail.ai_edit_item_toggle', {
+                          goal_category_id: gid,
+                          change_action: ACTION_KEY[c.action] ?? c.action,
+                          checked,
+                        })
+                        setPicked((p) => p.map((v, j) => (j === i ? checked : v)))
+                      }}
                       className="mt-1 size-4 shrink-0"
                     />
                     <span className="min-w-0 flex-1">

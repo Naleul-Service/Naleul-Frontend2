@@ -1,11 +1,14 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { ArrowRight, NotebookPen, Sparkles } from 'lucide-react'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { useKeepAsRecord } from '@/features/record/api'
-import type { GoalCategory } from '../api'
+import { useGoalTasks, type GoalCategory } from '../api'
 
 export const refineHref = (goal: GoalCategory) => `/goal/new?sourceGoalId=${goal.goalCategoryId}`
 
@@ -17,6 +20,33 @@ export const refineHref = (goal: GoalCategory) => `/goal/new?sourceGoalId=${goal
 export function RefineWithAiCard({ goal, className }: { goal: GoalCategory; className?: string }) {
   // 회사 업무처럼 "이룰 것"이 없는 일은 구체화할 필요 없이 기록형으로 두는 게 맞아요
   const keep = useKeepAsRecord(goal.goalCategoryId)
+  const gid = goal.goalCategoryId
+  const tasks = useGoalTasks(gid)
+
+  // 카드가 보일 때 한 번 — Task 목록을 받은 뒤 (못 받으면 task_count 없이)
+  const viewSent = useRef(false)
+  const taskCount = tasks.data ? tasks.data.tasks.filter((t) => t.routineId == null).length : undefined
+  const tasksSettled = !tasks.isPending
+  useEffect(() => {
+    if (viewSent.current || !tasksSettled) return
+    viewSent.current = true
+    track('goal_detail.refine_card_view', { goal_category_id: gid, task_count: taskCount })
+  }, [tasksSettled, taskCount, gid])
+
+  const keepAsRecord = () => {
+    track('goal_detail.keep_record_click', { goal_category_id: gid })
+    keep
+      .mutateAsync()
+      .then(() => track('goal_detail.keep_record_result', { goal_category_id: gid, result: 'success' }))
+      .catch((e: unknown) =>
+        track('goal_detail.keep_record_result', {
+          goal_category_id: gid,
+          result: 'fail',
+          error_status: errorStatusOf(e),
+        })
+      )
+  }
+
   const name = `${goal.emoji ? `${goal.emoji} ` : ''}${goal.goalCategoryName}`
   return (
     <section
@@ -36,11 +66,15 @@ export function RefineWithAiCard({ goal, className }: { goal: GoalCategory; clas
         </p>
       </div>
       <div className="flex shrink-0 flex-wrap gap-2">
-        <Button variant="secondary" size="lg" onClick={() => keep.mutate()} loading={keep.isPending}>
+        <Button variant="secondary" size="lg" onClick={keepAsRecord} loading={keep.isPending}>
           <NotebookPen className="size-4" />
           업무형으로 두기
         </Button>
-        <Link href={refineHref(goal)} className={buttonClass('brand', 'lg')}>
+        <Link
+          href={refineHref(goal)}
+          onClick={() => track('goal_detail.refine_click', { goal_category_id: gid })}
+          className={buttonClass('brand', 'lg')}
+        >
           AI로 구체화하기
           <ArrowRight className="size-4" />
         </Link>

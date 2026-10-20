@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Pencil, Sparkles, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/Chip'
 import { Card } from '@/components/ui/Card'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { useUserColors } from '@/features/color/api'
 import type { GoalCategory } from '../api'
 import { useDeleteGoal, useUpdateGoal } from '../edit/mutations'
@@ -26,12 +28,29 @@ import { GoalKindPicker } from './GoalKindPicker'
 
 const numStr = (v: number | null | undefined) => (v == null ? '' : String(v))
 
+/** 목표 루틴 수 (분석용 routine_count) — 세부 목표(영역)마다 달린 루틴을 모두 더해요 */
+export const routineCountOf = (goal: GoalCategory) =>
+  goal.generalCategories?.reduce((n, g) => n + (g.routines?.length ?? 0), 0) ?? 0
+
+const modeOf = (goal: GoalCategory) => goal.goalMode ?? 'ACHIEVEMENT'
+
+/** 수정 폼을 연 위치 (분석용 entry_point) */
+export type GoalEditEntryPoint = 'header_edit' | 'motive_card' | 'progress_metric'
+
+const trackEditOpen = (goal: GoalCategory, entryPoint: GoalEditEntryPoint) =>
+  track('goal_detail.edit_open', {
+    goal_category_id: goal.goalCategoryId,
+    goal_mode: modeOf(goal),
+    entry_point: entryPoint,
+  })
+
 /**
  * 전체 목표 수정 폼 — 이름·이모지·기간·색·시작한 이유·수치 목표.
  * 수치는 "시작값 · 목표값 · 종료일" 세 가지만 정해요. 점검 시점 수치는 이 값으로 자동 계산되고,
  * "현재" 값은 "지금 어디쯤?"에서 남긴 기록으로만 바뀌어요 (숫자를 고치는 곳이 여러 군데라 헷갈리던 문제).
  */
 function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: () => void; onDelete: () => void }) {
+  const gid = goal.goalCategoryId
   const colors = useUserColors()
   const update = useUpdateGoal(goal.goalCategoryId)
   const [f, setF] = useState({
@@ -71,9 +90,61 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
           ? '기타 카테고리 이름을 1~10자로 적어 주세요.'
           : null
 
-  const submit = () =>
-    update.mutate(
-      {
+  // [UX] 폼 아래 빨간 문구가 뜰 때 (이름이 비면 문구 없이 저장만 막혀요 → 보내지 않아요)
+  const shownError = f.name.trim() ? error : null
+  const lastError = useRef<string | null>(null)
+  useEffect(() => {
+    if (shownError === lastError.current) return
+    lastError.current = shownError
+    if (shownError) track('goal_detail.edit_error', { goal_category_id: gid, validation_error: shownError })
+  }, [shownError, gid])
+
+  const trackMetricToggle = (action: 'add' | 'clear' | 'undo') =>
+    track('goal_detail.metric_toggle_click', { goal_category_id: gid, metric_action: action })
+
+  /** 바뀐 칸들 (분석용 changed_fields) + 수치 칸에서 한 일 (metric_action) */
+  const changesOf = () => {
+    const fields: string[] = []
+    if (f.name.trim() !== goal.goalCategoryName) fields.push('name')
+    if (f.emoji.trim() !== (goal.emoji ?? '')) fields.push('emoji')
+    if (f.start !== (goal.goalCategoryStartDate ?? '') || (!isWork && f.end !== (goal.goalCategoryEndDate ?? '')))
+      fields.push('period')
+    if (
+      !isWork &&
+      isKindComplete(kind) &&
+      (kind.goalType !== goal.goalType ||
+        kind.goalSubType !== goal.goalSubType ||
+        (kind.goalKindLabel ?? '') !== (goal.goalKindLabel ?? ''))
+    )
+      fields.push('kind')
+    if (f.colorId !== null && f.colorId !== colorIdOf(colors.data, goal.colorCode)) fields.push('color')
+    if (f.motive.trim() !== (goal.motive ?? '')) fields.push('motive')
+    let metricAction: 'add' | 'clear' | 'update' | 'none' = 'none'
+    if (!isWork && clearMetric) metricAction = 'clear'
+    else if (!isWork && showMetric) {
+      const changed =
+        f.metricName.trim() !== (goal.metricName ?? '') ||
+        f.metricUnit.trim() !== (goal.metricUnit ?? '') ||
+        nums[0] !== (goal.startValue ?? null) ||
+        nums[1] !== (goal.targetValue ?? null)
+      if (!hadMetric) metricAction = 'add'
+      else if (changed) metricAction = 'update'
+    }
+    if (metricAction !== 'none') fields.push('metric')
+    return { fields, metricAction }
+  }
+
+  const submit = (method: 'button' | 'enter') => {
+    const { fields, metricAction } = changesOf()
+    track('goal_detail.edit_save', {
+      goal_category_id: gid,
+      goal_mode: modeOf(goal),
+      changed_fields: fields.join(','),
+      metric_action: metricAction,
+      submit_method: method,
+    })
+    update
+      .mutateAsync({
         goalCategoryName: f.name.trim(),
         emoji: f.emoji.trim(),
         motive: f.motive.trim(),
@@ -93,21 +164,37 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
                 targetValue: nums[1],
               }
             : {}),
-      },
-      { onSuccess: onDone }
-    )
+      })
+      .then(() => {
+        track('goal_detail.edit_result', { goal_category_id: gid, result: 'success' })
+        onDone()
+      })
+      .catch((e: unknown) =>
+        track('goal_detail.edit_result', { goal_category_id: gid, result: 'fail', error_status: errorStatusOf(e) })
+      )
+  }
 
   return (
     <InlineForm
       onSubmit={submit}
-      onCancel={onDone}
+      onCancel={(method) => {
+        track('goal_detail.edit_cancel', { goal_category_id: gid, close_method: method })
+        onDone()
+      }}
       saving={update.isPending}
       valid={!error}
-      error={f.name.trim() ? error : null}
+      error={shownError}
       extra={
         <button
           type="button"
-          onClick={onDelete}
+          onClick={() => {
+            track('goal_detail.delete_click', {
+              goal_category_id: gid,
+              goal_mode: modeOf(goal),
+              goal_status: goal.goalCategoryStatus,
+            })
+            onDelete()
+          }}
           className="text-danger hover:bg-danger-soft flex items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold"
         >
           <Trash2 className="size-3.5" />
@@ -223,7 +310,10 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
           {hadMetric && (
             <button
               type="button"
-              onClick={() => setClearMetric(true)}
+              onClick={() => {
+                trackMetricToggle('clear')
+                setClearMetric(true)
+              }}
               className="text-ink-3 hover:text-danger text-[13px] font-semibold"
             >
               수치 없이 진행하기
@@ -233,12 +323,26 @@ function GoalEditForm({ goal, onDone, onDelete }: { goal: GoalCategory; onDone: 
       ) : clearMetric ? (
         <div className="bg-warning-soft text-warning-ink-strong flex flex-wrap items-center gap-2 rounded-xl px-3 py-2.5 text-[13px]">
           <span className="flex-1">저장하면 수치 목표와 마일스톤의 수치가 지워져요. 기록한 값은 남아요.</span>
-          <button type="button" onClick={() => setClearMetric(false)} className="font-semibold underline">
+          <button
+            type="button"
+            onClick={() => {
+              trackMetricToggle('undo')
+              setClearMetric(false)
+            }}
+            className="font-semibold underline"
+          >
             되돌리기
           </button>
         </div>
       ) : (
-        <button type="button" onClick={() => setShowMetric(true)} className="text-brand text-[13px] font-semibold">
+        <button
+          type="button"
+          onClick={() => {
+            trackMetricToggle('add')
+            setShowMetric(true)
+          }}
+          className="text-brand text-[13px] font-semibold"
+        >
           + 수치 목표 추가 (예: 체중 80 → 72kg)
         </button>
       )}
@@ -256,11 +360,26 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
   const remove = useDeleteGoal(goal.goalCategoryId)
   const router = useRouter()
   const period = periodProgress(goal.goalCategoryStartDate, goal.goalCategoryEndDate)
+  const gid = goal.goalCategoryId
+
+  // 수정 폼이 열린 채로 다른 항목 입력창을 열어 닫힌 경우 (삭제 확인으로 넘어간 건 제외)
+  const current = edit.current
+  const prevEditing = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevEditing.current
+    prevEditing.current = current
+    if (prev === 'goal' && current !== null && current !== 'goal' && current !== 'del:goal')
+      track('goal_detail.edit_cancel', { goal_category_id: gid, close_method: 'other_open' })
+  }, [current, gid])
 
   return (
     <div>
       <p className="text-ink-3 text-[13px]">
-        <Link href="/goal" className="hover:text-ink">
+        <Link
+          href="/goal"
+          onClick={() => track('goal_detail.breadcrumb_click', { goal_category_id: gid, goal_mode: modeOf(goal) })}
+          className="hover:text-ink"
+        >
           목표
         </Link>{' '}
         › {goal.goalCategoryName}
@@ -272,15 +391,32 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
             message={`'${goal.goalCategoryName}' 목표를 삭제할까요?`}
             detail="지금 이후로 예정된 Task와 루틴은 모두 지워지고, 지난 Task·완료한 기록은 남아요. 되돌릴 수 없어요."
             loading={remove.isPending}
-            onCancel={del.close}
-            onConfirm={() =>
-              remove.mutate(undefined, {
-                onSuccess: () => {
+            onCancel={(method) => {
+              track('goal_detail.delete_cancel', { goal_category_id: gid, close_method: method })
+              del.close()
+            }}
+            onConfirm={() => {
+              track('goal_detail.delete_confirm', {
+                goal_category_id: gid,
+                goal_mode: modeOf(goal),
+                goal_status: goal.goalCategoryStatus,
+                routine_count: routineCountOf(goal),
+              })
+              remove
+                .mutateAsync(undefined)
+                .then(() => {
+                  track('goal_detail.delete_result', { goal_category_id: gid, result: 'success' })
                   del.close()
                   router.replace('/goal')
-                },
-              })
-            }
+                })
+                .catch((e: unknown) =>
+                  track('goal_detail.delete_result', {
+                    goal_category_id: gid,
+                    result: 'fail',
+                    error_status: errorStatusOf(e),
+                  })
+                )
+            }}
           />
         </div>
       ) : edit.isOpen ? (
@@ -303,7 +439,10 @@ export function GoalHeader({ goal }: { goal: GoalCategory }) {
             {goal.goalKindName && goal.goalType !== 'WORK' && <Badge tone="brand">{goal.goalKindName}</Badge>}
             <button
               type="button"
-              onClick={edit.open}
+              onClick={() => {
+                trackEditOpen(goal, 'header_edit')
+                edit.open()
+              }}
               className="text-ink-3 hover:bg-subtle hover:text-ink flex items-center gap-1 rounded-lg px-2 py-1 text-[13px] font-semibold"
             >
               <Pencil className="size-3.5" />
@@ -342,7 +481,10 @@ export function GoalNotes({ goal }: { goal: GoalCategory }) {
       {goal.motive && (
         <button
           type="button"
-          onClick={edit.open}
+          onClick={() => {
+            trackEditOpen(goal, 'motive_card')
+            edit.open()
+          }}
           className="hover:bg-canvas -m-2 block w-[calc(100%+16px)] rounded-xl p-2 text-left"
         >
           <p className="text-ink-3 text-[13px] font-medium">{motiveLabel(goal)}</p>

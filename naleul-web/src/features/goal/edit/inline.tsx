@@ -54,9 +54,14 @@ export function Field({ label, children, className }: { label: string; children:
   )
 }
 
+/** 입력창을 닫은 방법 (분석용 close_method) */
+export type InlineCloseMethod = 'esc' | 'cancel_button'
+/** 저장한 방법 (분석용 submit_method) */
+export type InlineSubmitMethod = 'button' | 'enter'
+
 interface InlineFormProps {
-  onSubmit: () => void
-  onCancel: () => void
+  onSubmit: (method: InlineSubmitMethod) => void
+  onCancel: (method: InlineCloseMethod) => void
   saving?: boolean
   /** false 면 저장 버튼 비활성 (Enter 도 무시) */
   valid?: boolean
@@ -84,6 +89,8 @@ export function InlineForm({
   children,
 }: InlineFormProps) {
   const ref = useRef<HTMLFormElement>(null)
+  /** 마지막 저장 시도가 Enter 키였는지 — keydown 에서 켜고 submit 에서 읽어요 */
+  const byEnter = useRef(false)
 
   useEffect(() => {
     const root = ref.current
@@ -96,15 +103,18 @@ export function InlineForm({
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault()
-    if (valid && !saving) onSubmit()
+    const method: InlineSubmitMethod = byEnter.current ? 'enter' : 'button'
+    byEnter.current = false
+    if (valid && !saving) onSubmit(method)
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLFormElement>) => {
     if (e.key === 'Escape') {
       e.preventDefault()
       e.stopPropagation()
-      if (!saving) onCancel()
+      if (!saving) onCancel('esc')
     }
+    byEnter.current = e.key === 'Enter' && !e.nativeEvent.isComposing
     // 한글 조합 중 Enter 는 글자 확정용 — 저장하지 않아요 (마지막 글자가 두 번 들어가는 문제 방지)
     if (e.key === 'Enter' && e.nativeEvent.isComposing) {
       e.preventDefault()
@@ -132,7 +142,7 @@ export function InlineForm({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {extra}
         <span className="text-ink-4 ml-auto hidden text-[11px] sm:inline">Enter 저장 · Esc 취소</span>
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
+        <Button type="button" variant="ghost" size="sm" onClick={() => onCancel('cancel_button')} disabled={saving}>
           취소
         </Button>
         <Button type="submit" size="sm" loading={saving} disabled={!valid}>
@@ -156,7 +166,7 @@ export function InlineConfirm({
   message: ReactNode
   detail?: ReactNode
   onConfirm: () => void
-  onCancel: () => void
+  onCancel: (method: InlineCloseMethod) => void
   loading?: boolean
   confirmLabel?: string
 }) {
@@ -170,7 +180,7 @@ export function InlineConfirm({
         if (e.key === 'Escape' && !loading) {
           e.preventDefault()
           e.stopPropagation()
-          onCancel()
+          onCancel('esc')
         }
       }}
       className="border-danger/30 bg-danger-soft/60 flex flex-wrap items-center gap-2 rounded-2xl border px-3.5 py-3"
@@ -179,7 +189,7 @@ export function InlineConfirm({
         <p className="text-[14px] font-semibold">{message}</p>
         {detail && <p className="text-ink-3 mt-0.5 text-xs">{detail}</p>}
       </div>
-      <Button variant="ghost" size="sm" onClick={onCancel} disabled={loading}>
+      <Button variant="ghost" size="sm" onClick={() => onCancel('cancel_button')} disabled={loading}>
         취소
       </Button>
       <Button ref={ref} variant="danger" size="sm" onClick={onConfirm} loading={loading}>

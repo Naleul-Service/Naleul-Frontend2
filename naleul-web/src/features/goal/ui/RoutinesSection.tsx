@@ -1,8 +1,10 @@
 'use client'
 
 import { isValidRoutineRange, minutesToTime, timeToMinutes } from '@/features/timetable/time'
-import { useState } from 'react'
-import { RoutineWeekMap } from './RoutineWeekMap'
+import { useEffect, useRef, useState } from 'react'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
+import { RoutineWeekMap, routineConflicts, useAllRoutines } from './RoutineWeekMap'
 import { Bell, BellOff, CalendarPlus } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { addDays, todayKst, weekdayIndex } from '@/features/timetable/time'
@@ -17,12 +19,43 @@ import {
   RowActions,
   inlineInput,
   useEditing,
+  type InlineCloseMethod,
+  type InlineSubmitMethod,
 } from '../edit/inline'
 import { JAVA_DAYS, JAVA_DAY_LABEL, formatDot, hhmm } from '../format'
 import { Section } from './sections'
 import { activeSubGoals, areasOf, bucketOf, defaultPeriod } from './SubGoalsSection'
 
 type DayTimeMap = Partial<Record<JavaDayOfWeek, { start: string; end: string }>>
+
+/** 오늘부터 며칠 뒤인지 (YYYY-MM-DD) */
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000)
+
+/** 목표 루틴 수 (분석용 routine_count) */
+const routineCountOf = (goal: GoalCategory) => activeSubGoals(goal).reduce((n, sg) => n + sg.routines.length, 0)
+
+type RoutineAction = 'create' | 'update' | 'delete' | 'extra_day'
+const trackRoutineResult = (goalId: number, action: RoutineAction, err?: unknown) =>
+  track('goal_detail.routine_result', {
+    goal_category_id: goalId,
+    routine_action: action,
+    result: err === undefined ? 'success' : 'fail',
+    error_status: err === undefined ? undefined : errorStatusOf(err),
+  })
+
+/**
+ * 루틴 입력창이 다른 항목 입력창을 열어서 닫혔을 때 (close_method=other_open).
+ * 취소·저장으로 닫히면 current 가 null 이 돼서 여기선 안 보내요.
+ */
+function useTrackOtherOpen(isOpen: boolean, current: string | null, goalId: number, isNew: boolean) {
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (wasOpen.current && !isOpen && current != null) {
+      track('goal_detail.routine_edit_cancel', { goal_category_id: goalId, is_new: isNew, close_method: 'other_open' })
+    }
+    wasOpen.current = isOpen
+  }, [isOpen, current, goalId, isNew])
+}
 
 const toDayTimeMap = (routine?: RoutineSummary): DayTimeMap =>
   Object.fromEntries(
@@ -84,6 +117,9 @@ function RoutineForm({
   const update = useUpdateRoutine()
   const period = defaultPeriod(goal)
   const today = todayKst()
+  const goalId = goal.goalCategoryId
+  const isNew = !routine
+  const allRoutines = useAllRoutines()
 
   const [name, setName] = useState(routine?.routineName ?? '')
   const [sub, setSub] = useState<number | null>(
@@ -145,7 +181,42 @@ function RoutineForm({
                 : null
   const valid = !!name.trim() && !error
 
-  const submit = () => {
+  // [UX] 빨간 문구가 뜰 때 (문구가 바뀔 때마다 한 번)
+  const lastError = useRef<string | null>(null)
+  useEffect(() => {
+    if (error && error !== lastError.current) {
+      track('goal_detail.routine_edit_error', { goal_category_id: goalId, is_new: isNew, validation_error: error })
+    }
+    lastError.current = error
+  }, [error, goalId, isNew])
+
+  const cancel = (method: InlineCloseMethod) => {
+    track('goal_detail.routine_edit_cancel', { goal_category_id: goalId, is_new: isNew, close_method: method })
+    onDone()
+  }
+
+  const submit = (method: InlineSubmitMethod) => {
+    const defStart = period.start < today ? today : period.start
+    const defEnd = period.end < today ? today : period.end
+    const conflictCount = routineConflicts(allRoutines.data ?? [], {
+      routineId: routine?.routineId,
+      name: name.trim(),
+      days,
+      timeOf,
+    }).length
+    track('goal_detail.routine_save_click', {
+      goal_category_id: goalId,
+      is_new: isNew,
+      repeat_day_count: days.length,
+      has_time: !!startTime && !!endTime,
+      per_day_time: overrides.length > 0,
+      notification_enabled: notify,
+      has_description: !!howTo.trim(),
+      has_sub_goal: sub != null,
+      period_changed: (start !== period.start && start !== defStart) || (end !== period.end && end !== defEnd),
+      has_conflict: conflictCount > 0,
+      submit_method: method,
+    })
     const body = {
       // 영역 없음 → 새로 만들 땐 null(서버가 "기타 할 일"로), 수정할 땐 "기타 할 일"로 옮기기 (그릇이 없으면 그대로)
       generalCategoryId: sub ?? (routine ? (bucket?.generalCategoryId ?? null) : null),
@@ -160,14 +231,22 @@ function RoutineForm({
       // 수정: 요일별을 끄면 [] → 모든 요일이 기본 시간으로 돌아가요
       dayTimes: overrides,
     }
-    if (routine) update.mutate({ id: routine.routineId, ...body }, { onSuccess: onDone })
-    else create.mutate(body, { onSuccess: onDone })
+    const action: RoutineAction = routine ? 'update' : 'create'
+    const callbacks = {
+      onSuccess: () => {
+        trackRoutineResult(goalId, action)
+        onDone()
+      },
+      onError: (e: unknown) => trackRoutineResult(goalId, action, e),
+    }
+    if (routine) update.mutate({ id: routine.routineId, ...body }, callbacks)
+    else create.mutate(body, callbacks)
   }
 
   return (
     <InlineForm
       onSubmit={submit}
-      onCancel={onDone}
+      onCancel={cancel}
       saving={create.isPending || update.isPending}
       valid={valid}
       error={error}
@@ -175,7 +254,14 @@ function RoutineForm({
       extra={
         <button
           type="button"
-          onClick={() => setNotify((v) => !v)}
+          onClick={() => {
+            track('goal_detail.routine_notify_toggle', {
+              goal_category_id: goalId,
+              is_new: isNew,
+              notification_enabled: !notify,
+            })
+            setNotify(!notify)
+          }}
           aria-pressed={notify}
           className={cn(
             'flex items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] font-semibold',
@@ -251,7 +337,14 @@ function RoutineForm({
       {/* 다른 루틴과 겹치는지 · 내 루틴 주간표 (캘린더에 다녀오지 않아도 돼요) */}
       <RoutineWeekMap
         draft={{ routineId: routine?.routineId, name: name.trim(), days, timeOf }}
+        analytics={{ goalId, isNew, routineCount: routineCountOf(goal) }}
         onPick={(d, m) => {
+          track('goal_detail.routine_weekmap_pick', {
+            goal_category_id: goalId,
+            day_of_week: d,
+            start_minute: m,
+            per_day_time: perDay && days.length > 1,
+          })
           // 지금 길이(없으면 1시간)를 그대로 두고 시작 시각만 옮겨요
           const len =
             startTime && endTime ? (timeToMinutes(endTime) - timeToMinutes(startTime) + 1440) % 1440 || 60 : 60
@@ -275,6 +368,11 @@ function RoutineForm({
               <button
                 type="button"
                 onClick={() => {
+                  track('goal_detail.routine_per_day_toggle', {
+                    goal_category_id: goalId,
+                    is_new: isNew,
+                    per_day_time: false,
+                  })
                   setPerDay(false)
                   setDayTimes({})
                 }}
@@ -334,7 +432,14 @@ function RoutineForm({
         ) : (
           <button
             type="button"
-            onClick={() => setPerDay(true)}
+            onClick={() => {
+              track('goal_detail.routine_per_day_toggle', {
+                goal_category_id: goalId,
+                is_new: isNew,
+                per_day_time: true,
+              })
+              setPerDay(true)
+            }}
             className="text-brand self-start text-[13px] font-semibold"
           >
             + 요일마다 시간을 다르게 하기
@@ -343,7 +448,14 @@ function RoutineForm({
       {!showPeriod && (
         <p className="text-ink-3 text-xs">
           {formatDot(start)} – {formatDot(end)} 동안 반복해요.{' '}
-          <button type="button" onClick={() => setShowPeriod(true)} className="text-ink-2 font-semibold underline">
+          <button
+            type="button"
+            onClick={() => {
+              track('goal_detail.routine_period_open', { goal_category_id: goalId, is_new: isNew })
+              setShowPeriod(true)
+            }}
+            className="text-ink-2 font-semibold underline"
+          >
             기간 바꾸기
           </button>
         </p>
@@ -380,7 +492,7 @@ function routineTimeOn(routine: RoutineSummary, ymd: string) {
  * 다른 날 추가 — 평일 루틴을 주말에도 했을 때처럼, 반복 요일이 아닌 날에 그날 하루만 루틴 블록을 만들어요.
  * "이미 했어요"면 그 시간을 실제로 한 시간으로 바로 남겨요 (앞날은 예정으로만).
  */
-function ExtraDayForm({ routine, onDone }: { routine: RoutineSummary; onDone: () => void }) {
+function ExtraDayForm({ goalId, routine, onDone }: { goalId: number; routine: RoutineSummary; onDone: () => void }) {
   const today = todayKst()
   const add = useAddRoutineExtraDay()
   const [date, setDate] = useState(today)
@@ -409,7 +521,15 @@ function ExtraDayForm({ routine, onDone }: { routine: RoutineSummary; onDone: ()
           ? '시작과 종료 시간을 확인해 주세요.'
           : null
 
-  const submit = () =>
+  const submit = () => {
+    track('goal_detail.routine_extra_day_save', {
+      goal_category_id: goalId,
+      routine_id: routine.routineId,
+      days_from_today: daysBetween(today, date),
+      marked_done: done && !future,
+      is_repeat_day: repeatDay,
+      has_time: !!startTime && !!endTime,
+    })
     add.mutate(
       {
         routineId: routine.routineId,
@@ -418,13 +538,29 @@ function ExtraDayForm({ routine, onDone }: { routine: RoutineSummary; onDone: ()
         endTime: endTime || null,
         done: done && !future,
       },
-      { onSuccess: onDone }
+      {
+        onSuccess: () => {
+          trackRoutineResult(goalId, 'extra_day')
+          onDone()
+        },
+        onError: (e) => trackRoutineResult(goalId, 'extra_day', e),
+      }
     )
+  }
+
+  const cancel = (method: InlineCloseMethod) => {
+    track('goal_detail.routine_extra_day_cancel', {
+      goal_category_id: goalId,
+      routine_id: routine.routineId,
+      close_method: method,
+    })
+    onDone()
+  }
 
   return (
     <InlineForm
       onSubmit={submit}
-      onCancel={onDone}
+      onCancel={cancel}
       saving={add.isPending}
       valid={!error}
       error={date ? error : null}
@@ -489,11 +625,18 @@ function RoutineRow({
   const remove = useDeleteRoutine()
   const start = hhmm(routine.repeatStartTime)
   const active = routine.routineStatus !== 'STOPPED' && routine.routineStatus !== 'DELETED'
+  const goalId = goal.goalCategoryId
+  const ids = { goal_category_id: goalId, routine_id: routine.routineId }
+  useTrackOtherOpen(edit.isOpen, edit.current, goalId, false)
+  const openEdit = (entryPoint: 'row' | 'edit_icon') => {
+    track('goal_detail.routine_edit_open', { ...ids, entry_point: entryPoint })
+    edit.open()
+  }
 
   if (extra.isOpen) {
     return (
       <li className="py-2">
-        <ExtraDayForm routine={routine} onDone={extra.close} />
+        <ExtraDayForm goalId={goalId} routine={routine} onDone={extra.close} />
       </li>
     )
   }
@@ -512,15 +655,27 @@ function RoutineRow({
           message={`'${routine.routineName}' 루틴을 삭제할까요?`}
           detail="이 루틴으로 만들어진 Task도 함께 삭제돼요."
           loading={remove.isPending}
-          onCancel={del.close}
-          onConfirm={() => remove.mutate(routine.routineId, { onSuccess: del.close })}
+          onCancel={() => {
+            track('goal_detail.routine_delete_cancel', ids)
+            del.close()
+          }}
+          onConfirm={() => {
+            track('goal_detail.routine_delete_confirm', ids)
+            remove.mutate(routine.routineId, {
+              onSuccess: () => {
+                trackRoutineResult(goalId, 'delete')
+                del.close()
+              },
+              onError: (e) => trackRoutineResult(goalId, 'delete', e),
+            })
+          }}
         />
       </li>
     )
   }
   return (
     <li className="group flex flex-wrap items-center gap-x-4 gap-y-2 py-3.5">
-      <button type="button" onClick={edit.open} className="min-w-0 flex-1 basis-[55%] text-left">
+      <button type="button" onClick={() => openEdit('row')} className="min-w-0 flex-1 basis-[55%] text-left">
         <p className="flex items-center gap-1.5 text-[15px] font-semibold">
           {routine.routineName}
           {routine.notificationEnabled && <Bell className="text-ink-3 size-3.5" aria-label="알림 켜짐" />}
@@ -548,7 +703,10 @@ function RoutineRow({
       {active && (
         <button
           type="button"
-          onClick={extra.open}
+          onClick={() => {
+            track('goal_detail.routine_extra_day_click', ids)
+            extra.open()
+          }}
           title="반복 요일이 아닌 날에도 했다면 그날을 추가해요"
           className="text-ink-3 hover:text-ink border-line hover:border-line-strong order-4 flex h-7 items-center gap-1 rounded-full border px-2.5 text-[12px] font-medium sm:order-none"
         >
@@ -556,7 +714,14 @@ function RoutineRow({
           다른 날 추가
         </button>
       )}
-      <RowActions label={routine.routineName} onEdit={edit.open} onDelete={del.open} />
+      <RowActions
+        label={routine.routineName}
+        onEdit={() => openEdit('edit_icon')}
+        onDelete={() => {
+          track('goal_detail.routine_delete_click', ids)
+          del.open()
+        }}
+      />
     </li>
   )
 }
@@ -564,6 +729,7 @@ function RoutineRow({
 /** 루틴 — 줄을 누르면 그 자리에서 수정, 아래 점선 버튼으로 추가 */
 export function RoutinesSection({ goal }: { goal: GoalCategory }) {
   const add = useEditing('routine:new')
+  useTrackOtherOpen(add.isOpen, add.current, goal.goalCategoryId, true)
   const rows = activeSubGoals(goal).flatMap((sg) =>
     sg.routines.map((r) => ({
       routine: r,
@@ -585,7 +751,17 @@ export function RoutinesSection({ goal }: { goal: GoalCategory }) {
         {add.isOpen ? (
           <RoutineForm goal={goal} onDone={add.close} />
         ) : (
-          <AddButton onClick={add.open}>루틴 추가</AddButton>
+          <AddButton
+            onClick={() => {
+              track('goal_detail.routine_add_click', {
+                goal_category_id: goal.goalCategoryId,
+                routine_count: rows.length,
+              })
+              add.open()
+            }}
+          >
+            루틴 추가
+          </AddButton>
         )}
       </div>
     </Section>

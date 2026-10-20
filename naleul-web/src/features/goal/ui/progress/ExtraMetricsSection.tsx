@@ -4,6 +4,8 @@ import { useState, type FormEvent } from 'react'
 import { LineChart, Pencil, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import {
   useCreateExtraMetric,
   useDeleteExtraMetric,
@@ -15,7 +17,16 @@ import {
   type GoalCategory,
   type GoalProgress,
 } from '../../api'
-import { AddButton, Field, InlineConfirm, InlineForm, inlineInput, toNum } from '../../edit/inline'
+import {
+  AddButton,
+  Field,
+  InlineConfirm,
+  InlineForm,
+  inlineInput,
+  toNum,
+  type InlineCloseMethod,
+  type InlineSubmitMethod,
+} from '../../edit/inline'
 import { Section } from '../sections'
 import { ProgressChart, type ChartSeries } from './ProgressChart'
 import { Insight, Legend, StatusChip, TrackBar, fmtNum } from './ProgressSection'
@@ -23,6 +34,25 @@ import { Insight, Legend, StatusChip, TrackBar, fmtNum } from './ProgressSection
 const MAX = 5
 const withUnit = (v: number, unit: string | null) => `${fmtNum(v)}${unit ?? ''}`
 const md = (iso: string) => `${Number(iso.slice(5, 7))}월 ${Number(iso.slice(8, 10))}일`
+/** 오늘부터 며칠 전인지 (YYYY-MM-DD) */
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000)
+
+type ExtraMetricAction = 'create' | 'update' | 'delete' | 'record' | 'log_delete'
+const trackExtraResult = (goalId: number, action: ExtraMetricAction, err?: unknown) =>
+  track('goal_detail.extra_metric_result', {
+    goal_category_id: goalId,
+    metric_action: action,
+    result: err === undefined ? 'success' : 'fail',
+    error_status: err === undefined ? undefined : errorStatusOf(err),
+  })
+/** mutate 두 번째 인자 — 결과 이벤트 + 성공했을 때 할 일 */
+const resultCallbacks = (goalId: number, action: ExtraMetricAction, onSuccess?: () => void) => ({
+  onSuccess: () => {
+    trackExtraResult(goalId, action)
+    onSuccess?.()
+  },
+  onError: (e: unknown) => trackExtraResult(goalId, action, e),
+})
 
 // ─── 그래프 만들기 · 고치기 ─────────────────────────────────────
 
@@ -35,8 +65,11 @@ function MetricForm({
 }: {
   initial?: { name: string; unit: string; startValue: number; targetValue: number }
   saving: boolean
-  onSubmit: (v: { name: string; unit: string; startValue: number; targetValue: number }) => void
-  onCancel: () => void
+  onSubmit: (
+    v: { name: string; unit: string; startValue: number; targetValue: number },
+    method: InlineSubmitMethod
+  ) => void
+  onCancel: (method: InlineCloseMethod) => void
   submitLabel: string
 }) {
   const [f, setF] = useState({
@@ -60,7 +93,9 @@ function MetricForm({
 
   return (
     <InlineForm
-      onSubmit={() => onSubmit({ name: f.name.trim(), unit: f.unit.trim(), startValue: start!, targetValue: target! })}
+      onSubmit={(method) =>
+        onSubmit({ name: f.name.trim(), unit: f.unit.trim(), startValue: start!, targetValue: target! }, method)
+      }
       onCancel={onCancel}
       saving={saving}
       valid={valid}
@@ -134,6 +169,7 @@ function ExtraMetricCard({
   const [value, setValue] = useState('')
   const [mode, setMode] = useState<'view' | 'edit' | 'delete'>('view')
   const [showLogs, setShowLogs] = useState(false)
+  const ids = { goal_category_id: goalId, metric_id: metric.metricId }
 
   if (mode === 'edit') {
     return (
@@ -141,8 +177,17 @@ function ExtraMetricCard({
         initial={{ name: m.name ?? '', unit: m.unit ?? '', startValue: m.startValue, targetValue: m.targetValue }}
         saving={update.isPending}
         submitLabel="저장"
-        onCancel={() => setMode('view')}
-        onSubmit={(v) => update.mutate({ metricId: metric.metricId, ...v }, { onSuccess: () => setMode('view') })}
+        onCancel={(method) => {
+          track('goal_detail.extra_metric_cancel', { goal_category_id: goalId, is_new: false, close_method: method })
+          setMode('view')
+        }}
+        onSubmit={(v, method) => {
+          track('goal_detail.extra_metric_save', { goal_category_id: goalId, is_new: false, submit_method: method })
+          update.mutate(
+            { metricId: metric.metricId, ...v },
+            resultCallbacks(goalId, 'update', () => setMode('view'))
+          )
+        }}
       />
     )
   }
@@ -152,8 +197,14 @@ function ExtraMetricCard({
         message={`'${m.name}' 그래프를 지울까요?`}
         detail="이 그래프에 남긴 기록도 함께 사라져요."
         loading={remove.isPending}
-        onCancel={() => setMode('view')}
-        onConfirm={() => remove.mutate(metric.metricId)}
+        onCancel={() => {
+          track('goal_detail.extra_metric_delete_cancel', ids)
+          setMode('view')
+        }}
+        onConfirm={() => {
+          track('goal_detail.extra_metric_delete_confirm', { ...ids, log_count: m.logs.length })
+          remove.mutate(metric.metricId, resultCallbacks(goalId, 'delete'))
+        }}
       />
     )
   }
@@ -162,7 +213,11 @@ function ExtraMetricCard({
     e.preventDefault()
     const v = Number(value)
     if (value.trim() === '' || !Number.isFinite(v) || record.isPending) return
-    record.mutate({ metricId: metric.metricId, value: v }, { onSuccess: () => setValue('') })
+    track('goal_detail.extra_metric_record_submit', { ...ids, is_overwrite: !!m.loggedToday })
+    record.mutate(
+      { metricId: metric.metricId, value: v },
+      resultCallbacks(goalId, 'record', () => setValue(''))
+    )
   }
 
   const from = p.startDate ?? m.logs[0]?.date ?? p.today
@@ -185,7 +240,10 @@ function ExtraMetricCard({
           <span className="flex shrink-0 items-center transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-focus-within/metric:opacity-100 [@media(hover:hover)]:group-hover/metric:opacity-100">
             <button
               type="button"
-              onClick={() => setMode('edit')}
+              onClick={() => {
+                track('goal_detail.extra_metric_edit_click', ids)
+                setMode('edit')
+              }}
               aria-label={`${m.name} 그래프 수정`}
               className="text-ink-3 hover:bg-subtle hover:text-ink rounded-lg p-1.5"
             >
@@ -193,7 +251,10 @@ function ExtraMetricCard({
             </button>
             <button
               type="button"
-              onClick={() => setMode('delete')}
+              onClick={() => {
+                track('goal_detail.extra_metric_delete_click', { ...ids, log_count: m.logs.length })
+                setMode('delete')
+              }}
               aria-label={`${m.name} 그래프 삭제`}
               className="text-ink-3 hover:bg-danger-soft hover:text-danger rounded-lg p-1.5"
             >
@@ -255,6 +316,9 @@ function ExtraMetricCard({
               label: `지금 ${withUnit(m.currentValue, m.unit)}`,
             }}
             format={(v) => withUnit(v, m.unit)}
+            onFirstInteract={() =>
+              track('goal_detail.chart_interact', { goal_category_id: goalId, chart_kind: 'extra_metric' })
+            }
           />
           <Legend
             items={[
@@ -269,7 +333,10 @@ function ExtraMetricCard({
         <div className="mt-3">
           <button
             type="button"
-            onClick={() => setShowLogs((v) => !v)}
+            onClick={() => {
+              track('goal_detail.extra_metric_logs_toggle', { ...ids, expanded: !showLogs })
+              setShowLogs(!showLogs)
+            }}
             aria-expanded={showLogs}
             className="text-ink-3 hover:text-ink text-[12px] font-semibold"
           >
@@ -284,7 +351,16 @@ function ExtraMetricCard({
                   {!readOnly && (
                     <button
                       type="button"
-                      onClick={() => removeLog.mutate({ metricId: metric.metricId, date: l.date })}
+                      onClick={() => {
+                        track('goal_detail.extra_metric_log_delete_click', {
+                          ...ids,
+                          days_ago: daysBetween(l.date, p.today),
+                        })
+                        removeLog.mutate(
+                          { metricId: metric.metricId, date: l.date },
+                          resultCallbacks(goalId, 'log_delete')
+                        )
+                      }}
                       aria-label={`${md(l.date)} 기록 지우기`}
                       className="text-ink-4 hover:text-danger p-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                     >
@@ -342,11 +418,40 @@ export function ExtraMetricsSection({ goal, readOnly = false }: { goal: GoalCate
             <MetricForm
               saving={create.isPending}
               submitLabel="그래프 추가"
-              onCancel={() => setAdding(false)}
-              onSubmit={(v) => create.mutate(v, { onSuccess: () => setAdding(false) })}
+              onCancel={(method) => {
+                track('goal_detail.extra_metric_cancel', {
+                  goal_category_id: goal.goalCategoryId,
+                  is_new: true,
+                  close_method: method,
+                })
+                setAdding(false)
+              }}
+              onSubmit={(v, method) => {
+                track('goal_detail.extra_metric_save', {
+                  goal_category_id: goal.goalCategoryId,
+                  is_new: true,
+                  submit_method: method,
+                })
+                create.mutate(
+                  v,
+                  resultCallbacks(goal.goalCategoryId, 'create', () => setAdding(false))
+                )
+              }}
             />
           ) : (
-            metrics.length < MAX && <AddButton onClick={() => setAdding(true)}>그래프 추가</AddButton>
+            metrics.length < MAX && (
+              <AddButton
+                onClick={() => {
+                  track('goal_detail.extra_metric_add_click', {
+                    goal_category_id: goal.goalCategoryId,
+                    metric_count: metrics.length,
+                  })
+                  setAdding(true)
+                }}
+              >
+                그래프 추가
+              </AddButton>
+            )
           )}
         </div>
       )}

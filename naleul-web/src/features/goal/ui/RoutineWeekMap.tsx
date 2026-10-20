@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, CalendarRange, ChevronDown, Sparkles } from 'lucide-react'
 import { api } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
 import { cn } from '@/lib/cn'
 import { hexOf } from '@/features/timetable/layout'
 import { minutesToTime, timeToMinutes, todayKst } from '@/features/timetable/time'
@@ -122,10 +123,13 @@ const HOUR_PX = 18
 export function RoutineWeekMap({
   draft,
   onPick,
+  analytics,
 }: {
   draft: RoutineDraft
   /** 빈 칸을 눌렀을 때 — 그 요일을 넣고 시작 시각을 그 시각으로 */
   onPick: (day: JavaDayOfWeek, minutes: number) => void
+  /** 분석용 — 목표 id · 새 루틴인지 · 목표 루틴 수 */
+  analytics?: { goalId: number; isNew: boolean; routineCount: number }
 }) {
   const routines = useAllRoutines()
   const [open, setOpen] = useState(false)
@@ -133,6 +137,21 @@ export function RoutineWeekMap({
   const all = routines.data ?? []
   const existing = all.filter((r) => r.routineId !== draft.routineId && isLive(r, today)).flatMap(slotsOf)
   const conflicts = routineConflicts(all, draft, today)
+  const conflictCount = conflicts.length
+  const goalId = analytics?.goalId
+  const isNew = analytics?.isNew
+
+  // 겹침 안내가 처음 뜰 때 한 번만 (입력창 하나당)
+  const conflictSeen = useRef(false)
+  useEffect(() => {
+    if (goalId == null || conflictCount === 0 || conflictSeen.current) return
+    conflictSeen.current = true
+    track('goal_detail.routine_conflict_view', {
+      goal_category_id: goalId,
+      conflict_count: conflictCount,
+      is_new: isNew,
+    })
+  }, [goalId, conflictCount, isNew])
 
   const mine: Slot[] = draft.days.flatMap((d) => {
     const t = draft.timeOf(d)
@@ -190,6 +209,14 @@ export function RoutineWeekMap({
             그대로 둬도 괜찮아요 (같은 시간에 둘 다 보여요). 많이 겹치면{' '}
             <Link
               href={`/calendar?view=week&ai=${encodeURIComponent(conflictCommand)}`}
+              onClick={() =>
+                analytics &&
+                track('goal_detail.routine_conflict_ai_click', {
+                  goal_category_id: analytics.goalId,
+                  conflict_count: conflicts.length,
+                  is_new: analytics.isNew,
+                })
+              }
               className="text-brand inline-flex items-center gap-0.5 font-semibold hover:underline"
             >
               <Sparkles className="size-3" />
@@ -202,7 +229,15 @@ export function RoutineWeekMap({
 
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (analytics)
+            track('goal_detail.routine_weekmap_toggle', {
+              goal_category_id: analytics.goalId,
+              expanded: !open,
+              routine_count: analytics.routineCount,
+            })
+          setOpen(!open)
+        }}
         aria-expanded={open}
         className="text-ink-2 hover:text-ink flex items-center gap-1.5 text-[13px] font-semibold"
       >

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Bell, BellOff, CalendarClock, X } from 'lucide-react'
-import { DaysPicker, Field, InlineForm, inlineInput } from '@/features/goal/edit/inline'
+import { DaysPicker, Field, InlineForm, inlineInput, type InlineSubmitMethod } from '@/features/goal/edit/inline'
+import { track } from '@/lib/client/analytics'
 import { JAVA_DAYS } from '@/features/goal/format'
 import type { JavaDayOfWeek } from '@/features/goal/api'
 import type { Habit, HabitInput } from '../api'
@@ -60,7 +61,27 @@ export function HabitForm({
           ? '끝나는 시간이 시작보다 뒤여야 해요.'
           : null
 
-  const submit = () =>
+  const isNew = !initial
+  const shownError = value ? error : null
+
+  // [UX] 빨간 문구가 새로 보일 때마다 한 번 (같은 문구가 계속 떠 있으면 다시 보내지 않아요)
+  const lastError = useRef<string | null>(null)
+  useEffect(() => {
+    if (shownError && shownError !== lastError.current) {
+      track('habit.edit_error', { is_new: isNew, validation_error: shownError })
+    }
+    lastError.current = shownError
+  }, [shownError, isNew])
+
+  const submit = (method: InlineSubmitMethod) => {
+    track('habit.save_click', {
+      is_new: isNew,
+      habit_id: initial?.habitId,
+      repeat_day_count: days.length,
+      has_time: !!start && !!end,
+      has_remind: !!remind,
+      submit_method: method,
+    })
     onSubmit({
       name: value,
       emoji: emoji.trim(),
@@ -68,14 +89,18 @@ export function HabitForm({
       ...(remind ? { remindTime: remind } : initial?.remindTime ? { clearRemindTime: true } : {}),
       ...(start && end ? { startTime: start, endTime: end } : initial?.startTime ? { clearTimeRange: true } : {}),
     })
+  }
 
   return (
     <InlineForm
       onSubmit={submit}
-      onCancel={onCancel}
+      onCancel={(method) => {
+        track('habit.edit_cancel', { is_new: isNew, close_method: method })
+        onCancel()
+      }}
       saving={saving}
       valid={!!value && !error}
-      error={value ? error : null}
+      error={shownError}
       submitLabel={submitLabel}
       extra={extra}
     >

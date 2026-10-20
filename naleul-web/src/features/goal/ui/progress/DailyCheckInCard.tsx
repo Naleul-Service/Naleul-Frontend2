@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import Link from 'next/link'
 import { NotebookPen, PencilLine, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -89,13 +91,44 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
   const valueOk = valueNum == null || Number.isFinite(valueNum)
   const hasSomething = (m && valueNum != null) || !!mood || !!note.trim() || !!today.reflection
   const canSave = valueOk && hasSomething && !checkIn.isPending
+  const goalId = goal.goalCategoryId
+
+  // [UX] '숫자로 입력해 주세요'가 보일 때
+  useEffect(() => {
+    if (!valueOk) track('goal_detail.checkin_invalid', { goal_category_id: goalId })
+  }, [valueOk, goalId])
+
+  /** 마지막 저장 시도가 Enter 키였는지 — keydown 에서 켜고 submit 에서 읽어요 */
+  const byEnter = useRef(false)
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault()
+    const method = byEnter.current ? 'enter' : 'button'
+    byEnter.current = false
     if (!canSave) return
+    track('goal_detail.checkin_submit', {
+      goal_category_id: goalId,
+      has_value: !!m && valueNum != null,
+      mood: mood ?? null,
+      note_length: note.trim().length,
+      is_edit: done,
+      submit_method: method,
+    })
+    const result = (err?: unknown) =>
+      track('goal_detail.checkin_result', {
+        goal_category_id: goalId,
+        result: err === undefined ? 'success' : 'fail',
+        error_status: err === undefined ? undefined : errorStatusOf(err),
+      })
     checkIn.mutate(
       { value: m ? valueNum : null, mood, note: note.trim() || null },
-      { onSuccess: () => setEditing(false) }
+      {
+        onSuccess: () => {
+          result()
+          setEditing(false)
+        },
+        onError: (err) => result(err),
+      }
     )
   }
 
@@ -120,7 +153,14 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
           </p>
         </div>
         {!editing && (
-          <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => {
+              track('goal_detail.checkin_edit_click', { goal_category_id: goalId })
+              setEditing(true)
+            }}
+          >
             <PencilLine className="size-3.5" />
             수정
           </Button>
@@ -128,9 +168,21 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
       </div>
 
       {!editing ? (
-        <TodaySummary value={today.value} unit={m?.unit ?? null} name={name} reflection={today.reflection} />
+        <TodaySummary
+          goal={goal}
+          value={today.value}
+          unit={m?.unit ?? null}
+          name={name}
+          reflection={today.reflection}
+        />
       ) : (
-        <form onSubmit={submit} className="mt-3 space-y-3">
+        <form
+          onSubmit={submit}
+          onKeyDown={(e) => {
+            byEnter.current = e.key === 'Enter' && !e.nativeEvent.isComposing
+          }}
+          className="mt-3 space-y-3"
+        >
           {m && (
             <label className="block">
               <span className="text-ink-2 mb-1 block text-[13px] font-semibold">
@@ -163,7 +215,15 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
                   type="button"
                   role="radio"
                   aria-checked={mood === o.value}
-                  onClick={() => setMood(mood === o.value ? null : o.value)}
+                  onClick={() => {
+                    const deselect = mood === o.value
+                    track('goal_detail.checkin_mood_select', {
+                      goal_category_id: goalId,
+                      mood: o.value,
+                      mood_action: deselect ? 'deselect' : 'select',
+                    })
+                    setMood(deselect ? null : o.value)
+                  }}
                   className={cn(
                     'flex h-9 items-center gap-1.5 rounded-full border px-3 text-[13px] font-semibold transition-colors',
                     mood === o.value
@@ -187,6 +247,7 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
                 // Enter 저장, Shift+Enter 줄바꿈
                 if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault()
+                  byEnter.current = true
                   submit()
                 }
               }}
@@ -205,7 +266,14 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
               기록하기
             </Button>
             {done && (
-              <Button type="button" variant="ghost" onClick={() => setEditing(false)}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  track('goal_detail.checkin_cancel_click', { goal_category_id: goalId })
+                  setEditing(false)
+                }}
+              >
                 취소
               </Button>
             )}
@@ -223,11 +291,13 @@ function CheckInBody({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
 }
 
 function TodaySummary({
+  goal,
   value,
   unit,
   name,
   reflection,
 }: {
+  goal: GoalCategory
   value: number | null
   unit: string | null
   name: string
@@ -255,17 +325,24 @@ function TodaySummary({
           {reflection.note}
         </p>
       )}
-      <AdjustHint />
+      <AdjustHint goal={goal} />
     </div>
   )
 }
 
 /** 기록을 남긴 뒤 — 쌓인 기록으로 계획을 조정받을 수 있다는 걸 알려줘요 */
-function AdjustHint() {
+function AdjustHint({ goal }: { goal: GoalCategory }) {
   return (
     <button
       type="button"
-      onClick={() => prefillAiEdit('최근 기록과 회고를 보고 계획을 조정해줘')}
+      onClick={() => {
+        // 말로 고치기 칸은 임시·완료 목표엔 없어요 (GoalDetailView 와 같은 조건)
+        track('goal_detail.checkin_adjust_hint_click', {
+          goal_category_id: goal.goalCategoryId,
+          has_ai_edit: !goal.temporary && goal.goalCategoryStatus !== 'COMPLETED',
+        })
+        prefillAiEdit('최근 기록과 회고를 보고 계획을 조정해줘')
+      }}
       className="text-brand hover:bg-brand-soft flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-semibold"
     >
       <Sparkles className="size-3.5" />
@@ -291,6 +368,7 @@ function RecentReflections({
         <p className="text-ink-3 text-[12px] font-semibold">최근 기록</p>
         <Link
           href={`/goal/${goalId}?tab=reflections`}
+          onClick={() => track('goal_detail.recent_records_all_click', { goal_category_id: goalId })}
           className="text-brand ml-auto text-[12px] font-semibold hover:underline"
         >
           모두 보기

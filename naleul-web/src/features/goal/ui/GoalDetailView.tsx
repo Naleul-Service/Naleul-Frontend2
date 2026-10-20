@@ -1,14 +1,16 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { BarChart3, KanbanSquare, LayoutDashboard, Library, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
+import { track } from '@/lib/client/analytics'
 import { isApiError } from '@/lib/client/api'
 import { cn } from '@/lib/cn'
+import { errorStatusOf } from '@/features/home/analytics'
 import { RecordPatternSection } from '@/features/record/ui/pattern/RecordPatternSection'
 import { HabitView } from '@/features/habit/ui/HabitView'
 import { ReflectionTimeline } from '@/features/reflection/ui/ReflectionsView'
@@ -17,7 +19,7 @@ import { isHabitGoal, isRecordGoal, useGoalCategory, type GoalCategory } from '.
 import { EditingContext } from '../edit/inline'
 import { dDayLabel, periodProgress } from '../format'
 import { GoalAiEditBar } from './GoalAiEditBar'
-import { GoalHeader, GoalNotes } from './GoalHeader'
+import { GoalHeader, GoalNotes, routineCountOf } from './GoalHeader'
 import { GoalAdjustmentBanner, GoalOutcomeSection, GoalWrapUpSection } from './GoalOutcomeSection'
 import { GoalTaskList } from './GoalTaskList'
 import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
@@ -124,7 +126,14 @@ function useGoalTab<T extends string>(tabs: TabDef<T>[]) {
   const pathname = usePathname()
   const raw = params.get('tab')
   const tab = tabs.find((t) => t.value === raw)?.value ?? tabs[0].value
-  const setTab = (t: T) => {
+  const setTab = (t: T, goal: GoalCategory) => {
+    // 같은 탭을 또 눌러도 보내요
+    track('goal_detail.tab_click', {
+      goal_category_id: goal.goalCategoryId,
+      goal_mode: goal.goalMode ?? 'ACHIEVEMENT',
+      tab: t,
+      from_tab: tab,
+    })
     const next = new URLSearchParams(params)
     if (t === tabs[0].value) next.delete('tab')
     else next.set('tab', t)
@@ -176,6 +185,12 @@ function ReflectionsPanel({ goal, hint }: { goal: GoalCategory; hint: string }) 
         <p className="text-ink-3 text-[13px]">{hint}</p>
         <Link
           href={`/reflections`}
+          onClick={() =>
+            track('goal_detail.reflections_all_click', {
+              goal_category_id: goal.goalCategoryId,
+              goal_mode: goal.goalMode ?? 'ACHIEVEMENT',
+            })
+          }
           className="text-brand ml-auto text-[12px] font-semibold hover:underline"
           title="모든 목표의 회고를 한 번에"
         >
@@ -208,7 +223,7 @@ function RecordGoalBody({ goal }: { goal: GoalCategory }) {
 
   return (
     <>
-      <GoalTabBar tabs={RECORD_TABS} tab={tab} onChange={setTab} />
+      <GoalTabBar tabs={RECORD_TABS} tab={tab} onChange={(t) => setTab(t, goal)} />
 
       {tab === 'board' ? (
         <div id="goal-panel-board" role="tabpanel" aria-labelledby="goal-tab-board" className="mt-5">
@@ -240,6 +255,43 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
     () => ({ editing, open: (key: string) => setEditing(key), close: () => setEditing(null) }),
     [editing]
   )
+  const params = useSearchParams()
+  const rawTab = params.get('tab')
+
+  // 불러오기 실패 — 실패 상태로 바뀔 때마다 한 번 (다시 시도 후 또 실패하면 다시)
+  const failSent = useRef(false)
+  const errorStatus = errorStatusOf(error) ?? (isError ? 0 : undefined)
+  useEffect(() => {
+    if (!isError) {
+      failSent.current = false
+      return
+    }
+    if (failSent.current) return
+    failSent.current = true
+    track('goal_detail.load_fail', { goal_category_id: goalId, error_status: errorStatus })
+  }, [isError, errorStatus, goalId])
+
+  // 목표 상세 진입 — 처음 그려졌을 때 한 번. 기본 생활 습관 그릇은 habit.pageview 가 대신해요
+  const viewSent = useRef(false)
+  useEffect(() => {
+    if (!goal || viewSent.current) return
+    viewSent.current = true
+    if (isHabitGoal(goal)) return
+    const record = isRecordGoal(goal)
+    const tabs: string[] = record ? RECORD_TABS.map((t) => t.value) : ACHIEVEMENT_TABS.map((t) => t.value)
+    const period = periodProgress(goal.goalCategoryStartDate, goal.goalCategoryEndDate)
+    track('goal_detail.pageview', {
+      goal_category_id: goal.goalCategoryId,
+      goal_mode: goal.goalMode ?? 'ACHIEVEMENT',
+      goal_status: goal.goalCategoryStatus,
+      is_temporary: !!goal.temporary,
+      just_created: justCreated,
+      tab: rawTab && tabs.includes(rawTab) ? rawTab : tabs[0],
+      has_metric: goal.targetValue != null,
+      routine_count: routineCountOf(goal),
+      d_day: period?.remain,
+    })
+  }, [goal, justCreated, rawTab])
 
   if (isPending) {
     return (
@@ -256,10 +308,23 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
         <p className="text-lg font-bold">{notFound ? '목표를 찾을 수 없어요' : '목표를 불러오지 못했어요'}</p>
         {!notFound && <p className="text-ink-3 mt-1 text-sm">{error?.message}</p>}
         <div className="mt-5 flex justify-center gap-2">
-          <Link href="/goal" className="text-ink-2 px-3 py-2 text-sm font-semibold">
+          <Link
+            href="/goal"
+            onClick={() => track('goal_detail.load_fail_cta_click', { cta: 'goal_list', error_status: errorStatus })}
+            className="text-ink-2 px-3 py-2 text-sm font-semibold"
+          >
             목표 목록
           </Link>
-          {!notFound && <Button onClick={() => refetch()}>다시 시도</Button>}
+          {!notFound && (
+            <Button
+              onClick={() => {
+                track('goal_detail.load_fail_cta_click', { cta: 'retry', error_status: errorStatus })
+                refetch()
+              }}
+            >
+              다시 시도
+            </Button>
+          )}
         </div>
       </Card>
     )
@@ -306,7 +371,7 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
   const [tab, setTab] = useGoalTab(ACHIEVEMENT_TABS)
   return (
     <>
-      <GoalTabBar tabs={ACHIEVEMENT_TABS} tab={tab} onChange={setTab} />
+      <GoalTabBar tabs={ACHIEVEMENT_TABS} tab={tab} onChange={(t) => setTab(t, goal)} />
       {tab === 'overview' ? (
         <div id="goal-panel-overview" role="tabpanel" aria-labelledby="goal-tab-overview">
           <AchievementOverview goal={goal} />

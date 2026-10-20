@@ -52,6 +52,8 @@ interface Props {
   /** y축을 0부터 (Task 개수처럼 누적값) */
   zeroBased?: boolean
   className?: string
+  /** 처음으로 그래프를 만져 값 말풍선을 볼 때 (이 그래프에서 한 번만) — 분석용 */
+  onFirstInteract?: () => void
 }
 
 function useWidth<T extends HTMLElement>() {
@@ -109,9 +111,11 @@ export function ProgressChart({
   height = 220,
   zeroBased = false,
   className,
+  onFirstInteract,
 }: Props) {
   const [wrapRef, width] = useWidth<HTMLDivElement>()
   const [hoverX, setHoverX] = useState<number | null>(null)
+  const interacted = useRef(false)
 
   const x0 = dayNum(from)
   const x1 = Math.max(dayNum(to), x0 + 1)
@@ -154,6 +158,10 @@ export function ProgressChart({
     const px = e.clientX - rect.left
     const x = Math.round(x0 + ((px - PAD.left) / innerW) * (x1 - x0))
     setHoverX(Math.min(Math.max(x, x0), x1))
+    if (!interacted.current) {
+      interacted.current = true
+      onFirstInteract?.()
+    }
   }
 
   const hover =
