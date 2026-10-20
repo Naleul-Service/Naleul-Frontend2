@@ -20,6 +20,13 @@ export type LoginSurface = 'login_page' | 'login_modal'
 export const LOGIN_RESULT_COOKIE = 'naleul_login_result'
 export const LOGIN_RESULT_MAX_AGE_SEC = 60
 
+/**
+ * 둘러보기 토큰을 "방금" 발급했다는 1회용 표시 (proxy.ts 가 심고, GuestSessionTracker 가 읽고 지워요)
+ * → guest.session_start 의 is_new_guest = true
+ */
+export const GUEST_STARTED_COOKIE = 'naleul_guest_started'
+export const GUEST_STARTED_MAX_AGE_SEC = 60
+
 /** 로그인 실패로 돌아올 때 붙이는 쿼리 (?loginError 와 같이) */
 export const LOGIN_PROVIDER_PARAM = 'loginProvider'
 
@@ -89,15 +96,25 @@ export function takeLoginAttempt(): LoginAttempt | null {
   }
 }
 
-/** 1회용 결과 쿠키를 읽고 바로 지워요 */
-export function takeLoginResultCookie(): LoginResult | null {
-  if (typeof document === 'undefined') return null
-  const prefix = `${LOGIN_RESULT_COOKIE}=`
+/** 1회용 쿠키를 읽고 바로 지워요 (없으면 undefined) */
+function takeCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined
+  const prefix = `${name}=`
   const raw = document.cookie
     .split('; ')
     .find((c) => c.startsWith(prefix))
     ?.slice(prefix.length)
-  if (raw === undefined) return null
-  document.cookie = `${LOGIN_RESULT_COOKIE}=; Max-Age=0; Path=/`
-  return decodeLoginResult(raw)
+  if (raw !== undefined) document.cookie = `${name}=; Max-Age=0; Path=/`
+  return raw
+}
+
+/** 1회용 결과 쿠키를 읽고 바로 지워요 */
+export function takeLoginResultCookie(): LoginResult | null {
+  const raw = takeCookie(LOGIN_RESULT_COOKIE)
+  return raw === undefined ? null : decodeLoginResult(raw)
+}
+
+/** 둘러보기 토큰을 방금 받았는지 (읽으면 지워져요) */
+export function takeGuestStartedCookie(): boolean {
+  return takeCookie(GUEST_STARTED_COOKIE) !== undefined
 }

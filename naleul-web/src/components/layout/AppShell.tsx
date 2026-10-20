@@ -4,6 +4,7 @@ import { useState, type ReactNode } from 'react'
 import { Menu } from 'lucide-react'
 import { Logo } from '@/components/brand/Logo'
 import { GuestBanner } from '@/components/auth/LoginRequiredDialog'
+import { GuestSessionTracker } from '@/components/analytics/GuestSessionTracker'
 import { Sidebar } from './Sidebar'
 import { isGuestUser, type SessionUserView } from './types'
 
@@ -18,6 +19,7 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
 
   return (
     <div className="min-h-dvh">
+      <GuestSessionTracker isGuest={isGuestUser(user)} />
       <aside className="border-line bg-surface fixed inset-y-0 left-0 z-30 hidden w-[272px] border-r lg:block">
         <Sidebar user={user} />
       </aside>

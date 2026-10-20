@@ -8,7 +8,14 @@
  * 둘 다 set/delete 메서드를 가지고 있어서 아래 CookieWriter 하나로 받아요.
  */
 import { secondsUntilExp } from '@/lib/jwt'
-import { LOGIN_RESULT_COOKIE, LOGIN_RESULT_MAX_AGE_SEC, encodeLoginResult, type LoginResult } from '@/lib/loginAnalytics'
+import {
+  GUEST_STARTED_COOKIE,
+  GUEST_STARTED_MAX_AGE_SEC,
+  LOGIN_RESULT_COOKIE,
+  LOGIN_RESULT_MAX_AGE_SEC,
+  encodeLoginResult,
+  type LoginResult,
+} from '@/lib/loginAnalytics'
 
 export const COOKIE = {
   access: 'accessToken',
@@ -93,6 +100,17 @@ export function setGuestCookies(writer: CookieWriter, accessToken: string) {
   const opts = baseOptions(USER_COOKIE_SEC)
   writer.set(COOKIE.userName, GUEST_NAME, opts)
   writer.set(COOKIE.userRole, 'GUEST', opts)
+}
+
+/** 둘러보기 토큰을 방금 발급했다는 1회용 표시 (guest.session_start 의 is_new_guest). 브라우저 JS 가 읽어야 해서 httpOnly 가 아니에요 */
+export function setGuestStartedCookie(writer: CookieWriter) {
+  writer.set(GUEST_STARTED_COOKIE, '1', {
+    httpOnly: false,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: GUEST_STARTED_MAX_AGE_SEC,
+  })
 }
 
 export function clearSessionCookies(writer: CookieWriter) {

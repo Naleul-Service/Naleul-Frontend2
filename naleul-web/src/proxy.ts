@@ -11,7 +11,14 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { isJwtExpired } from '@/lib/jwt'
 import { guestLogin, reissueAccessToken } from '@/lib/server/authApi'
-import { COOKIE, GUEST_NAME, clearSessionCookies, setGuestCookies, setTokenCookies } from '@/lib/server/session'
+import {
+  COOKIE,
+  GUEST_NAME,
+  clearSessionCookies,
+  setGuestCookies,
+  setGuestStartedCookie,
+  setTokenCookies,
+} from '@/lib/server/session'
 
 const PUBLIC_PATHS = ['/login']
 
@@ -40,6 +47,7 @@ async function startGuest(req: NextRequest) {
   req.cookies.set(COOKIE.userRole, 'GUEST')
   const res = NextResponse.next({ request: { headers: req.headers } })
   setGuestCookies(res.cookies, token)
+  setGuestStartedCookie(res.cookies) // guest.session_start 의 is_new_guest = true
   return res
 }
 
