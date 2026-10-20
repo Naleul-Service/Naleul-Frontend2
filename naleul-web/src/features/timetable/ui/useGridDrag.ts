@@ -68,9 +68,14 @@ interface Options {
   /** 머리글 등 위에 붙어 있는 영역 높이 — 자동 스크롤 기준 */
   stickyTop: number
   validate: (source: DragSource, target: DropTarget) => string | null
-  onDrop: (source: DragSource, target: DropTarget) => void
+  onDrop: (source: DragSource, target: DropTarget, mode: DragMode) => void
   onActivate?: () => void
+  /** 끌기 시작 후 저장 없이 끝났을 때 (분석용) — invalid 면 놓을 수 없던 이유 문구 */
+  onCancel?: (source: DragSource, mode: DragMode, reason: DragCancelReason, invalid?: string) => void
 }
+
+/** esc · 터치 취소(pointer_cancel) · 자리 밖(no_target) · 놓을 수 없는 자리(invalid) */
+export type DragCancelReason = 'esc' | 'pointer_cancel' | 'no_target' | 'invalid'
 
 const MOUSE_THRESHOLD = 4
 const TOUCH_HOLD_MS = 350
@@ -111,13 +116,13 @@ export function groupMoves(
   ]
 }
 
-export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onDrop, onActivate }: Options) {
+export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onDrop, onActivate, onCancel }: Options) {
   const [drag, setDrag] = useState<DragState | null>(null)
 
   // 이벤트 리스너 안에서 최신 값을 쓰기 위해 ref 에 보관
-  const opts = useRef({ from, to, ppm, stickyTop, validate, onDrop, onActivate })
+  const opts = useRef({ from, to, ppm, stickyTop, validate, onDrop, onActivate, onCancel })
   useEffect(() => {
-    opts.current = { from, to, ppm, stickyTop, validate, onDrop, onActivate }
+    opts.current = { from, to, ppm, stickyTop, validate, onDrop, onActivate, onCancel }
   })
 
   const session = useRef<{
@@ -237,7 +242,7 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
     }
   }, [scrollRef, update])
 
-  const finish = useCallback((commit: boolean) => {
+  const finish = useCallback((commit: boolean, cancelReason: DragCancelReason = 'pointer_cancel') => {
     const s = session.current
     if (!s) return
     s.cleanup()
@@ -248,7 +253,10 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
     suppressClick.current = true
     window.setTimeout(() => (suppressClick.current = false), 0)
     const st = s.state
-    if (commit && st?.target && !st.invalid) opts.current.onDrop(s.source, st.target)
+    if (commit && st?.target && !st.invalid) opts.current.onDrop(s.source, st.target, s.mode)
+    else if (!commit) opts.current.onCancel?.(s.source, s.mode, cancelReason)
+    else if (st?.invalid) opts.current.onCancel?.(s.source, s.mode, 'invalid', st.invalid)
+    else opts.current.onCancel?.(s.source, s.mode, 'no_target')
   }, [])
 
   const activate = useCallback(() => {
@@ -309,7 +317,7 @@ export function useGridDrag({ scrollRef, from, to, ppm, stickyTop, validate, onD
         if (ev.key === 'Escape' && session.current?.active) {
           ev.preventDefault()
           ev.stopPropagation()
-          finish(false)
+          finish(false, 'esc')
         }
       }
       // 터치로 드래그 중에는 화면이 같이 스크롤되지 않게

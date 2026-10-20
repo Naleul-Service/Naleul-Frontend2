@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
@@ -8,6 +8,8 @@ import type { ReflectionMood } from '@/features/goal/api'
 import { inlineInput } from '@/features/goal/edit/inline'
 import { MOODS } from '@/features/goal/ui/progress/DailyCheckInCard'
 import { useHomeCheckIn, type HomeCheckIn } from '../api'
+import { errorStatusOf, HE, useHomeAnalytics } from '../analytics'
+import type { DiscardTracker } from './TodayRetro'
 
 const NOTE_MAX = 500
 const fmt = (v: number) => String(Number(v.toFixed(2)))
@@ -32,6 +34,8 @@ export function HomeCheckInForm({
   date,
   checkIn,
   prompt,
+  goalMode,
+  tracker,
   onSaved,
   onSkip,
 }: {
@@ -40,9 +44,14 @@ export function HomeCheckInForm({
   date: string
   checkIn: HomeCheckIn
   prompt: string
+  goalMode?: string | null
+  /** 분석: 입력 시작 · 버려짐 (회고 패널이 내려줘요) */
+  tracker?: DiscardTracker
   onSaved: () => void
-  onSkip: () => void
+  /** noteLength: 건너뛸 때 한 줄 회고 칸에 남아 있던 글자 수 */
+  onSkip: (noteLength: number) => void
 }) {
+  const { trackHome } = useHomeAnalytics()
   const save = useHomeCheckIn()
   const had = checkIn.value != null || checkIn.mood != null || !!checkIn.note
   const [value, setValue] = useState(checkIn.value != null ? fmt(checkIn.value) : '')
@@ -56,9 +65,52 @@ export function HomeCheckInForm({
   const hasSomething = (checkIn.hasMetric && valueNum != null) || !!mood || !!note.trim() || had
   const canSave = valueOk && hasSomething && !save.isPending
 
-  const submit = (e?: FormEvent) => {
+  // ── 분석 ──
+  // 입력값이 처음과 달라졌는지 (저장하면 깨끗해져요) — 이 칸이 사라질 때 남아 있으면 "버려짐"
+  const dirty = useRef(false)
+  const latest = useRef({ noteLength: 0 })
+  useEffect(() => {
+    latest.current.noteLength = note.trim().length
+  }, [note])
+  const touch = () => {
+    if (!dirty.current) tracker?.inputStart(goalCategoryId, 'checkin', goalMode ?? null)
+    dirty.current = true
+  }
+  // '숫자로 입력해 주세요'가 처음 보일 때 (폼마다 1회)
+  const invalidSent = useRef(false)
+  useEffect(() => {
+    if (valueOk || invalidSent.current) return
+    invalidSent.current = true
+    trackHome(HE.checkinValueInvalid, { goal_category_id: goalCategoryId })
+  }, [valueOk, goalCategoryId, trackHome])
+  useEffect(
+    () => () => {
+      if (!dirty.current || !tracker) return
+      // 패널째 닫히면 패널이 정한 이유, 아니면 (목표형) 다른 목표로 바뀐 것
+      trackHome(HE.retroDraftDiscard, {
+        discard_reason: tracker.panelClosing.current ? tracker.reasonNow() : 'goal_switch',
+        content_length: latest.current.noteLength,
+        form_type: 'checkin',
+        goal_category_id: goalCategoryId,
+      })
+    },
+    // 사라질 때 한 번만
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
+
+  const submit = (method: 'button' | 'enter', e?: FormEvent) => {
     e?.preventDefault()
     if (!canSave) return
+    trackHome(HE.checkinSaveClick, {
+      goal_category_id: goalCategoryId,
+      has_metric: checkIn.hasMetric,
+      has_value: checkIn.hasMetric && valueNum != null,
+      mood: mood ?? undefined,
+      note_length: note.trim().length,
+      is_edit: had,
+      submit_method: method,
+    })
     save.mutate(
       {
         goalCategoryId,
@@ -67,12 +119,25 @@ export function HomeCheckInForm({
         mood,
         note: note.trim() || null,
       },
-      { onSuccess: onSaved }
+      {
+        onSuccess: () => {
+          dirty.current = false
+          trackHome(HE.retroSaveResult, { retro_action: 'checkin', result: 'success', goal_category_id: goalCategoryId })
+          onSaved()
+        },
+        onError: (err) =>
+          trackHome(HE.retroSaveResult, {
+            retro_action: 'checkin',
+            result: 'fail',
+            error_status: errorStatusOf(err),
+            goal_category_id: goalCategoryId,
+          }),
+      }
     )
   }
 
   return (
-    <form onSubmit={submit} className="border-brand/40 bg-brand-soft/30 mt-3 space-y-3 rounded-2xl border p-3">
+    <form onSubmit={(e) => submit('button', e)} className="border-brand/40 bg-brand-soft/30 mt-3 space-y-3 rounded-2xl border p-3">
       {checkIn.hasMetric && (
         <label className="block">
           <span className="text-ink-2 mb-1 block text-[13px] font-semibold">{josa(name, '은', '는')} 얼마예요?</span>
@@ -80,7 +145,10 @@ export function HomeCheckInForm({
             <input
               inputMode="decimal"
               value={value}
-              onChange={(e) => setValue(e.target.value.replace(/[^0-9.-]/g, ''))}
+              onChange={(e) => {
+                touch()
+                setValue(e.target.value.replace(/[^0-9.-]/g, ''))
+              }}
               placeholder={checkIn.currentValue != null ? fmt(checkIn.currentValue) : ''}
               aria-label={`${goalName} ${name} 값`}
               className={cn(inlineInput, 'bg-surface h-10 pr-12 text-[16px] font-bold')}
@@ -104,7 +172,12 @@ export function HomeCheckInForm({
               type="button"
               role="radio"
               aria-checked={mood === o.value}
-              onClick={() => setMood(mood === o.value ? null : o.value)}
+              onClick={() => {
+                const off = mood === o.value
+                touch()
+                trackHome(HE.checkinMoodSelect, { mood: o.value, mood_action: off ? 'deselect' : 'select' })
+                setMood(off ? null : o.value)
+              }}
               className={cn(
                 'flex h-8 items-center gap-1 rounded-full border px-2.5 text-[12px] font-semibold transition-colors',
                 mood === o.value
@@ -123,12 +196,15 @@ export function HomeCheckInForm({
         <span className="text-ink-2 mb-1 block text-[13px] font-semibold">무엇을 했나요? (한 줄 회고)</span>
         <textarea
           value={note}
-          onChange={(e) => setNote(e.target.value.slice(0, NOTE_MAX))}
+          onChange={(e) => {
+            touch()
+            setNote(e.target.value.slice(0, NOTE_MAX))
+          }}
           onKeyDown={(e) => {
             // Enter 저장, Shift+Enter 줄바꿈
             if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
-              submit()
+              submit('enter')
             }
           }}
           rows={3}
@@ -139,7 +215,7 @@ export function HomeCheckInForm({
       </label>
 
       <div className="flex items-center gap-2">
-        <button type="button" onClick={onSkip} className="text-ink-3 hover:text-ink text-[13px] font-semibold">
+        <button type="button" onClick={() => onSkip(note.trim().length)} className="text-ink-3 hover:text-ink text-[13px] font-semibold">
           건너뛰기
         </button>
         <Button type="submit" size="sm" className="ml-auto" loading={save.isPending} disabled={!canSave}>

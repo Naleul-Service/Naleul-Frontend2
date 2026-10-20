@@ -16,6 +16,11 @@ const API_KEY = process.env.NEXT_PUBLIC_AMPLITUDE_API_KEY ?? ''
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? ''
 
 /** Tracking Plan 의 event 컬럼 값 */
+import { HOME_EVENTS, type HomeEventName } from './homeEvents'
+
+/** 화면별 이벤트 이름 모음 (홈은 개수가 많아 homeEvents.ts 로 나눴어요) */
+export { HOME_EVENTS }
+
 export const EVENTS = {
   guestSessionStart: 'guest.session_start',
   guestBannerLoginClick: 'guest_banner.login_click',
@@ -40,7 +45,7 @@ export const EVENTS = {
   settingsLogoutConfirmClick: 'settings.logout_confirm_click',
 } as const
 
-export type AnalyticsEventName = (typeof EVENTS)[keyof typeof EVENTS]
+export type AnalyticsEventName = (typeof EVENTS)[keyof typeof EVENTS] | HomeEventName
 
 /** event property. Tracking Plan 의 varchar → string, int → number, boolean → boolean */
 export type EventProps = Record<string, string | number | boolean | null | undefined>
@@ -97,7 +102,37 @@ export function initAnalytics() {
   })
 }
 
+/**
+ * 화면 첫 동작 · 머문 시간(*.first_interaction / *.page_exit)을 세는 쪽(usePageEngagement)에 알려 줘요.
+ * '{page}.' 로 시작하는 "사용자 동작" 이벤트가 나갈 때마다 불려요. (보기 · 결과 · 실패 같은 이벤트는 빼요)
+ */
+type InteractionListener = (event: string) => void
+const interactionListeners = new Set<InteractionListener>()
+export function onInteraction(listener: InteractionListener) {
+  interactionListeners.add(listener)
+  return () => {
+    interactionListeners.delete(listener)
+  }
+}
+/** 사용자가 직접 한 동작이 아닌 이벤트 (화면이 보여 준 것 · 요청 결과 · 자동으로 일어난 것) */
+const PASSIVE = [
+  '.pageview',
+  '.page_exit',
+  '.first_interaction',
+  '_view',
+  '.load_fail',
+  '_load_fail',
+  '_result',
+  '.scroll_depth',
+  '.section_scroll',
+  '.day_rollover',
+  '_invalid',
+  '_discard',
+]
+const isPassive = (event: string) => PASSIVE.some((p) => event.endsWith(p))
+
 export function track(event: AnalyticsEventName, props?: EventProps) {
+  if (!isPassive(event)) interactionListeners.forEach((l) => l(event))
   if (!enabled()) return
   initAnalytics()
   amplitude.track(event, clean(props))
@@ -112,6 +147,7 @@ const LEAVE_TIMEOUT_MS = 800
  * 돌려주는 Promise 는 전송이 끝나거나 800ms 가 지나면 끝나요. (await 하지 않아도 돼요)
  */
 export async function trackBeforeLeave(event: AnalyticsEventName, props?: EventProps): Promise<void> {
+  if (!isPassive(event)) interactionListeners.forEach((l) => l(event))
   if (!enabled()) return
   initAnalytics()
   amplitude.setTransport('beacon')

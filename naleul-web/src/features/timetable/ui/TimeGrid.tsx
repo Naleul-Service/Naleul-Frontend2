@@ -21,6 +21,8 @@ import {
   canUnschedule,
   groupMoves,
   useGridDrag,
+  type DragCancelReason,
+  type DragMode,
   type DragSource,
   type DragState,
   type DropTarget,
@@ -62,7 +64,11 @@ interface Props {
   /** 주간에서 날짜 머리글 클릭 → 일간 */
   onDayClick?: (date: string) => void
   /** 드래그해서 놓았을 때 (원래 자리와 같으면 호출되지 않아요) */
-  onDrop?: (source: DragSource, target: DropTarget) => void
+  onDrop?: (source: DragSource, target: DropTarget, mode: DragMode) => void
+  /** 끌기 시작 후 저장 없이 끝났을 때 (분석용) */
+  onDragCancel?: (source: DragSource, mode: DragMode, reason: DragCancelReason, invalid?: string) => void
+  /** 기록할 수 없는 빈 칸(앞날 · 지금 이후)을 눌렀을 때 (분석용 — 반응 없는 클릭) */
+  onBlockedEmptyClick?: (date: string, minutes: number) => void
   /** 드래그가 시작될 때 (열린 팝오버 닫기 등) */
   onDragStart?: () => void
   /** "NEW" 표시할 Task (방금 만든 것) */
@@ -150,6 +156,8 @@ export function TimeGrid({
   onSelectFixed,
   onDayClick,
   onDrop,
+  onDragCancel,
+  onBlockedEmptyClick,
   onDragStart,
   highlightIds,
   focusIds,
@@ -243,10 +251,11 @@ export function TimeGrid({
     ppm: PPM,
     stickyTop: HEADER_PX,
     validate,
-    onDrop: (source, target) => {
-      if (!sameAsSource(source, target)) onDrop?.(source, target)
+    onDrop: (source, target, mode) => {
+      if (!sameAsSource(source, target)) onDrop?.(source, target, mode)
     },
     onActivate: onDragStart,
+    onCancel: onDragCancel,
   })
   const enabled = !!onDrop
   const isDragging = (kind: 'task' | 'fixed', id: string | number) =>
@@ -287,7 +296,10 @@ export function TimeGrid({
     const minutes = Math.floor((from + (e.clientY - rect.top) / PPM) / 30) * 30
     // 자정 뒤 칸(24:00~)은 다음 날 시각
     const nowOnDay = date === now.date ? now.minutes : addDays(date, 1) === now.date ? now.minutes + 1440 : null
-    if (date > now.date || (nowOnDay !== null && minutes >= nowOnDay)) return
+    if (date > now.date || (nowOnDay !== null && minutes >= nowOnDay)) {
+      onBlockedEmptyClick?.(date, minutes)
+      return
+    }
     onEmptyClick(date, minutes, e)
   }
 

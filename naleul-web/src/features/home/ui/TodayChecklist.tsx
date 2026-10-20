@@ -10,6 +10,7 @@ import { hexOf } from '@/features/timetable/layout'
 import { addDays, dDay, hm } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
 import { isDone } from '../today'
+import { EmptyStateView, HE, useHomeAnalytics } from '../analytics'
 import { BODY, FILL } from './fill'
 import { TaskCheck } from './TaskCheck'
 
@@ -33,11 +34,15 @@ export function TodayTasks({
   const [showDone, setShowDone] = useState(false)
   const todo = tasks.filter((t) => !isDone(t))
   const done = tasks.filter(isDone)
+  const { trackHome } = useHomeAnalytics()
+  const addClick = (entry: 'header' | 'empty_state') =>
+    trackHome(HE.taskAddClick, { entry_point: entry, task_count: tasks.length })
 
   return (
-    <Card className={cn(FILL, className)}>
+    <Card data-home-section="tasks" className={cn(FILL, className)}>
       <Header title="할 일" done={done.length} total={tasks.length}>
         <Link
+          onClick={() => addClick('header')}
           href="/tasks/new"
           className="text-ink-3 hover:text-ink flex items-center gap-0.5 text-[13px] font-semibold"
           aria-label="Task 추가"
@@ -49,8 +54,9 @@ export function TodayTasks({
       <div className={BODY}>
         {tasks.length === 0 ? (
           <p className="text-ink-3 py-4 text-sm">
+            <EmptyStateView section="tasks" />
             {dayLabel}로 정한 할 일이 없어요.{' '}
-            <Link href="/tasks/new" className="text-brand font-semibold">
+            <Link href="/tasks/new" onClick={() => addClick('empty_state')} className="text-brand font-semibold">
               할 일을 추가해 보세요
             </Link>
           </p>
@@ -61,7 +67,15 @@ export function TodayTasks({
             ) : (
               <ul className="-my-1">
                 {todo.map((t) => (
-                  <TaskRow key={t.taskId} t={t} today={today} onToggle={onToggle} busy={togglingId === t.taskId} />
+                  <TaskRow
+                    key={t.taskId}
+                    t={t}
+                    today={today}
+                    onToggle={onToggle}
+                    busy={togglingId === t.taskId}
+                    kind="task"
+                    listSection="todo"
+                  />
                 ))}
               </ul>
             )}
@@ -69,7 +83,10 @@ export function TodayTasks({
               <div className="border-line mt-2 border-t pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowDone((v) => !v)}
+                  onClick={() => {
+                    trackHome(HE.taskDoneToggleClick, { expanded: !showDone, done_count: done.length })
+                    setShowDone((v) => !v)
+                  }}
                   aria-expanded={showDone}
                   className="text-success flex items-center gap-1 text-[13px] font-semibold"
                 >
@@ -79,7 +96,15 @@ export function TodayTasks({
                 {showDone && (
                   <ul>
                     {done.map((t) => (
-                      <TaskRow key={t.taskId} t={t} today={today} onToggle={onToggle} busy={togglingId === t.taskId} />
+                      <TaskRow
+                        key={t.taskId}
+                        t={t}
+                        today={today}
+                        onToggle={onToggle}
+                        busy={togglingId === t.taskId}
+                        kind="task"
+                        listSection="done"
+                      />
                     ))}
                   </ul>
                 )}
@@ -118,15 +143,17 @@ export function TodayRoutines({
   // 안 한 것 먼저
   const sortedRoutines = [...routines].sort((a, b) => Number(isDone(a)) - Number(isDone(b)))
   const sortedHabits = [...todayHabits].sort((a, b) => Number(a.checked) - Number(b.checked))
+  const { trackHome } = useHomeAnalytics()
 
   return (
-    <Card className={cn(FILL, className)}>
+    <Card data-home-section="routines" className={cn(FILL, className)}>
       <Header title="루틴 · 습관" done={done} total={total} />
       <div className={BODY}>
         {total === 0 ? (
           <p className="text-ink-3 py-4 text-sm">
+            <EmptyStateView section="routines" />
             {dayLabel} 할 루틴이 없어요.{' '}
-            <Link href="/goal" className="text-brand font-semibold">
+            <Link href="/goal" onClick={() => trackHome(HE.habitAddClick)} className="text-brand font-semibold">
               생활 습관 추가하기
             </Link>
           </p>
@@ -143,6 +170,8 @@ export function TodayRoutines({
                       today={today}
                       onToggle={onToggleTask}
                       busy={togglingId === t.taskId}
+                      kind="routine"
+                      listSection="todo"
                     />
                   ))}
                 </ul>
@@ -151,14 +180,29 @@ export function TodayRoutines({
             {sortedHabits.length > 0 && (
               <>
                 <SubTitle>
-                  <Link href={habits ? `/goal/${habits.goalCategoryId}` : '/goal'} className="hover:text-ink">
+                  <Link
+                    href={habits ? `/goal/${habits.goalCategoryId}` : '/goal'}
+                    onClick={() => trackHome(HE.habitGroupLinkClick, { goal_category_id: habits?.goalCategoryId })}
+                    className="hover:text-ink"
+                  >
                     {habits?.emoji ?? '🌱'} 생활 습관
                   </Link>
                 </SubTitle>
                 <ul>
                   {sortedHabits.map((h) => (
                     <li key={h.habitId} className="flex items-center gap-2.5 py-1.5">
-                      <TaskCheck done={h.checked} label={h.name} onToggle={() => onToggleHabit(h)} />
+                      <TaskCheck
+                        done={h.checked}
+                        label={h.name}
+                        onToggle={() => {
+                          trackHome(HE.habitCheckClick, {
+                            habit_id: h.habitId,
+                            check_action: h.checked ? 'uncomplete' : 'complete',
+                            streak: h.streak,
+                          })
+                          onToggleHabit(h)
+                        }}
+                      />
                       <span
                         className={cn('min-w-0 flex-1 truncate text-[14px]', h.checked && 'text-ink-3 line-through')}
                       >
@@ -166,7 +210,10 @@ export function TodayRoutines({
                         {h.name}
                       </span>
                       {h.streak > 1 && (
-                        <span className="flex shrink-0 items-center text-[11px] font-semibold text-[#ea580c]">
+                        <span
+                          data-dead="streak"
+                          className="flex shrink-0 items-center text-[11px] font-semibold text-[#ea580c]"
+                        >
                           <Flame className="size-3" />
                           {h.streak}
                         </span>
@@ -226,20 +273,55 @@ function TaskRow({
   today,
   onToggle,
   busy,
+  kind,
+  listSection,
 }: {
   t: TimeBlockTask
   today: string
   onToggle: (t: TimeBlockTask) => void
   busy: boolean
+  /** 할 일 카드(task) / 루틴·습관 카드(routine) — 이벤트 이름이 달라요 */
+  kind: 'task' | 'routine'
+  /** 할 일 카드에서 남은 일(todo) / 끝낸 일(done) */
+  listSection: 'todo' | 'done'
 }) {
   const done = isDone(t)
+  const { trackHome } = useHomeAnalytics()
+  const dueState =
+    t.dueDate && !done && t.dueDate <= addDays(today, 2) ? (t.dueDate < today ? 'overdue' : 'due_soon') : 'none'
+  const check = () => {
+    const base = {
+      task_id: t.taskId,
+      check_action: done ? 'uncomplete' : 'complete',
+      goal_category_id: t.goalCategoryId ?? undefined,
+    }
+    if (kind === 'routine') trackHome(HE.routineCheckClick, base)
+    else {
+      trackHome(HE.taskCheckClick, {
+        ...base,
+        source_type: t.sourceType,
+        list_section: listSection,
+        is_scheduled: !!t.plannedStartAt,
+        due_state: dueState,
+        is_missed: t.missed,
+      })
+    }
+    onToggle(t)
+  }
   return (
     <li className="flex items-center gap-2.5 py-1.5">
       <TaskCheck
         done={done}
         label={t.taskName}
-        onToggle={() => onToggle(t)}
+        onToggle={check}
         disabled={busy || t.sourceType === 'MISSION'}
+        onDisabledPress={() =>
+          trackHome(HE.disabledClick, {
+            disabled_reason: t.sourceType === 'MISSION' ? 'mission' : 'saving',
+            task_id: t.taskId,
+            source_type: t.sourceType,
+          })
+        }
       />
       <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: hexOf(t.goalColorCode) }} aria-hidden />
       <div className="min-w-0 flex-1">

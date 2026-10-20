@@ -12,6 +12,10 @@ import type { TimeBlockTask, TimetableDay } from '@/features/timetable/types'
 import type { DeadlineType, HomeDeadline } from '../api'
 import { isRoutineTask, startMinutes, tasksOfDay } from '../today'
 import { BODY, FILL } from './fill'
+import { EmptyStateView, HE, useHomeAnalytics } from '../analytics'
+
+/** 두 날짜(YYYY-MM-DD) 사이 날 수 */
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000)
 
 /**
  * 다가오는 일정 — 내일부터 6일 동안 시간이 정해진 일 (루틴은 매일 반복이라 빼요).
@@ -34,22 +38,33 @@ export function UpcomingSchedule({
         .sort((a, b) => startMinutes(d.date, a) - startMinutes(d.date, b)),
     }))
     .filter((g) => g.items.length > 0)
+  const { trackHome } = useHomeAnalytics()
 
   return (
-    <Card className={cn(FILL, className)}>
+    <Card data-home-section="upcoming" className={cn(FILL, className)}>
       <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
         <h2 className="text-[17px] font-bold">다가오는 일정</h2>
         <span className="text-ink-3 text-[13px]">앞으로 6일</span>
       </div>
       <div className={BODY}>
         {groups.length === 0 ? (
-          <p className="text-ink-3 py-4 text-sm">이번 주에 잡힌 일정이 없어요.</p>
+          <p className="text-ink-3 py-4 text-sm">
+            <EmptyStateView section="upcoming" />
+            이번 주에 잡힌 일정이 없어요.
+          </p>
         ) : (
           <div className="space-y-3">
             {groups.map((g) => (
               <section key={g.date}>
                 <Link
                   href={`/calendar?view=day&date=${g.date}`}
+                  onClick={() =>
+                    trackHome(HE.upcomingDayClick, {
+                      target_date: g.date,
+                      days_from_today: daysBetween(today, g.date),
+                      item_count: g.items.length,
+                    })
+                  }
                   className="text-ink-2 hover:text-ink mb-1 inline-block text-[13px] font-bold"
                 >
                   {dayLabel(g.date, today)}
@@ -72,7 +87,8 @@ export function UpcomingSchedule({
 function ScheduleRow({ t }: { t: TimeBlockTask }) {
   const appointment = t.taskKind === 'APPOINTMENT'
   return (
-    <li className="flex items-center gap-2 py-1">
+    // 일정 줄은 눌러도 반응이 없어요 → 많이 눌리면 링크로 바꿀 후보 (home.dead_click)
+    <li data-dead="upcoming_row" className="flex items-center gap-2 py-1">
       <span className="text-ink-3 w-[46px] shrink-0 text-[12px] tabular-nums">
         {t.plannedStartAt ? hm(t.plannedStartAt) : '미정'}
       </span>
@@ -147,9 +163,10 @@ export function DeadlineRoadmap({
     const i = shown.findIndex((d) => !d.overdue)
     return i === -1 ? shown.length : i
   })()
+  const { trackHome } = useHomeAnalytics()
 
   return (
-    <Card className={cn(FILL, className)}>
+    <Card data-home-section="deadlines" className={cn(FILL, className)}>
       <div className="mb-3 flex shrink-0 items-center justify-between gap-2">
         <h2 className="text-[17px] font-bold">마감 로드맵</h2>
         {list.length > 0 && (
@@ -162,6 +179,7 @@ export function DeadlineRoadmap({
         <div className="bg-subtle h-32 animate-pulse rounded-xl" />
       ) : list.length === 0 ? (
         <p className="text-ink-3 py-4 text-sm">
+          <EmptyStateView section="deadlines" />
           다가오는 마감이 없어요. 목표형 종료일 · 업무형 주제 마감 · Task 마감이 여기 이어져요.
         </p>
       ) : (
@@ -178,6 +196,15 @@ export function DeadlineRoadmap({
                     <li>
                       <Link
                         href={d.goalCategoryId ? `/goal/${d.goalCategoryId}` : `/calendar?view=day&date=${d.date}`}
+                        onClick={() =>
+                          trackHome(HE.deadlineItemClick, {
+                            deadline_type: d.type,
+                            d_day: d.dDay,
+                            is_overdue: d.overdue,
+                            goal_category_id: d.goalCategoryId ?? undefined,
+                            destination: d.goalCategoryId ? 'goal' : 'calendar',
+                          })
+                        }
                         className="hover:bg-subtle/60 -mx-2 flex items-start gap-0 rounded-xl px-2 py-2"
                       >
                         <span className="w-[52px] shrink-0 pt-0.5 text-right">

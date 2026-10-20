@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from 'react'
 import Link from 'next/link'
 import { ArrowRight, Check, Library, Pencil, PencilLine, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -18,6 +18,20 @@ import {
   type HomeRetro,
 } from '../api'
 import { HomeCheckInForm } from './HomeCheckInForm'
+import { EmptyStateView, errorStatusOf, HE, useHomeAnalytics } from '../analytics'
+
+/** 쓰던 글이 저장 없이 사라진 이유 (home.retro_draft_discard 의 discard_reason) */
+export type DiscardReason = 'panel_close' | 'goal_link' | 'date_change' | 'day_rollover' | 'goal_switch' | 'page_leave'
+
+/** 패널 안의 입력 칸이 "버려질 때" 이유를 알 수 있게 패널이 내려주는 것 */
+export interface DiscardTracker {
+  /** 패널 자체가 닫히는 중인지 (아니면 목표만 바뀐 것) */
+  panelClosing: MutableRefObject<boolean>
+  /** 패널이 닫히는 이유 (HomeView 가 닫기 직전에 정해요, 기본 page_leave) */
+  reasonNow: () => DiscardReason
+  /** 목표마다 1회 — home.retro_input_start */
+  inputStart: (goalCategoryId: number, formType: 'retro' | 'checkin', goalMode: string | null) => void
+}
 
 /** 그날 남긴 게 있는지 — 목표형은 "오늘 기록"(수치 · 기분 · 회고), 업무형은 회고 글 */
 export const hasRecord = (g: HomeGoalToday) => g.retros.length > 0 || checkInWritten(g.checkIn)
@@ -50,14 +64,21 @@ export function RetroPanel({
   today,
   failed,
   bare = false,
+  discardReason,
+  onWrittenChange,
 }: {
   goals: HomeGoalToday[] | undefined
   today: string
   failed: boolean
   /** 오른쪽 패널 안에 넣을 때 — 카드 · 제목 없이 */
   bare?: boolean
+  /** 패널을 닫는 쪽(HomeView)이 닫기 직전에 이유를 적어 두는 곳 */
+  discardReason?: MutableRefObject<DiscardReason>
+  /** 이번 패널에서 남긴 회고 수 (home.retro_panel_close 의 written_count) */
+  onWrittenChange?: (count: number) => void
 }) {
   const create = useCreateTodayRetro()
+  const { trackHome } = useHomeAnalytics()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [picked, setPicked] = useState<number | null>(null)
   const [finished, setFinished] = useState(false)
@@ -66,9 +87,57 @@ export function RetroPanel({
   const [text, setText] = useState('')
   const [showIdle, setShowIdle] = useState(false)
 
+  // ── 분석: 쓰던 글이 버려질 때 · 입력 시작 ──
+  // 버려진 이유: 목표 이름을 눌러 이동했으면 goal_link, 아니면 패널을 닫는 쪽(HomeView)이 적어 둔 이유
+  const goalLinkClicked = useRef(false)
+  const reasonNow = (): DiscardReason =>
+    goalLinkClicked.current ? 'goal_link' : (discardReason?.current ?? 'page_leave')
+  const panelClosing = useRef(false)
+  const started = useRef(new Set<number>())
+  const draft = useRef({ length: 0, goalCategoryId: 0 })
+  useEffect(() => onWrittenChange?.(written.size), [written, onWrittenChange])
+  // 화면에서 사라지는 순간: layout 정리가 먼저 돌아서, 안쪽 입력 칸이 "패널째 닫힘"을 알 수 있어요
+  useLayoutEffect(
+    () => () => {
+      panelClosing.current = true
+    },
+    []
+  )
+  useEffect(
+    () => () => {
+      // 업무형 회고 글 (목표를 바꿔도 남아 있다가 패널이 사라질 때 버려져요)
+      if (draft.current.length > 0) {
+        trackHome(HE.retroDraftDiscard, {
+          discard_reason: reasonNow(),
+          content_length: draft.current.length,
+          form_type: 'retro',
+          goal_category_id: draft.current.goalCategoryId,
+        })
+      }
+    },
+    // 사라질 때 한 번만 (최신 값은 ref 로 읽어요)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
+  const tracker: DiscardTracker = {
+    panelClosing,
+    reasonNow,
+    inputStart: (goalCategoryId, formType, goalMode) => {
+      if (started.current.has(goalCategoryId)) return
+      started.current.add(goalCategoryId)
+      trackHome(HE.retroInputStart, { goal_category_id: goalCategoryId, form_type: formType, goal_mode: goalMode })
+    },
+  }
+
   if (failed) return <p className="text-ink-3 text-sm">회고할 목표를 불러오지 못했어요.</p>
   if (!goals) return <div className="bg-subtle h-60 animate-pulse rounded-[20px]" />
-  if (goals.length === 0) return <p className="text-ink-3 text-sm">진행 중인 목표가 없어요.</p>
+  if (goals.length === 0)
+    return (
+      <p className="text-ink-3 text-sm">
+        <EmptyStateView section="retro_goals" />
+        진행 중인 목표가 없어요.
+      </p>
+    )
 
   const hasRetro = (g: HomeGoalToday) => hasRecord(g) || written.has(g.goalCategoryId)
   // 앞날은 아직 기록할 수 없어요 (목표형 기록은 서버도 미래 날짜를 막아요)
@@ -81,7 +150,16 @@ export function RetroPanel({
 
   const Wrap = bare ? 'div' : Card
   const focus = () => requestAnimationFrame(() => inputRef.current?.focus())
-  const pick = (id: number) => {
+  const formTypeOf = (g: HomeGoalToday) => (g.checkIn ? 'checkin' : 'retro')
+  const pick = (g: HomeGoalToday) => {
+    const id = g.goalCategoryId
+    trackHome(HE.retroGoalChipClick, {
+      goal_category_id: id,
+      goal_mode: g.goalMode,
+      has_record: hasRetro(g),
+      is_active_today: g.activeToday,
+      content_length: text.length,
+    })
     setPicked(id)
     setFinished(false)
     focus()
@@ -97,27 +175,51 @@ export function RetroPanel({
       setFinished(true)
     }
   }
-  const submit = () => {
+  const submit = (method: 'button' | 'enter') => {
     const v = text.trim()
     if (!v || !current || create.isPending) return
     const id = current.goalCategoryId
+    trackHome(HE.retroSaveClick, {
+      goal_category_id: id,
+      goal_mode: current.goalMode,
+      submit_method: method,
+      content_length: v.length,
+      is_auto_selected: picked === null,
+    })
     create.mutate(
       { goalCategoryId: id, content: v, date: today },
       {
         onSuccess: () => {
+          trackHome(HE.retroSaveResult, { retro_action: 'create', result: 'success', goal_category_id: id })
           setText('')
+          draft.current.length = 0
           setWritten((s) => new Set([...s, id]))
           goNext(id, true)
         },
+        onError: (e) =>
+          trackHome(HE.retroSaveResult, {
+            retro_action: 'create',
+            result: 'fail',
+            error_status: errorStatusOf(e),
+            goal_category_id: id,
+          }),
       }
     )
+  }
+  const skip = (g: HomeGoalToday, contentLength: number) => {
+    trackHome(HE.retroSkipClick, {
+      goal_category_id: g.goalCategoryId,
+      form_type: formTypeOf(g),
+      content_length: contentLength,
+    })
+    goNext(g.goalCategoryId, false)
   }
 
   const chip = (g: HomeGoalToday) => (
     <button
       key={g.goalCategoryId}
       type="button"
-      onClick={() => pick(g.goalCategoryId)}
+      onClick={() => pick(g)}
       aria-pressed={current?.goalCategoryId === g.goalCategoryId}
       className={cn(
         'flex h-8 max-w-full items-center gap-1 rounded-full border px-2.5 text-[12px] font-semibold transition-colors',
@@ -156,6 +258,7 @@ export function RetroPanel({
       </div>
       <Link
         href="/reflections"
+        onClick={() => trackHome(HE.retroReflectionsLinkClick)}
         className="text-brand hover:bg-brand-soft mt-1 -ml-1 inline-flex items-center gap-1 rounded-lg px-1 py-0.5 text-[12px] font-semibold"
       >
         <Library className="size-3.5" />
@@ -168,7 +271,10 @@ export function RetroPanel({
         {active.length > 0 && idle.length > 0 && !showIdle && (
           <button
             type="button"
-            onClick={() => setShowIdle(true)}
+            onClick={() => {
+              trackHome(HE.retroMoreGoalsClick, { item_count: idle.length })
+              setShowIdle(true)
+            }}
             className="text-ink-3 hover:text-ink h-8 px-1.5 text-[12px] font-semibold"
           >
             + 다른 목표 {idle.length}
@@ -181,7 +287,14 @@ export function RetroPanel({
         <div className="mt-4">
           <div className="text-ink-3 flex items-center gap-1.5 text-[12px]">
             <span className="size-2 rounded-full" style={{ backgroundColor: hexOf(current.colorCode) }} aria-hidden />
-            <Link href={`/goal/${current.goalCategoryId}`} className="text-ink truncate font-bold hover:underline">
+            <Link
+              href={`/goal/${current.goalCategoryId}`}
+              onClick={() => {
+                goalLinkClicked.current = true
+                trackHome(HE.retroGoalLinkClick, { goal_category_id: current.goalCategoryId })
+              }}
+              className="text-ink truncate font-bold hover:underline"
+            >
               {current.goalName}
             </Link>
             {current.planned + current.done > 0 && (
@@ -218,13 +331,14 @@ export function RetroPanel({
           {current.retros.length > 0 && (
             <ul className="mt-2 space-y-1.5">
               {current.retros.map((r) => (
-                <RetroItem key={r.retrospectiveId} retro={r} />
+                <RetroItem key={r.retrospectiveId} retro={r} goalCategoryId={current.goalCategoryId} />
               ))}
             </ul>
           )}
 
           {future ? (
             <p className="text-ink-3 bg-subtle mt-3 rounded-xl px-3 py-3 text-[13px]">
+              <TrackView event={HE.retroFutureBlockedView} />
               앞날은 아직 기록할 수 없어요. 그날이 되면 남겨 주세요.
             </p>
           ) : current.checkIn ? (
@@ -235,22 +349,29 @@ export function RetroPanel({
               date={today}
               checkIn={current.checkIn}
               prompt={promptOf(current)}
+              goalMode={current.goalMode}
+              tracker={tracker}
               onSaved={() => {
                 setWritten((s) => new Set([...s, current.goalCategoryId]))
                 goNext(current.goalCategoryId, true)
               }}
-              onSkip={() => goNext(current.goalCategoryId, false)}
+              onSkip={(noteLength) => skip(current, noteLength)}
             />
           ) : (
             <>
               <textarea
                 ref={inputRef}
                 value={text}
-                onChange={(e) => setText(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  if (v && !text) tracker.inputStart(current.goalCategoryId, 'retro', current.goalMode)
+                  draft.current = { length: v.trim().length, goalCategoryId: current.goalCategoryId }
+                  setText(v)
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault()
-                    submit()
+                    submit('enter')
                   }
                 }}
                 rows={4}
@@ -261,7 +382,7 @@ export function RetroPanel({
               <div className="mt-2 flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => goNext(current.goalCategoryId, false)}
+                  onClick={() => skip(current, text.trim().length)}
                   className="text-ink-3 hover:text-ink text-[13px] font-semibold"
                 >
                   건너뛰기
@@ -271,7 +392,7 @@ export function RetroPanel({
                   className="ml-auto"
                   loading={create.isPending}
                   disabled={!text.trim()}
-                  onClick={submit}
+                  onClick={() => submit('button')}
                 >
                   저장하고 다음
                   <ArrowRight className="size-3.5" />
@@ -283,6 +404,10 @@ export function RetroPanel({
         </div>
       ) : (
         <div className="mt-5 py-4 text-center">
+          <TrackView
+            event={HE.retroAllDoneView}
+            props={{ written_count: written.size, active_goal_count: active.length }}
+          />
           <p className="text-[15px] font-bold">오늘 회고를 모두 남겼어요 🎉</p>
           <p className="text-ink-3 mt-1 text-[13px]">더 쓰고 싶은 목표가 있으면 위에서 골라 주세요.</p>
         </div>
@@ -291,11 +416,26 @@ export function RetroPanel({
   )
 }
 
-function RetroItem({ retro }: { retro: HomeRetro }) {
+function RetroItem({ retro, goalCategoryId }: { retro: HomeRetro; goalCategoryId: number }) {
   const update = useUpdateRetro()
   const remove = useDeleteRetro()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(retro.content)
+  const { trackHome } = useHomeAnalytics()
+  const result = (action: 'update' | 'delete') => ({
+    onSuccess: () => trackHome(HE.retroSaveResult, { retro_action: action, result: 'success', goal_category_id: goalCategoryId }),
+    onError: (e: unknown) =>
+      trackHome(HE.retroSaveResult, {
+        retro_action: action,
+        result: 'fail',
+        error_status: errorStatusOf(e),
+        goal_category_id: goalCategoryId,
+      }),
+  })
+  const cancelEdit = (method: 'cancel_button' | 'esc') => {
+    trackHome(HE.retroEditCancelClick, { close_method: method })
+    setEditing(false)
+  }
 
   if (editing) {
     return (
@@ -304,25 +444,33 @@ function RetroItem({ retro }: { retro: HomeRetro }) {
           autoFocus
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === 'Escape' && setEditing(false)}
+          onKeyDown={(e) => e.key === 'Escape' && cancelEdit('esc')}
           rows={2}
           aria-label="회고 고치기"
           className={`${inlineInput} h-auto resize-none py-2 text-[14px] leading-relaxed`}
         />
         <div className="mt-1.5 flex justify-end gap-2">
-          <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+          <Button size="sm" variant="ghost" onClick={() => cancelEdit('cancel_button')}>
             취소
           </Button>
           <Button
             size="sm"
             loading={update.isPending}
             disabled={!value.trim()}
-            onClick={() =>
+            onClick={() => {
+              trackHome(HE.retroEditSaveClick, { content_length: value.trim().length })
+              const r = result('update')
               update.mutate(
                 { retrospectiveId: retro.retrospectiveId, content: value.trim() },
-                { onSuccess: () => setEditing(false) }
+                {
+                  onSuccess: () => {
+                    r.onSuccess()
+                    setEditing(false)
+                  },
+                  onError: r.onError,
+                }
               )
-            }
+            }}
           >
             저장
           </Button>
@@ -337,6 +485,7 @@ function RetroItem({ retro }: { retro: HomeRetro }) {
         <button
           type="button"
           onClick={() => {
+            trackHome(HE.retroEditClick, { goal_category_id: goalCategoryId })
             setValue(retro.content)
             setEditing(true)
           }}
@@ -347,7 +496,10 @@ function RetroItem({ retro }: { retro: HomeRetro }) {
         </button>
         <button
           type="button"
-          onClick={() => remove.mutate(retro.retrospectiveId)}
+          onClick={() => {
+            trackHome(HE.retroDeleteClick, { goal_category_id: goalCategoryId })
+            remove.mutate(retro.retrospectiveId, result('delete'))
+          }}
           aria-label="회고 지우기"
           className="text-ink-4 hover:text-danger p-0.5"
         >
@@ -356,4 +508,15 @@ function RetroItem({ retro }: { retro: HomeRetro }) {
       </span>
     </li>
   )
+}
+
+/** 화면에 보일 때 한 번 보내는 이벤트 (view_date · date_relation 자동) */
+function TrackView({ event, props }: { event: Parameters<ReturnType<typeof useHomeAnalytics>['trackHome']>[0]; props?: Record<string, number> }) {
+  const { trackHome } = useHomeAnalytics()
+  useEffect(() => {
+    trackHome(event, props)
+    // 보일 때 한 번만
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return null
 }

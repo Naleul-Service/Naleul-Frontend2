@@ -9,15 +9,18 @@ export function TaskCheck({
   label,
   onToggle,
   disabled,
+  onDisabledPress,
   size = 'md',
 }: {
   done: boolean
   label: string
   onToggle: () => void
   disabled?: boolean
+  /** 비활성 체크를 눌렀을 때 — disabled 버튼은 click 이 안 나서 감싼 span 의 pointerdown 으로 잡아요 */
+  onDisabledPress?: () => void
   size?: 'sm' | 'md'
 }) {
-  return (
+  const button = (
     <button
       type="button"
       onClick={onToggle}
@@ -32,5 +35,11 @@ export function TaskCheck({
     >
       <Check className={size === 'sm' ? 'size-3' : 'size-3.5'} strokeWidth={3.5} />
     </button>
+  )
+  if (!disabled || !onDisabledPress) return button
+  return (
+    <span className="contents" onPointerDown={onDisabledPress}>
+      {button}
+    </span>
   )
 }

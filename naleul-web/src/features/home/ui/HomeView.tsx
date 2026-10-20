@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
 import { ChevronLeft, ChevronRight, PencilLine, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
@@ -10,20 +10,36 @@ import { useHabitHome, useToggleHabitCheck, type Habit } from '@/features/habit/
 import { useTimetable, useToggleComplete } from '@/features/timetable/api'
 import { addDays, formatMinutes, monthOf, dayOfMonth, nowKst, weekdayIndex } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
+import { usePageEngagement } from '@/components/analytics/usePageEngagement'
+import { track, type EventProps } from '@/lib/client/analytics'
 import { useHomeToday } from '../api'
+import { dateRelationOf, errorStatusOf, HE, HomeAnalyticsProvider, layoutBreakpoint } from '../analytics'
 import { agendaOf, inLabel, isDone, isRoutineTask, startMinutes, tasksOfDay } from '../today'
 import { HomeDayCalendar } from './HomeDayCalendar'
 import { TodayRoutines, TodayTasks } from './TodayChecklist'
-import { RetroPanel, hasRecord } from './TodayRetro'
+import { RetroPanel, hasRecord, type DiscardReason } from './TodayRetro'
 import { DeadlineRoadmap, UpcomingSchedule } from './Upcoming'
 
 const WEEKDAY_FULL = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']
 
-/** 1분마다 바뀌는 지금 (한국 시간) */
-function useNow() {
+/**
+ * 1분마다 바뀌는 지금 (한국 시간).
+ * onDayChange: 날짜가 바뀌는 순간 화면이 바뀌기 "전에" 불려요 (회고 칸이 사라지기 전에 이유를 적어 두려고)
+ */
+function useNow(onDayChange?: (from: string, to: string) => void) {
   const [now, setNow] = useState(() => nowKst())
+  const cb = useRef(onDayChange)
   useEffect(() => {
-    const id = setInterval(() => setNow(nowKst()), 60_000)
+    cb.current = onDayChange
+  })
+  useEffect(() => {
+    let lastDate = nowKst().date
+    const id = setInterval(() => {
+      const next = nowKst()
+      if (next.date !== lastDate) cb.current?.(lastDate, next.date)
+      lastDate = next.date
+      setNow(next)
+    }, 60_000)
     return () => clearInterval(id)
   }, [])
   return now
@@ -38,10 +54,21 @@ function useNow() {
  *  오늘 회고는 요약의 "오늘 회고" 버튼 → 오른쪽 패널 (캘린더의 Task 추가 패널처럼)
  */
 export function HomeView({ userName }: { userName: string }) {
-  const now = useNow()
-  const realToday = now.date
   // 날짜 ‹ › 로 고른 날 (null = 오늘을 따라가요 — 자정이 지나면 저절로 다음 날)
   const [picked, setPicked] = useState<string | null>(null)
+  const pickedRef = useRef(picked)
+  useEffect(() => {
+    pickedRef.current = picked
+  })
+  // 회고 칸이 사라질 때 읽는 "버려진 이유"
+  const discardReason = useRef<DiscardReason>('page_leave')
+  // 오늘을 보던 채로 자정이 지나 다음 날로 바뀜
+  const now = useNow((from, to) => {
+    if (pickedRef.current !== null) return
+    discardReason.current = 'day_rollover'
+    track(HE.dayRollover, { from_date: from, to_date: to })
+  })
+  const realToday = now.date
   const today = picked ?? realToday
   const isToday = today === realToday
   const isFuture = today > realToday
@@ -52,13 +79,96 @@ export function HomeView({ userName }: { userName: string }) {
   const toggle = useToggleComplete()
   const toggleHabit = useToggleHabitCheck(isToday || isFuture ? undefined : today)
   const [retroOpen, setRetroOpen] = useState(false)
-  const go = (d: string) => setPicked(d === realToday ? null : d)
+
+  // ── 분석 (노션 Tracking Plan 「홈」) ──
+  const rel = dateRelationOf(today, realToday)
+  const th = useCallback(
+    (event: Parameters<typeof track>[0], props?: EventProps) =>
+      track(event, { view_date: today, date_relation: rel, ...props }),
+    [today, rel]
+  )
+  const sent = useRef(new Set<string>())
+  const once = useCallback((key: string, fn: () => void) => {
+    if (sent.current.has(key)) return
+    sent.current.add(key)
+    fn()
+  }, [])
+  // 회고 패널: 남긴 수 · 열린 시각
+  const writtenCount = useRef(0)
+  const onWrittenChange = useCallback((n: number) => {
+    writtenCount.current = n
+  }, [])
+  const retroOpenedAt = useRef(0)
+  // 이유를 적어 둔 변경(날짜 바꿈 · 자정 · 패널 닫기)이 끝나면 다시 기본값으로
+  // (안쪽 회고 칸이 사라지며 이유를 읽은 다음에 돌아요 — 같은 커밋에서 자식 정리가 먼저)
+  useEffect(() => {
+    discardReason.current = 'page_leave'
+  }, [today, retroOpen])
+
+  const loaded = !!week.data
+  usePageEngagement('home', { view_date: today }, loaded)
+
+  // 불러오기 실패 (날짜마다 1회)
+  useEffect(() => {
+    if (week.isError) once(`load_fail:${today}`, () => th(HE.loadFail, { error_status: errorStatusOf(week.error) }))
+  }, [week.isError, week.error, today, once, th])
+  useEffect(() => {
+    if (!loaded) return
+    if (home.isError) {
+      once(`section_fail:home_today:${today}`, () =>
+        th(HE.sectionLoadFail, { failed_section: 'home_today', error_status: errorStatusOf(home.error) })
+      )
+    }
+    if (habits.isError) {
+      once(`section_fail:habits:${today}`, () =>
+        th(HE.sectionLoadFail, { failed_section: 'habits', error_status: errorStatusOf(habits.error) })
+      )
+    }
+  }, [loaded, home.isError, home.error, habits.isError, habits.error, today, once, th])
+
+  // 스크롤: 좁은 화면(lg 미만)은 페이지 25·50·75·100% / 넓은 화면은 카드 안 첫 스크롤 (카드마다 1회)
+  useEffect(() => {
+    if (!loaded) return
+    const onWindowScroll = () => {
+      if (window.innerWidth >= 1024) return
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      if (max <= 0) return
+      const pct = (window.scrollY / max) * 100
+      for (const mark of [25, 50, 75, 100]) {
+        if (pct >= mark - 1) once(`scroll:${mark}`, () => track(HE.scrollDepth, { scroll_percent: mark }))
+      }
+    }
+    const onAnyScroll = (e: Event) => {
+      if (window.innerWidth < 1024 || !(e.target instanceof HTMLElement)) return
+      const section = e.target.closest<HTMLElement>('[data-home-section]')?.dataset.homeSection
+      if (section) once(`section_scroll:${section}`, () => track(HE.sectionScroll, { section }))
+    }
+    window.addEventListener('scroll', onWindowScroll, { passive: true })
+    document.addEventListener('scroll', onAnyScroll, { capture: true, passive: true })
+    return () => {
+      window.removeEventListener('scroll', onWindowScroll)
+      document.removeEventListener('scroll', onAnyScroll, { capture: true })
+    }
+  }, [loaded, once])
+
+  // 눌릴 것처럼 보이지만 반응 없는 곳 (data-dead="...") — 많이 눌리면 링크로 바꿀 후보
+  const onDeadClick = (e: MouseEvent<HTMLElement>) => {
+    if (!(e.target instanceof Element)) return
+    const target = e.target.closest<HTMLElement>('[data-dead]')?.dataset.dead
+    if (target) th(HE.deadClick, { dead_target: target })
+  }
+
+  const go = (d: string, event: typeof HE.datePrevClick | typeof HE.dateNextClick | typeof HE.dateTodayClick) => {
+    track(event, { from_date: today, to_date: d, date_relation: dateRelationOf(d, realToday) })
+    discardReason.current = 'date_change'
+    setPicked(d === realToday ? null : d)
+  }
   const nav = {
     today,
     isToday,
-    onPrev: () => go(addDays(today, -1)),
-    onNext: () => go(addDays(today, 1)),
-    onToday: () => go(realToday),
+    onPrev: () => go(addDays(today, -1), HE.datePrevClick),
+    onNext: () => go(addDays(today, 1), HE.dateNextClick),
+    onToday: () => go(realToday, HE.dateTodayClick),
   }
 
   if (week.isPending) {
@@ -78,7 +188,15 @@ export function HomeView({ userName }: { userName: string }) {
         <Card className="p-8 text-center">
           <p className="font-bold">{isToday ? '오늘' : '이날'} 일정을 불러오지 못했어요</p>
           <p className="text-ink-3 mt-1 text-sm">{week.error?.message}</p>
-          <Button className="mt-4" onClick={() => week.refetch()}>
+          <Button
+            className="mt-4"
+            onClick={() => {
+              th(HE.retryClick)
+              // 다시 실패하면 load_fail 을 또 남겨요
+              sent.current.delete(`load_fail:${today}`)
+              week.refetch()
+            }}
+          >
             다시 시도
           </Button>
         </Card>
@@ -93,30 +211,99 @@ export function HomeView({ userName }: { userName: string }) {
   const togglingId = toggle.isPending ? (toggle.variables?.taskId ?? null) : null
 
   // 완료하면 캘린더 · 홈(목표별 오늘 끝낸 일 · 마감)이 같이 다시 불러와져요 (timetable/api 의 공통 처리)
-  const onToggle = (t: TimeBlockTask) => toggle.mutate(t)
-  const onToggleHabit = (h: Habit) => toggleHabit.mutate({ habit: h, day: today })
+  const onToggle = (t: TimeBlockTask) =>
+    toggle.mutate(t, checkResult(isRoutineTask(t) ? 'routine' : 'task', isDone(t) ? 'uncomplete' : 'complete'))
+  const onToggleHabit = (h: Habit) =>
+    toggleHabit.mutate({ habit: h, day: today }, checkResult('habit', h.checked ? 'uncomplete' : 'complete'))
 
   const retroLeft = (home.data?.goals ?? []).filter((g) => g.activeToday && !hasRecord(g)).length
   // 앞날은 습관을 체크할 수 없어서 빼요 (루틴 Task 는 보여요)
   const habitsShown = isFuture ? undefined : habits.data
 
+  // 체크 결과 (성공 / 실패 · 되돌림) — 둘러보기 401 도 fail 로 남고 로그인 모달이 떠요
+  const checkResult = (itemType: 'task' | 'routine' | 'habit', action: 'complete' | 'uncomplete') => ({
+    onSuccess: () => th(HE.checkResult, { item_type: itemType, check_action: action, result: 'success' }),
+    onError: (e: unknown) =>
+      th(HE.checkResult, { item_type: itemType, check_action: action, result: 'fail', error_status: errorStatusOf(e) }),
+  })
+
+  // home.pageview — 일정을 다 불러와 화면이 그려진 직후 (이 화면에 들어올 때마다 1회)
+  const agendaTasks = agendaOf(day).flatMap((it) => (it.kind === 'task' ? [it] : []))
+  const habitTotal = habitsShown?.scheduledCount ?? 0
+  const habitDone = habitsShown?.doneCount ?? 0
+  const doneCount = tasks.filter(isDone).length + routines.filter(isDone).length + habitDone
+  const totalCount = tasks.length + routines.length + habitTotal
+  const deadlines = home.data?.deadlines ?? []
+  const openAgenda = agendaTasks.filter((a) => !isDone(a.task))
+  const focusState = !isToday
+    ? 'hidden'
+    : openAgenda.some((a) => a.start <= now.minutes && now.minutes < a.end)
+      ? 'current'
+      : openAgenda.some((a) => a.start > now.minutes)
+        ? 'next'
+        : 'none'
+  const sendPageview = () =>
+    once('pageview', () =>
+    th(HE.pageview, {
+      total_count: totalCount,
+      done_count: doneCount,
+      progress_percent: totalCount ? Math.round((doneCount / totalCount) * 100) : 0,
+      task_count: tasks.length,
+      routine_count: routines.length,
+      habit_count: habitTotal,
+      retro_left_count: retroLeft,
+      due_today_count: deadlines.filter((d) => d.dDay === 0).length,
+      overdue_count: deadlines.filter((d) => d.overdue).length,
+      focus_state: focusState,
+      layout_breakpoint: layoutBreakpoint(),
+    })
+  )
+
+  const openRetro = () => {
+    th(HE.retroButtonClick, { retro_left_count: retroLeft })
+    if (retroOpen) return
+    const goals = home.data?.goals
+    th(HE.retroPanelView, {
+      goal_count: goals?.length,
+      active_goal_count: goals?.filter((g) => g.activeToday).length,
+      retro_done_count: goals?.filter((g) => g.activeToday && hasRecord(g)).length,
+      layout_breakpoint: layoutBreakpoint(),
+    })
+    retroOpenedAt.current = Date.now()
+    setRetroOpen(true)
+  }
+  const closeRetro = (method: 'x_button' | 'esc') => {
+    th(HE.retroPanelClose, {
+      close_method: method,
+      written_count: writtenCount.current,
+      open_duration_seconds: Math.round((Date.now() - retroOpenedAt.current) / 1000),
+    })
+    discardReason.current = 'panel_close'
+    setRetroOpen(false)
+  }
+
   return (
     // 넓은 화면(lg~): 한 화면에 다 보이게 — 요약 한 줄 + 칸 나누기(캘린더 1/3 · 나머지 2×2), 넘치면 칸 안에서 스크롤
     // 회고 패널이 열리면 아주 넓은 화면(2xl~)에선 옆으로 비켜서 나란히, 그보다 좁으면 위에 덮어요
-    <div className={cn('flex flex-col gap-4 lg:h-[calc(100dvh-4rem)] lg:min-h-[640px]', retroOpen && '2xl:pr-[416px]')}>
+    <HomeAnalyticsProvider viewDate={today}>
+    <RunOnMount run={sendPageview} />
+    <div
+      onClick={onDeadClick}
+      className={cn('flex flex-col gap-4 lg:h-[calc(100dvh-4rem)] lg:min-h-[640px]', retroOpen && '2xl:pr-[416px]')}
+    >
       <Summary
         userName={userName}
         nav={nav}
         nowMinutes={now.minutes}
         tasks={tasks}
         routines={routines}
-        habitDone={habitsShown?.doneCount ?? 0}
-        habitTotal={habitsShown?.scheduledCount ?? 0}
-        agendaTasks={agendaOf(day).flatMap((it) => (it.kind === 'task' ? [it] : []))}
-        dueToday={(home.data?.deadlines ?? []).filter((d) => d.dDay === 0).length}
-        overdue={(home.data?.deadlines ?? []).filter((d) => d.overdue).length}
+        habitDone={habitDone}
+        habitTotal={habitTotal}
+        agendaTasks={agendaTasks}
+        dueToday={deadlines.filter((d) => d.dDay === 0).length}
+        overdue={deadlines.filter((d) => d.overdue).length}
         retroLeft={retroLeft}
-        onRetro={() => setRetroOpen(true)}
+        onRetro={openRetro}
       />
 
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-3 lg:grid-rows-2">
@@ -144,13 +331,22 @@ export function HomeView({ userName }: { userName: string }) {
       {retroOpen && (
         <RetroSidePanel
           title={isToday ? '오늘 회고' : `${monthOf(today)}월 ${dayOfMonth(today)}일 회고`}
-          onClose={() => setRetroOpen(false)}
+          onClose={closeRetro}
         >
           {/* 날짜가 바뀌면 입력 중이던 상태를 새로 시작해요 */}
-          <RetroPanel key={today} goals={home.data?.goals} today={today} failed={home.isError} bare />
+          <RetroPanel
+            key={today}
+            goals={home.data?.goals}
+            today={today}
+            failed={home.isError}
+            bare
+            discardReason={discardReason}
+            onWrittenChange={onWrittenChange}
+          />
         </RetroSidePanel>
       )}
     </div>
+    </HomeAnalyticsProvider>
   )
 }
 
@@ -161,7 +357,7 @@ function RetroSidePanel({
   children,
 }: {
   title: string
-  onClose: () => void
+  onClose: (method: 'x_button' | 'esc') => void
   children: React.ReactNode
 }) {
   // Esc 로 닫기 — 입력 중이거나 다른 창(모달 · 팝오버)이 떠 있으면 그쪽이 먼저
@@ -170,7 +366,7 @@ function RetroSidePanel({
       if (e.key !== 'Escape' || e.defaultPrevented) return
       const el = e.target instanceof HTMLElement ? e.target : null
       if (el?.closest('input, textarea, select, [role="dialog"]')) return
-      onClose()
+      onClose('esc')
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
@@ -186,7 +382,7 @@ function RetroSidePanel({
         <p className="text-[16px] font-bold">{title}</p>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => onClose('x_button')}
           aria-label={`${title} 닫기`}
           className="text-ink-3 hover:bg-subtle hover:text-ink ml-auto rounded-lg p-1.5"
         >
@@ -310,7 +506,7 @@ function Summary({
         </h1>
       </div>
 
-      <div className="flex min-w-[180px] items-center gap-3">
+      <div data-dead="progress" className="flex min-w-[180px] items-center gap-3">
         <span className="text-[26px] leading-none font-bold tabular-nums">{percent}%</span>
         <div>
           <div className="h-1.5 w-28 overflow-hidden rounded-full bg-white/15">
@@ -325,13 +521,21 @@ function Summary({
       </div>
 
       <div className="flex flex-wrap gap-1.5 text-[12px]">
-        {dueToday > 0 && <Pill tone="warning">오늘 마감 {dueToday}</Pill>}
-        {overdue > 0 && <Pill tone="danger">마감 지남 {overdue}</Pill>}
+        {dueToday > 0 && (
+          <Pill tone="warning" dead="due_pill">
+            오늘 마감 {dueToday}
+          </Pill>
+        )}
+        {overdue > 0 && (
+          <Pill tone="danger" dead="overdue_pill">
+            마감 지남 {overdue}
+          </Pill>
+        )}
       </div>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {isToday && (
-          <div className="max-w-[260px] min-w-0 rounded-xl bg-white/8 px-3 py-1.5">
+          <div data-dead="focus_box" className="max-w-[260px] min-w-0 rounded-xl bg-white/8 px-3 py-1.5">
             <p className="text-[11px] font-semibold text-white/60">{current ? '지금 할 일' : '다음 일정'}</p>
             {focus ? (
               <p className="truncate text-[13px] font-bold">
@@ -358,9 +562,10 @@ function Summary({
   )
 }
 
-function Pill({ children, tone }: { children: React.ReactNode; tone?: 'danger' | 'warning' }) {
+function Pill({ children, tone, dead }: { children: React.ReactNode; tone?: 'danger' | 'warning'; dead?: string }) {
   return (
     <span
+      data-dead={dead}
       className={cn(
         'rounded-full px-2.5 py-0.5 font-semibold tabular-nums',
         tone === 'danger'
@@ -373,4 +578,14 @@ function Pill({ children, tone }: { children: React.ReactNode; tone?: 'danger' |
       {children}
     </span>
   )
+}
+
+/** 화면이 그려진 직후 한 번 실행 (렌더 중에 이벤트를 보내지 않으려고) */
+function RunOnMount({ run }: { run: () => void }) {
+  useEffect(() => {
+    run()
+    // 처음 그려질 때 한 번만
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return null
 }
