@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
-import { TaskAddView, type TaskAddedInfo } from './TaskAddView'
+import { track } from '@/lib/client/analytics'
+import { TaskAddView, type TaskAddedInfo, type TaskAddViewHandle } from './TaskAddView'
 
 /** 패널 폭 — 캘린더는 이만큼 비켜서 나란히 보여요 (xl 이상) */
 export const TASK_PANEL_WIDTH = 420
@@ -22,12 +23,20 @@ export function TaskAddPanel({
   onClose: () => void
   onAdded: (info: TaskAddedInfo) => void
 }) {
+  const viewRef = useRef<TaskAddViewHandle>(null)
+  /** 닫기 — 적던 내용은 확인 없이 사라져서 has_input 으로 남겨요 */
+  const closeWith = (method: 'x_button' | 'esc') => {
+    track('task_add.panel_close', { ...viewRef.current?.closeInfo(), close_method: method })
+    onClose()
+  }
+
   // Esc 로 닫기 — 입력 중이거나 다른 창(모달·팝오버)이 떠 있으면 그쪽이 먼저
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented) return
       const el = e.target instanceof HTMLElement ? e.target : null
       if (el?.closest('input, textarea, select, [role="dialog"]')) return
+      track('task_add.panel_close', { ...viewRef.current?.closeInfo(), close_method: 'esc' })
       onClose()
     }
     document.addEventListener('keydown', onKey)
@@ -44,7 +53,7 @@ export function TaskAddPanel({
         <p className="text-ink-3 hidden text-xs sm:block">캘린더를 보면서 추가해요</p>
         <button
           type="button"
-          onClick={onClose}
+          onClick={() => closeWith('x_button')}
           aria-label="Task 추가 닫기"
           className="text-ink-3 hover:bg-subtle hover:text-ink ml-auto rounded-lg p-1.5"
         >
@@ -52,7 +61,7 @@ export function TaskAddPanel({
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-        <TaskAddView key={mode} variant="panel" initialMode={mode} onAdded={onAdded} />
+        <TaskAddView ref={viewRef} key={mode} variant="panel" initialMode={mode} onAdded={onAdded} />
       </div>
     </aside>
   )

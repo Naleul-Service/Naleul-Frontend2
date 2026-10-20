@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { TaskAddPanel } from '@/features/brain-dump/ui/TaskAddPanel'
+import { track } from '@/lib/client/analytics'
 import { useActivities, useTimetable } from '../api'
 import { visibleHours } from '../layout'
 import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst } from '../time'
@@ -288,14 +289,41 @@ export function CalendarView() {
             const inView = (d: string) => d >= start && d <= end
             // AI로 정리한 Task 는 바로 놓지 않고 점선으로 먼저 보여 줘요 → 아래 바에서 "이대로 진행할까요?"
             if (info.pendingTaskIds?.length) {
+              const pendingCount = info.pendingTaskIds.length
+              // Esc 로 취소하면 final 이 비어 와서, 받은 제안 수를 따로 기억해요 (task_add_result.proposal_resolve)
+              let unscheduledCount = 0
+              const surface = 'calendar_panel'
               previewFill(
                 { taskIds: info.pendingTaskIds },
                 {
                   kind: 'new',
                   onPreview: (r) => {
+                    unscheduledCount = r.unscheduled.length
+                    track('task_add_result.proposal_ready', {
+                      surface,
+                      result: 'success',
+                      placed_count: r.proposals.length,
+                      unscheduled_count: r.unscheduled.length,
+                    })
                     const first = r.proposals.map((p) => p.date).sort()[0] ?? info.date
                     if (first && !inView(first)) go({ date: first })
                   },
+                  onResolve: (applied, final) => {
+                    track('task_add_result.proposal_resolve', {
+                      surface,
+                      proposal_applied: applied,
+                      dragged_count: final.filter((p) => p.start !== p.proposedStart || p.end !== p.proposedEnd).length,
+                      placed_count: applied ? final.length : 0,
+                      unscheduled_count: applied ? unscheduledCount : pendingCount,
+                    })
+                  },
+                  onError: () =>
+                    track('task_add_result.proposal_ready', {
+                      surface,
+                      result: 'fail',
+                      placed_count: 0,
+                      unscheduled_count: pendingCount,
+                    }),
                 }
               )
               return

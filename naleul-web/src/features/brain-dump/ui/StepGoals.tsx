@@ -1,15 +1,18 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AlertCircle, CalendarClock, Clock, Pencil, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import type { GoalCategory } from '@/features/goal/api'
 import { hexOf } from '@/features/timetable/layout'
 import { formatDuration, formatMonthDay } from '@/features/timetable/time'
-import type { ConfirmItem, TempGoalInput } from '../types'
+import type { ConfirmItem, ConfirmResponse, TempGoalInput } from '../types'
+import type { TaskAddSurface } from '../analytics'
 import { ItemEditModal } from './ItemEditModal'
 
 /** 2단계에서 고치는 Task 하나 = 확정 요청 Item + AI 가 붙인 연결 이유 */
@@ -18,6 +21,51 @@ export interface MapItem extends ConfirmItem {
 }
 
 export const MAX_TEMP_GOALS = 5
+
+/** 연결된 목표 종류 (노션 goal_match) — existing: 내 목표 / temp: 이번 임시 목표 / none: 없음 */
+export const goalMatchOf = (i: Pick<ConfirmItem, 'goalCategoryId' | 'tempGoalKey'>) =>
+  i.goalCategoryId ? 'existing' : i.tempGoalKey ? 'temp' : 'none'
+
+/**
+ * task_add_goals.confirm_result — 저장 요청 결과는 부모(TaskAddView)의 confirm.mutate 콜백에서만 알 수 있어요.
+ * 부모가 onSuccess 맨 앞에서 { res }, onError 에서 { error } 로 한 번 불러 주세요.
+ * tempCount = 요청에 담은 임시 목표 수.
+ */
+export function trackGoalsConfirmResult(
+  surface: TaskAddSurface,
+  outcome: { res: ConfirmResponse } | { error: unknown },
+  tempCount: number
+) {
+  if ('error' in outcome) {
+    track('task_add_goals.confirm_result', {
+      surface,
+      result: 'fail',
+      error_status: errorStatusOf(outcome.error) ?? 0,
+      temp_count: tempCount,
+    })
+    return
+  }
+  const { res } = outcome
+  if (!res.created) {
+    track('task_add_goals.confirm_result', {
+      surface,
+      result: 'conflict',
+      conflict_count: res.conflicts.length,
+      temp_count: tempCount,
+    })
+    return
+  }
+  track('task_add_goals.confirm_result', {
+    surface,
+    result: 'success',
+    conflict_count: res.conflicts.length,
+    placed_count: res.placements.length,
+    moved_count: res.movedToOtherDays.length,
+    unscheduled_count: res.unscheduled.length,
+    pending_count: (res.pending ?? []).length,
+    temp_count: tempCount,
+  })
+}
 
 interface Props {
   items: MapItem[]
@@ -32,6 +80,8 @@ interface Props {
   onChange: (items: MapItem[], tempGoals: TempGoalInput[]) => void
   onBack: () => void
   onConfirm: () => void
+  /** 어느 화면에서 열렸는지 (task_add_goals.* · task_add_item_edit.* 의 surface) */
+  surface?: TaskAddSurface
 }
 
 type Group = { key: string; title: string; emoji?: string | null; color: string; temp: boolean; items: MapItem[] }
@@ -54,8 +104,14 @@ export function StepGoals({
   onChange,
   onBack,
   onConfirm,
+  surface = 'page',
 }: Props) {
   const [editing, setEditing] = useState<MapItem | null>(null)
+  /** 2단계에서 "변경 → 저장"으로 실제로 바뀐 Task (edited_count) */
+  const edited = useRef(new Set<string>())
+  const viewed = useRef(false)
+  /** 임시 목표 이름 칸에 들어갈 때의 값 — 벗어날 때 바뀌었으면 temp_rename */
+  const renameFrom = useRef<string | null>(null)
 
   const groups: Group[] = []
   const byKey = new Map<string, Group>()
@@ -88,6 +144,57 @@ export function StepGoals({
   groups.sort((a, b) => (a.key === 'none' ? -1 : b.key === 'none' ? 1 : 0))
   const missing = items.filter((i) => !i.goalCategoryId && !i.tempGoalKey).length
   const blankTemp = tempGoals.some((t) => !t.name.trim())
+  const usedTempCount = tempGoals.filter((t) => items.some((i) => i.tempGoalKey === t.tempKey)).length
+  /** 화면에 보이는 순서 (목표 없는 묶음이 맨 위) — list_position */
+  const order = groups.flatMap((g) => g.items.map((i) => i.clientKey))
+
+  useEffect(() => {
+    if (viewed.current) return
+    viewed.current = true
+    track('task_add_goals.view', {
+      surface,
+      item_count: items.length,
+      missing_goal_count: missing,
+      temp_count: usedTempCount,
+      ai_failed: aiFailed,
+      ai_limited: aiLimited,
+    })
+  }, [surface, items.length, missing, usedTempCount, aiFailed, aiLimited])
+
+  const openEdit = (it: MapItem) => {
+    track('task_add_goals.edit_open', {
+      surface,
+      list_position: order.indexOf(it.clientKey),
+      goal_match: goalMatchOf(it),
+      has_conflict: !!conflicts[it.clientKey],
+    })
+    setEditing(it)
+  }
+
+  const back = () => {
+    track('task_add_goals.back_click', { surface, item_count: items.length, edited_count: edited.current.size })
+    onBack()
+  }
+
+  const confirmBlocked = missing > 0 || blankTemp
+  const onConfirmPointerDown = () => {
+    if (loading || !confirmBlocked) return
+    track('task_add_goals.confirm_blocked', {
+      surface,
+      disabled_reason: missing > 0 ? 'no_goal' : 'blank_temp',
+      missing_goal_count: missing,
+    })
+  }
+  const confirm = () => {
+    track('task_add_goals.confirm_click', {
+      surface,
+      item_count: items.length,
+      temp_count: usedTempCount,
+      timed_count: items.filter((i) => i.dateType === 'ON' && !!i.startTime).length,
+      edited_count: edited.current.size,
+    })
+    onConfirm()
+  }
 
   const renameTemp = (tempKey: string, name: string) =>
     onChange(
@@ -95,7 +202,8 @@ export function StepGoals({
       tempGoals.map((t) => (t.tempKey === tempKey ? { ...t, name: name.slice(0, 30) } : t))
     )
 
-  const save = (next: MapItem, newTemp?: TempGoalInput) => {
+  const save = (next: MapItem, newTemp?: TempGoalInput, changedFields: string[] = []) => {
+    if (changedFields.length) edited.current.add(next.clientKey)
     const list = items.map((i) => (i.clientKey === next.clientKey ? next : i))
     const temps = newTemp ? [...tempGoals, newTemp] : tempGoals
     // 아무 Task 도 가리키지 않는 임시 목표는 만들지 않아요
@@ -143,6 +251,13 @@ export function StepGoals({
                   <input
                     value={g.title}
                     onChange={(e) => renameTemp(g.key.slice(2), e.target.value)}
+                    onFocus={(e) => (renameFrom.current = e.target.value)}
+                    onBlur={(e) => {
+                      const from = renameFrom.current
+                      renameFrom.current = null
+                      if (from === null || from === e.target.value) return
+                      track('task_add_goals.temp_rename', { surface, text_length: e.target.value.trim().length })
+                    }}
                     aria-label="임시 목표 이름"
                     size={Math.max(g.title.length * 2, 6)}
                     className="focus:border-brand min-w-0 border-b border-transparent bg-transparent text-[15px] font-bold outline-none"
@@ -165,7 +280,7 @@ export function StepGoals({
                   item={it}
                   goals={goals}
                   conflict={conflicts[it.clientKey]}
-                  onEdit={() => setEditing(it)}
+                  onEdit={() => openEdit(it)}
                 />
               ))}
             </ul>
@@ -176,12 +291,15 @@ export function StepGoals({
       <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
         {missing > 0 && <span className="text-danger text-sm">{missing}개 Task의 목표를 골라 주세요</span>}
         {blankTemp && <span className="text-danger text-sm">임시 목표 이름을 입력해 주세요</span>}
-        <Button variant="secondary" onClick={onBack} disabled={loading}>
+        <Button variant="secondary" onClick={back} disabled={loading}>
           이전
         </Button>
-        <Button onClick={onConfirm} disabled={missing > 0 || blankTemp || loading} loading={loading}>
-          TimeBlock 만들기
-        </Button>
+        {/* disabled 버튼은 click 이 안 나서 감싼 요소의 pointerdown 으로 막힌 클릭을 잡아요 */}
+        <span className="contents" onPointerDown={onConfirmPointerDown}>
+          <Button onClick={confirm} disabled={confirmBlocked || loading} loading={loading}>
+            TimeBlock 만들기
+          </Button>
+        </span>
       </div>
 
       {editing && (
@@ -195,6 +313,7 @@ export function StepGoals({
           canAddTemp={tempGoals.length < MAX_TEMP_GOALS}
           onSave={save}
           onClose={() => setEditing(null)}
+          surface={surface}
         />
       )}
     </Card>

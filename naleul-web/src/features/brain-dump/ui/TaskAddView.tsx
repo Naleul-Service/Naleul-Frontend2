@@ -1,24 +1,43 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import { CalendarCheck, Check, NotebookPen, PenLine, RotateCcw, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { cn } from '@/lib/cn'
 import { isApiError } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { toast } from '@/stores/toastStore'
 import { useGoalCategories } from '@/features/goal/api'
 import { isOngoing } from '@/features/goal/format'
 import { formatMonthDay, hm, todayKst } from '@/features/timetable/time'
 import { LogDoneView } from '@/features/record/ui/LogDoneView'
+import type { TaskAddSurface } from '../analytics'
 import { useConfirmBrainDump, useParseBrainDump, useTaskQuota } from '../api'
 import type { ConfirmResponse, ParseResponse, TempGoalInput } from '../types'
 import { ManualTaskAdd } from './ManualTaskAdd'
-import { StepGoals, type MapItem } from './StepGoals'
+import { StepGoals, trackGoalsConfirmResult, type MapItem } from './StepGoals'
 import { StepInput, type DumpLine } from './StepInput'
 import { StepResult } from './StepResult'
 
 const STEPS = ['Task 입력', '목표 연결', 'TimeBlock 확인'] as const
+/** task_add.* 의 ai_step — STEPS 순서 그대로 */
+const AI_STEPS = ['input', 'goals', 'result'] as const
+
+type AddMode = 'ai' | 'manual' | 'log'
+
+/** 패널이 닫힐 때(task_add.panel_close) 부모가 읽는 지금 상태 */
+export interface TaskAddViewHandle {
+  closeInfo: () => { add_mode: AddMode; ai_step?: (typeof AI_STEPS)[number]; has_input: boolean }
+}
+
+/** 화면에 글자가 적힌 입력칸이 있는지 (탭을 바꾸거나 패널을 닫으면 확인 없이 사라지는 내용) — 원문은 보내지 않아요 */
+const hasTypedInput = (root: HTMLElement | null) =>
+  !!root &&
+  Array.from(
+    root.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('textarea, input:not([type]), input[type="text"]')
+  ).some((el) => el.value.trim().length > 0)
 
 /** "15:00:00" → "15:00" */
 const toHm = (t?: string | null) => (t ? t.slice(0, 5) : null)
@@ -67,13 +86,17 @@ export function TaskAddView({
   initialMode = 'ai',
   variant = 'page',
   onAdded,
+  ref,
 }: {
   initialMode?: 'ai' | 'manual' | 'log'
   /** page = /tasks/new 화면 · panel = 캘린더 오른쪽 패널 (좁은 폭, 결과는 옆 캘린더에서 확인) */
   variant?: 'page' | 'panel'
   onAdded?: (info: TaskAddedInfo) => void
+  /** 캘린더 옆 패널이 닫힐 때 지금 방식·단계·적던 내용 여부를 읽어요 */
+  ref?: Ref<TaskAddViewHandle>
 }) {
   const panel = variant === 'panel'
+  const surface: TaskAddSurface = panel ? 'calendar_panel' : 'page'
   const today = todayKst()
   // 목표 만들기처럼 "AI로 정리하기 / 직접 추가하기" 중에서 골라요
   // 할 일을 적거나(ai·manual), 이미 한 일을 기록하거나(log)
@@ -93,9 +116,53 @@ export function TaskAddView({
   const confirm = useConfirmBrainDump()
   const ongoingGoals = (goals.data ?? []).filter((g) => isOngoing(g.goalCategoryStatus))
 
+  // ── 분석 ──
+  const contentRef = useRef<HTMLDivElement>(null)
+  /** 지금 방식에 적어 둔 내용이 있는지 — AI 정리는 저장(3단계) 전까지 줄 목록도 내용이에요 */
+  const hasInput = () => {
+    if (mode === 'ai') return step < 2 && (lines.length > 0 || hasTypedInput(contentRef.current))
+    return hasTypedInput(contentRef.current)
+  }
+  useImperativeHandle(ref, () => ({
+    closeInfo: () => ({
+      add_mode: mode,
+      ai_step: mode === 'ai' ? AI_STEPS[step] : undefined,
+      has_input: hasInput(),
+    }),
+  }))
+
+  // 화면/패널 열림 — 오늘 남은 개수를 받은 뒤(실패해도) 한 번
+  const viewSent = useRef(false)
+  useEffect(() => {
+    if (quota.isPending || viewSent.current) return
+    viewSent.current = true
+    const q = quota.data
+    track('task_add.view', {
+      surface,
+      initial_mode: initialMode,
+      is_premium: q?.premium,
+      quota_remaining: q && !q.premium ? q.remaining : undefined,
+    })
+  }, [quota.isPending, quota.data, surface, initialMode])
+
+  // 오늘 남은 개수 불러오기 실패 — 실패 상태로 바뀔 때 한 번
+  const quotaFailSent = useRef(false)
+  const quotaErrorStatus = quota.isError ? (errorStatusOf(quota.error) ?? 0) : undefined
+  useEffect(() => {
+    if (quotaErrorStatus === undefined) {
+      quotaFailSent.current = false
+      return
+    }
+    if (quotaFailSent.current) return
+    quotaFailSent.current = true
+    track('task_add.quota_load_fail', { surface, error_status: quotaErrorStatus })
+  }, [quotaErrorStatus, surface])
+
   const goParse = () => {
     const valid = lines.filter((l) => l.text.trim())
     if (!valid.length) return
+    const startedAt = Date.now()
+    const secondsElapsed = () => Math.round((Date.now() - startedAt) / 1000)
     parse.mutate(
       valid.map((l) => ({
         clientKey: l.clientKey,
@@ -109,6 +176,17 @@ export function TaskAddView({
       {
         onSuccess: (res) => {
           const mapped = toMapItems(res)
+          track('task_add_input.parse_result', {
+            surface,
+            result: 'success',
+            item_count: mapped.items.length,
+            ai_failed: res.aiFailed,
+            ai_limited: !!res.aiLimited,
+            temp_count: mapped.tempGoals.length,
+            missing_goal_count: mapped.items.filter((i) => !i.goalCategoryId && !i.generalCategoryId && !i.tempGoalKey)
+              .length,
+            seconds_elapsed: secondsElapsed(),
+          })
           setItems(mapped.items)
           setTempGoals(mapped.tempGoals)
           setAiFailed(res.aiFailed)
@@ -116,7 +194,15 @@ export function TaskAddView({
           setConflicts({})
           setStep(1)
         },
-        onError: (e) => toast.error(isApiError(e) ? e.message : '정리하지 못했어요. 다시 시도해 주세요.'),
+        onError: (e) => {
+          track('task_add_input.parse_result', {
+            surface,
+            result: 'fail',
+            error_status: errorStatusOf(e) ?? 0,
+            seconds_elapsed: secondsElapsed(),
+          })
+          toast.error(isApiError(e) ? e.message : '정리하지 못했어요. 다시 시도해 주세요.')
+        },
       }
     )
   }
@@ -148,6 +234,7 @@ export function TaskAddView({
       },
       {
         onSuccess: (res) => {
+          trackGoalsConfirmResult(surface, { res }, used.size)
           if (!res.created) {
             const map: Record<string, string> = {}
             for (const c of res.conflicts) {
@@ -183,7 +270,10 @@ export function TaskAddView({
             pendingTaskIds: pending.map((u) => u.taskId),
           })
         },
-        onError: (e) => toast.error(isApiError(e) ? e.message : '저장하지 못했어요. 다시 시도해 주세요.'),
+        onError: (e) => {
+          trackGoalsConfirmResult(surface, { error: e }, used.size)
+          toast.error(isApiError(e) ? e.message : '저장하지 못했어요. 다시 시도해 주세요.')
+        },
       }
     )
   }
@@ -220,131 +310,160 @@ export function TaskAddView({
             ['manual', PenLine, '직접 추가하기', '목표·날짜·시간을 정해서 하나씩 바로 추가해요.'],
             ['log', NotebookPen, '한 일 기록', '이미 한 일을 한 줄씩 적으면 목표에 연결해 기록으로 쌓아요.'],
           ] as const
-        ).map(([key, Icon, title, desc]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={mode === key}
-            onClick={() => setMode(key)}
-            disabled={mode === 'ai' && key !== 'ai' && step > 0 && !result}
-            title={
-              mode === 'ai' && key !== 'ai' && step > 0 && !result
-                ? 'AI 정리를 마치거나 처음으로 돌아가면 바꿀 수 있어요'
-                : panel
-                  ? desc
-                  : undefined
-            }
-            className={cn(
-              'flex rounded-2xl border text-left transition-colors disabled:opacity-40',
-              panel ? 'flex-col items-center gap-1 rounded-xl p-2 text-center' : 'items-start gap-3 p-4',
-              mode === key ? 'border-ink bg-surface ring-ink ring-1' : 'border-line bg-surface hover:border-line-strong'
-            )}
-          >
-            <span
+        ).map(([key, Icon, title, desc]) => {
+          const locked = mode === 'ai' && key !== 'ai' && step > 0 && !result
+          const tab = (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={mode === key}
+              onClick={() => {
+                track('task_add.mode_click', {
+                  surface,
+                  add_mode: key,
+                  from_mode: mode,
+                  ai_step: AI_STEPS[step],
+                  has_input: hasInput(),
+                })
+                setMode(key)
+              }}
+              disabled={locked}
+              title={locked ? 'AI 정리를 마치거나 처음으로 돌아가면 바꿀 수 있어요' : panel ? desc : undefined}
               className={cn(
-                'grid shrink-0 place-items-center rounded-xl',
-                panel ? 'size-7 rounded-lg' : 'size-9',
-                mode === key ? 'bg-ink text-on-ink' : 'bg-subtle text-ink-3'
+                'flex rounded-2xl border text-left transition-colors disabled:opacity-40',
+                panel ? 'flex-col items-center gap-1 rounded-xl p-2 text-center' : 'items-start gap-3 p-4',
+                mode === key
+                  ? 'border-ink bg-surface ring-ink ring-1'
+                  : 'border-line bg-surface hover:border-line-strong'
               )}
             >
-              <Icon className="size-4" />
+              <span
+                className={cn(
+                  'grid shrink-0 place-items-center rounded-xl',
+                  panel ? 'size-7 rounded-lg' : 'size-9',
+                  mode === key ? 'bg-ink text-on-ink' : 'bg-subtle text-ink-3'
+                )}
+              >
+                <Icon className="size-4" />
+              </span>
+              <span className="min-w-0">
+                <span className={cn('block font-bold', panel ? 'text-[12px]' : 'text-[15px]')}>{title}</span>
+                {!panel && <span className="text-ink-3 mt-0.5 block text-[13px] leading-snug">{desc}</span>}
+              </span>
+            </button>
+          )
+          if (!locked) return tab
+          // 잠긴 탭 — disabled 버튼은 click 이 안 나서 감싼 span 의 pointerdown 으로 잡아요
+          return (
+            <span
+              key={key}
+              className="contents"
+              onPointerDown={() =>
+                track('task_add.mode_locked_click', { surface, add_mode: key, ai_step: AI_STEPS[step] })
+              }
+            >
+              {tab}
             </span>
-            <span className="min-w-0">
-              <span className={cn('block font-bold', panel ? 'text-[12px]' : 'text-[15px]')}>{title}</span>
-              {!panel && <span className="text-ink-3 mt-0.5 block text-[13px] leading-snug">{desc}</span>}
-            </span>
-          </button>
-        ))}
+          )
+        })}
       </div>
 
-      {mode === 'log' ? (
-        <div className={cn('mt-4', wide)}>
-          <LogDoneView goals={ongoingGoals} />
-        </div>
-      ) : mode === 'manual' ? (
-        <div className={cn('mt-4', wide)}>
-          <ManualTaskAdd
-            inPanel={panel}
-            onCreated={(t) =>
-              onAdded?.({
-                taskIds: [t.taskId],
-                date: (t.plannedStartAt ?? t.date ?? t.scheduledDate ?? '').slice(0, 10) || null,
-              })
-            }
-          />
-        </div>
-      ) : (
-        <>
-          <ol className={cn('mb-4 flex flex-wrap items-center gap-2', panel ? 'mt-4' : 'mt-5')} aria-label="진행 단계">
-            {STEPS.map((label, i) => (
-              <li key={label} className="flex items-center gap-2" aria-current={step === i ? 'step' : undefined}>
-                <span
-                  className={cn(
-                    'grid size-6 place-items-center rounded-full text-xs font-bold',
-                    i < step ? 'bg-success text-on-ink' : i === step ? 'bg-ink text-on-ink' : 'bg-subtle text-ink-3'
-                  )}
-                >
-                  {i < step ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
-                </span>
-                <span className={cn(panel ? 'text-[12px]' : 'text-sm', i === step ? 'font-bold' : 'text-ink-3')}>
-                  {panel && i === 2 ? '확인' : label}
-                </span>
-                {i < STEPS.length - 1 && (
-                  <span className={cn('bg-line-strong mx-1 h-px', panel ? 'w-3' : 'w-6')} aria-hidden />
-                )}
-              </li>
-            ))}
-          </ol>
-
-          <div className={wide}>
-            {step === 0 && (
-              <StepInput
-                lines={lines}
-                onChange={setLines}
-                quota={quota.data}
-                quotaLoading={quota.isPending}
-                today={today}
-                loading={parse.isPending}
-                onNext={goParse}
-              />
-            )}
-            {step === 1 && (
-              <StepGoals
-                items={items}
-                tempGoals={tempGoals}
-                goals={ongoingGoals}
-                aiFailed={aiFailed}
-                aiLimited={aiLimited}
-                conflicts={conflicts}
-                today={today}
-                loading={confirm.isPending}
-                onChange={(nextItems, nextTemps) => {
-                  setItems(nextItems)
-                  setTempGoals(nextTemps)
-                  // 고친 Task 는 겹침 표시를 지워요
-                  setConflicts((c) => {
-                    const changed = nextItems.filter((n) => items.find((o) => o.clientKey === n.clientKey) !== n)
-                    if (!changed.length) return c
-                    const next = { ...c }
-                    changed.forEach((n) => delete next[n.clientKey])
-                    return next
-                  })
-                }}
-                onBack={() => setStep(0)}
-                onConfirm={goConfirm}
-              />
-            )}
-            {step === 2 &&
-              result &&
-              (panel ? (
-                <PanelResult result={result} onAddMore={reset} />
-              ) : (
-                <StepResult result={result} today={today} onAddMore={reset} />
-              ))}
+      <div ref={contentRef} className="contents">
+        {mode === 'log' ? (
+          <div className={cn('mt-4', wide)}>
+            <LogDoneView goals={ongoingGoals} surface={surface} />
           </div>
-        </>
-      )}
+        ) : mode === 'manual' ? (
+          <div className={cn('mt-4', wide)}>
+            <ManualTaskAdd
+              inPanel={panel}
+              surface={surface}
+              onCreated={(t) =>
+                onAdded?.({
+                  taskIds: [t.taskId],
+                  date: (t.plannedStartAt ?? t.date ?? t.scheduledDate ?? '').slice(0, 10) || null,
+                })
+              }
+            />
+          </div>
+        ) : (
+          <>
+            <ol
+              className={cn('mb-4 flex flex-wrap items-center gap-2', panel ? 'mt-4' : 'mt-5')}
+              aria-label="진행 단계"
+            >
+              {STEPS.map((label, i) => (
+                <li key={label} className="flex items-center gap-2" aria-current={step === i ? 'step' : undefined}>
+                  <span
+                    className={cn(
+                      'grid size-6 place-items-center rounded-full text-xs font-bold',
+                      i < step ? 'bg-success text-on-ink' : i === step ? 'bg-ink text-on-ink' : 'bg-subtle text-ink-3'
+                    )}
+                  >
+                    {i < step ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
+                  </span>
+                  <span className={cn(panel ? 'text-[12px]' : 'text-sm', i === step ? 'font-bold' : 'text-ink-3')}>
+                    {panel && i === 2 ? '확인' : label}
+                  </span>
+                  {i < STEPS.length - 1 && (
+                    <span className={cn('bg-line-strong mx-1 h-px', panel ? 'w-3' : 'w-6')} aria-hidden />
+                  )}
+                </li>
+              ))}
+            </ol>
+
+            <div className={wide}>
+              {step === 0 && (
+                <StepInput
+                  lines={lines}
+                  onChange={setLines}
+                  quota={quota.data}
+                  quotaLoading={quota.isPending}
+                  today={today}
+                  loading={parse.isPending}
+                  onNext={goParse}
+                  surface={surface}
+                />
+              )}
+              {step === 1 && (
+                <StepGoals
+                  items={items}
+                  tempGoals={tempGoals}
+                  goals={ongoingGoals}
+                  aiFailed={aiFailed}
+                  aiLimited={aiLimited}
+                  conflicts={conflicts}
+                  today={today}
+                  loading={confirm.isPending}
+                  surface={surface}
+                  onChange={(nextItems, nextTemps) => {
+                    setItems(nextItems)
+                    setTempGoals(nextTemps)
+                    // 고친 Task 는 겹침 표시를 지워요
+                    setConflicts((c) => {
+                      const changed = nextItems.filter((n) => items.find((o) => o.clientKey === n.clientKey) !== n)
+                      if (!changed.length) return c
+                      const next = { ...c }
+                      changed.forEach((n) => delete next[n.clientKey])
+                      return next
+                    })
+                  }}
+                  onBack={() => setStep(0)}
+                  onConfirm={goConfirm}
+                />
+              )}
+              {step === 2 &&
+                result &&
+                (panel ? (
+                  <PanelResult result={result} onAddMore={reset} />
+                ) : (
+                  <StepResult result={result} today={today} onAddMore={reset} surface={surface} />
+                ))}
+            </div>
+          </>
+        )}
+      </div>
     </>
   )
 }
@@ -355,6 +474,22 @@ export function TaskAddView({
  */
 function PanelResult({ result, onAddMore }: { result: ConfirmResponse; onAddMore: () => void }) {
   const pending = result.pending ?? []
+
+  // 3단계 노출 (패널은 요약만) — 결과마다 한 번
+  const viewSent = useRef(false)
+  useEffect(() => {
+    if (viewSent.current) return
+    viewSent.current = true
+    track('task_add_result.view', {
+      surface: 'calendar_panel',
+      placed_count: result.placements.length,
+      moved_count: result.movedToOtherDays.length,
+      unscheduled_count: result.unscheduled.length,
+      pending_count: (result.pending ?? []).length,
+      temp_count: result.tempGoals.length,
+    })
+  }, [result])
+
   const rows = [
     ...result.placements.map((p) => ({
       id: p.taskId,
@@ -397,7 +532,19 @@ function PanelResult({ result, onAddMore }: { result: ConfirmResponse; onAddMore
           </li>
         ))}
       </ul>
-      <Button variant="secondary" size="sm" className="mt-4" onClick={onAddMore}>
+      <Button
+        variant="secondary"
+        size="sm"
+        className="mt-4"
+        onClick={() => {
+          // 점선 제안은 옆 캘린더(CalendarView)에서 확인해서 여기선 바로 놓인 개수만 알아요
+          track('task_add_result.add_more_click', {
+            surface: 'calendar_panel',
+            placed_count: result.placements.length,
+          })
+          onAddMore()
+        }}
+      >
         <RotateCcw className="size-3.5" />더 추가하기
       </Button>
     </div>

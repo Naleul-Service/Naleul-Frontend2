@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
-import { Modal } from '@/components/ui/Modal'
+import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
+import { track } from '@/lib/client/analytics'
 import type { GoalCategory } from '@/features/goal/api'
 import type { TaskPriority } from '@/features/timetable/types'
 import type { DateType, TempGoalInput } from '../types'
+import type { TaskAddSurface } from '../analytics'
 import type { MapItem } from './StepGoals'
 
 const NEW_TEMP = '__new__'
@@ -24,6 +26,25 @@ const field =
   'border-line-strong focus:border-brand h-11 w-full rounded-xl border bg-surface px-3 text-[15px] outline-none'
 const labelText = 'text-ink-3 mb-1 block text-xs font-medium'
 
+/** 선택 값 → goal_match (existing / temp / new_temp / none) */
+const goalMatchOfSel = (sel: string) =>
+  sel === NEW_TEMP ? 'new_temp' : sel.startsWith('g') ? 'existing' : sel.startsWith('t:') ? 'temp' : 'none'
+
+/** 처음 값과 비교해 바뀐 칸 (노션 changed_fields 의 Task 이름) */
+function changedFieldsOf(a: MapItem, b: MapItem, goalChanged: boolean) {
+  const out: string[] = []
+  if (a.title.trim() !== b.title.trim()) out.push('name')
+  if (a.generalCategoryId !== b.generalCategoryId) out.push('topic')
+  if (a.dateType !== b.dateType || (b.dateType === 'ON' && a.scheduledDate !== b.scheduledDate)) out.push('date')
+  if (b.dateType === 'DUE' && a.dueDate !== b.dueDate) out.push('due_date')
+  if (goalChanged || a.milestoneId !== b.milestoneId) out.push('goal')
+  if ((a.startTime ?? null) !== (b.startTime ?? null) || (a.endTime ?? null) !== (b.endTime ?? null)) out.push('time')
+  if ((a.estimatedMinutes ?? 30) !== (b.estimatedMinutes ?? 30)) out.push('duration')
+  if ((a.priority ?? 'C') !== (b.priority ?? 'C')) out.push('priority')
+  if ((a.kind ?? 'NORMAL') !== (b.kind ?? 'NORMAL')) out.push('appointment')
+  return out
+}
+
 /** goal 선택 값: "g12" (기존 목표) / "t:t1" (이번에 만드는 임시 목표) / "__new__" */
 const goalValue = (i: MapItem) =>
   i.goalCategoryId ? `g${i.goalCategoryId}` : i.tempGoalKey ? `t:${i.tempGoalKey}` : ''
@@ -33,15 +54,26 @@ interface Props {
   goals: GoalCategory[]
   tempGoals: TempGoalInput[]
   today: string
-  /** 새 임시 목표를 만들었으면 newTemp 도 같이 */
-  onSave: (item: MapItem, newTemp?: TempGoalInput) => void
+  /** 새 임시 목표를 만들었으면 newTemp 도 같이 · changedFields = 처음 값과 달라진 칸 */
+  onSave: (item: MapItem, newTemp?: TempGoalInput, changedFields?: string[]) => void
   onClose: () => void
   nextTempKey: string
   canAddTemp: boolean
+  surface?: TaskAddSurface
 }
 
 /** 2단계 "변경" — 목표·세부 목표·마일스톤·날짜·시간·소요 시간·중요도 */
-export function ItemEditModal({ item, goals, tempGoals, today, onSave, onClose, nextTempKey, canAddTemp }: Props) {
+export function ItemEditModal({
+  item,
+  goals,
+  tempGoals,
+  today,
+  onSave,
+  onClose,
+  nextTempKey,
+  canAddTemp,
+  surface = 'page',
+}: Props) {
   const [f, setF] = useState<MapItem>(item)
   const [goalSel, setGoalSel] = useState(goalValue(item))
   const [newTempName, setNewTempName] = useState('')
@@ -70,42 +102,91 @@ export function ItemEditModal({ item, goals, tempGoals, today, onSave, onClose, 
     (f.dateType === 'NONE' || !!date) &&
     !timeInvalid
 
+  const initialGoalSel = goalValue(item)
+  const changedFields = changedFieldsOf(item, f, goalSel !== initialGoalSel)
+  const isDirty = changedFields.length > 0 || (goalSel === NEW_TEMP && !!newTempName.trim())
+
+  // 임시 목표가 이미 5개라 "+ 새 임시 목표 만들기"가 빠진 채 열림
+  const limitViewed = useRef(false)
+  useEffect(() => {
+    if (canAddTemp || limitViewed.current) return
+    limitViewed.current = true
+    track('task_add_item_edit.temp_limit_view', { surface, temp_count: tempGoals.length })
+  }, [canAddTemp, surface, tempGoals.length])
+
+  const close = (method: ModalCloseMethod | 'cancel_button') => {
+    track('task_add_item_edit.close', { surface, close_method: method, is_dirty: isDirty })
+    onClose()
+  }
+
+  const blockedReason = !f.title.trim()
+    ? 'no_title'
+    : !goalSel
+      ? 'no_goal'
+      : goalSel === NEW_TEMP && !newTempName.trim()
+        ? 'blank_temp'
+        : f.dateType !== 'NONE' && !date
+          ? 'no_date'
+          : timeInvalid
+            ? 'time_order'
+            : null
+  const onSavePointerDown = () => {
+    if (valid || !blockedReason) return
+    track('task_add_item_edit.save_blocked', { surface, disabled_reason: blockedReason })
+  }
+
   const save = () => {
     if (!valid) return
+    track('task_add_item_edit.save_click', {
+      surface,
+      changed_fields: changedFields.join(','),
+      goal_match: goalMatchOfSel(goalSel),
+      date_type: f.dateType,
+      has_time: f.dateType === 'ON' && !!f.startTime,
+      time_dropped: f.dateType === 'ON' && !f.startTime && !!f.endTime,
+    })
     const base: MapItem = { ...f, title: f.title.trim() }
     if (goalSel === NEW_TEMP) {
       const temp = { tempKey: nextTempKey, name: newTempName.trim().slice(0, 30), emoji: newTempEmoji || null }
       onSave(
         { ...base, goalCategoryId: null, generalCategoryId: null, milestoneId: null, tempGoalKey: temp.tempKey },
-        temp
+        temp,
+        changedFields
       )
     } else if (goalSel.startsWith('t:')) {
-      onSave({
-        ...base,
-        goalCategoryId: null,
-        generalCategoryId: null,
-        milestoneId: null,
-        tempGoalKey: goalSel.slice(2),
-      })
+      onSave(
+        {
+          ...base,
+          goalCategoryId: null,
+          generalCategoryId: null,
+          milestoneId: null,
+          tempGoalKey: goalSel.slice(2),
+        },
+        undefined,
+        changedFields
+      )
     } else {
-      onSave({ ...base, goalCategoryId: Number(goalSel.slice(1)), tempGoalKey: null })
+      onSave({ ...base, goalCategoryId: Number(goalSel.slice(1)), tempGoalKey: null }, undefined, changedFields)
     }
   }
 
   return (
     <Modal
       open
-      onClose={onClose}
+      onClose={close}
       title="Task 변경"
       size="md"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <Button variant="secondary" onClick={() => close('cancel_button')}>
             취소
           </Button>
-          <Button onClick={save} disabled={!valid}>
-            저장
-          </Button>
+          {/* disabled 버튼은 click 이 안 나서 감싼 요소의 pointerdown 으로 막힌 클릭을 잡아요 */}
+          <span className="contents" onPointerDown={onSavePointerDown}>
+            <Button onClick={save} disabled={!valid}>
+              저장
+            </Button>
+          </span>
         </>
       }
     >
@@ -128,6 +209,7 @@ export function ItemEditModal({ item, goals, tempGoals, today, onSave, onClose, 
             value={goalSel}
             onChange={(e) => {
               setGoalSel(e.target.value)
+              track('task_add_item_edit.goal_select', { surface, goal_match: goalMatchOfSel(e.target.value) })
               set({ generalCategoryId: null, milestoneId: null })
             }}
             className={field}
@@ -233,7 +315,15 @@ export function ItemEditModal({ item, goals, tempGoals, today, onSave, onClose, 
                 ['NONE', '날짜 없음'],
               ] as const
             ).map(([t, label]) => (
-              <Chip key={t} size="sm" selected={f.dateType === t} onClick={() => setDateType(t)}>
+              <Chip
+                key={t}
+                size="sm"
+                selected={f.dateType === t}
+                onClick={() => {
+                  setDateType(t)
+                  track('task_add_item_edit.date_type_select', { surface, date_type: t })
+                }}
+              >
                 {label}
               </Chip>
             ))}

@@ -1,14 +1,16 @@
 'use client'
 
-import { useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { Clock, CornerDownLeft, Lock, Timer, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Chip } from '@/components/ui/Chip'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
 import { toast } from '@/stores/toastStore'
 import { addDays, formatDuration, formatMonthDay, timeToMinutes } from '@/features/timetable/time'
+import type { TaskAddSurface } from '../analytics'
 import { parseLine } from '../parseLine'
 import type { TaskQuota } from '../types'
 
@@ -56,7 +58,11 @@ interface Props {
   today: string
   loading: boolean
   onNext: () => void
+  /** 같은 부품이 쓰인 화면 (task_add_input.* 의 surface) */
+  surface?: TaskAddSurface
 }
+
+type ChipKind = 'today' | 'tomorrow' | 'date' | 'due' | 'time'
 
 /**
  * 1단계 · Task 입력 (명세 3-2)
@@ -64,32 +70,92 @@ interface Props {
  *  - 여러 줄을 붙여 넣으면 줄마다 나눠서 추가
  *  - Free 한도: 목록 개수가 남은 개수에 닿으면 입력창을 막고 안내
  */
-export function StepInput({ lines, onChange, quota, quotaLoading, today, loading, onNext }: Props) {
+export function StepInput({ lines, onChange, quota, quotaLoading, today, loading, onNext, surface = 'page' }: Props) {
   const [draft, setDraft] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   const limit = quota && !quota.premium && quota.remaining != null ? Math.min(quota.remaining, MAX_LINES) : MAX_LINES
   const full = lines.length >= limit
   const freeLimited = !!quota && !quota.premium && quota.remaining != null && lines.length >= quota.remaining
+  /** 무료 오늘 남은 개수 (Pro 는 비움) */
+  const quotaRemaining = quota && !quota.premium ? (quota.remaining ?? undefined) : undefined
+  /** 한도가 무료 하루 개수인지, 한 번에 20개인지 */
+  const limitReason = quotaRemaining != null && quotaRemaining < MAX_LINES ? 'free_quota' : 'max_lines'
 
-  const add = (texts: string[]) => {
+  // 들어오자마자 잠긴 경우 (무료 오늘 남은 개수 0) — 한 번
+  const zeroLimitSent = useRef(false)
+  const lockedAtStart = !quotaLoading && full && lines.length === 0
+  useEffect(() => {
+    if (!lockedAtStart || zeroLimitSent.current) return
+    zeroLimitSent.current = true
+    track('task_add_input.limit_hit', {
+      surface,
+      limit_reason: limitReason,
+      quota_remaining: quotaRemaining,
+      line_count: 0,
+      dropped_count: 0,
+    })
+  }, [lockedAtStart, surface, limitReason, quotaRemaining])
+
+  const add = (texts: string[], method: 'enter' | 'button' | 'paste') => {
     const clean = texts.map((t) => t.trim()).filter(Boolean)
     if (!clean.length) return
     const room = Math.max(limit - lines.length, 0)
     const accepted = clean.slice(0, room)
-    if (accepted.length) onChange([...lines, ...accepted.map((t) => newLine(t, today))])
-    if (clean.length > accepted.length) toast.show(`${clean.length - accepted.length}개는 한도를 넘어서 넣지 않았어요.`)
+    const added = accepted.map((t) => newLine(t, today))
+    const dropped = clean.length - accepted.length
+    const lineCount = lines.length + added.length
+    if (added.length) {
+      onChange([...lines, ...added])
+      track('task_add_input.line_add', {
+        surface,
+        input_method: method,
+        added_count: added.length,
+        dropped_count: dropped,
+        line_count: lineCount,
+        has_date: added.some((l) => !!l.date),
+        has_parsed_time: added.some((l) => !!l.startTime),
+        has_parsed_duration: added.some((l) => l.minutes != null),
+      })
+    }
+    // 입력칸이 잠기거나(한도에 닿음) 붙여넣기 일부가 빠졌을 때
+    if (dropped > 0 || (added.length > 0 && lineCount >= limit)) {
+      track('task_add_input.limit_hit', {
+        surface,
+        limit_reason: limitReason,
+        quota_remaining: quotaRemaining,
+        line_count: lineCount,
+        dropped_count: dropped,
+      })
+    }
+    if (dropped > 0) toast.show(`${dropped}개는 한도를 넘어서 넣지 않았어요.`)
   }
+
+  const next = (method: 'button' | 'enter') => {
+    track('task_add_input.next_click', {
+      surface,
+      line_count: lines.length,
+      empty_line_count: lines.filter((l) => !l.text.trim()).length,
+      dated_count: lines.filter((l) => !!l.date).length,
+      timed_count: lines.filter((l) => l.dateType !== 'DUE' && !!l.startTime).length,
+      duration_count: lines.filter((l) => l.minutes != null).length,
+      submit_method: method,
+    })
+    onNext()
+  }
+
+  const chipClick = (kind: ChipKind, checked: boolean, index: number) =>
+    track('task_add_input.chip_click', { surface, chip_kind: kind, checked, list_position: index })
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     // 한글 조합 중 Enter 는 글자 확정용이라 무시 (안 그러면 마지막 글자가 다음 줄로 넘어가요)
     if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.keyCode === 229) return
     e.preventDefault()
     if (!draft.trim()) {
-      if (lines.length && !loading) onNext() // 빈 칸에서 Enter = 다음
+      if (lines.length && !loading) next('enter') // 빈 칸에서 Enter = 다음
       return
     }
-    add([draft])
+    add([draft], 'enter')
     setDraft('')
   }
 
@@ -97,12 +163,19 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
     const text = e.clipboardData.getData('text')
     if (!text.includes('\n')) return
     e.preventDefault()
-    add(text.split(/\r?\n/))
+    add(text.split(/\r?\n/), 'paste')
   }
 
-  const update = (key: string, patch: Partial<DumpLine>) =>
+  const update = (key: string, patch: Partial<DumpLine>) => {
+    const index = lines.findIndex((l) => l.clientKey === key)
+    // 이미 추가한 줄의 글자를 다 지움 → 다음 단계로 갈 때 말없이 빠져요
+    if (index >= 0 && patch.text !== undefined && lines[index].text.trim() && !patch.text.trim())
+      track('task_add_input.line_cleared', { surface, list_position: index, line_count: lines.length })
     onChange(lines.map((l) => (l.clientKey === key ? { ...l, ...patch } : l)))
+  }
   const remove = (key: string) => {
+    const index = lines.findIndex((l) => l.clientKey === key)
+    track('task_add_input.line_remove', { surface, list_position: index, line_count: lines.length - 1 })
     onChange(lines.filter((l) => l.clientKey !== key))
     inputRef.current?.focus()
   }
@@ -143,6 +216,14 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
               disabled={loading}
               onChange={(p) => update(l.clientKey, p)}
               onRemove={() => remove(l.clientKey)}
+              onChipClick={(kind, checked) => chipClick(kind, checked, i)}
+              onDurationSelect={(minutes) =>
+                track('task_add_input.duration_select', {
+                  surface,
+                  duration_minutes: minutes ?? undefined,
+                  list_position: i,
+                })
+              }
             />
           ))}
         </ol>
@@ -159,7 +240,10 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
                 무료 플랜은 하루 {quota?.dailyLimit ?? 2}개까지 추가할 수 있어요 ·{' '}
                 <button
                   type="button"
-                  onClick={() => toast.show('Pro 플랜은 곧 만나볼 수 있어요.')}
+                  onClick={() => {
+                    track('task_add_input.pro_click', { surface, quota_remaining: quotaRemaining })
+                    toast.show('Pro 플랜은 곧 만나볼 수 있어요.')
+                  }}
                   className="text-brand font-semibold hover:underline"
                 >
                   Pro 알아보기
@@ -190,7 +274,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
             <button
               type="button"
               onClick={() => {
-                add([draft])
+                add([draft], 'button')
                 setDraft('')
                 inputRef.current?.focus()
               }}
@@ -211,7 +295,7 @@ export function StepInput({ lines, onChange, quota, quotaLoading, today, loading
             AI가 목표와 연결하고 있어요…
           </span>
         )}
-        <Button onClick={onNext} disabled={!lines.length || loading} loading={loading}>
+        <Button onClick={() => next('button')} disabled={!lines.length || loading} loading={loading}>
           다음 · 목표 연결
         </Button>
       </div>
@@ -226,6 +310,8 @@ function LineRow({
   disabled,
   onChange,
   onRemove,
+  onChipClick,
+  onDurationSelect,
 }: {
   index: number
   line: DumpLine
@@ -233,10 +319,16 @@ function LineRow({
   disabled: boolean
   onChange: (p: Partial<DumpLine>) => void
   onRemove: () => void
+  /** 분석 — checked: 누른 뒤 켜졌는지 */
+  onChipClick: (kind: ChipKind, checked: boolean) => void
+  onDurationSelect: (minutes: number | null) => void
 }) {
   const [showTime, setShowTime] = useState(!!line.startTime)
   const tomorrow = addDays(today, 1)
-  const pick = (d: string | null) => onChange({ date: line.date === d ? null : d })
+  const pick = (kind: 'today' | 'tomorrow', d: string) => {
+    onChipClick(kind, line.date !== d)
+    onChange({ date: line.date === d ? null : d })
+  }
 
   return (
     <li className="border-line rounded-2xl border px-3 py-2.5" data-line={index}>
@@ -260,10 +352,15 @@ function LineRow({
         </button>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-1.5 pl-7">
-        <Chip size="sm" selected={line.date === today} onClick={() => pick(today)} disabled={disabled}>
+        <Chip size="sm" selected={line.date === today} onClick={() => pick('today', today)} disabled={disabled}>
           오늘
         </Chip>
-        <Chip size="sm" selected={line.date === tomorrow} onClick={() => pick(tomorrow)} disabled={disabled}>
+        <Chip
+          size="sm"
+          selected={line.date === tomorrow}
+          onClick={() => pick('tomorrow', tomorrow)}
+          disabled={disabled}
+        >
           내일
         </Chip>
         {/* 칩 모양 위에 투명한 날짜 입력을 겹쳐서, 누르면 달력이 열려요 */}
@@ -280,7 +377,10 @@ function LineRow({
             type="date"
             min={today}
             value={line.date ?? ''}
-            onChange={(e) => onChange({ date: e.target.value || null })}
+            onChange={(e) => {
+              onChipClick('date', !!e.target.value)
+              onChange({ date: e.target.value || null })
+            }}
             onClick={(e) => e.currentTarget.showPicker?.()}
             disabled={disabled}
             aria-label={`${index + 1}번 날짜`}
@@ -291,9 +391,10 @@ function LineRow({
           <Chip
             size="sm"
             selected={line.dateType === 'DUE'}
-            onClick={() =>
+            onClick={() => {
+              onChipClick('due', line.dateType !== 'DUE')
               onChange({ dateType: line.dateType === 'DUE' ? 'ON' : 'DUE', startTime: null, endTime: null })
-            }
+            }}
             disabled={disabled}
           >
             ~까지
@@ -304,6 +405,7 @@ function LineRow({
             size="sm"
             selected={showTime}
             onClick={() => {
+              onChipClick('time', !showTime)
               if (showTime) onChange({ startTime: null, endTime: null })
               setShowTime(!showTime)
             }}
@@ -334,7 +436,15 @@ function LineRow({
             />
           </span>
         )}
-        <DurationChip line={line} index={index} disabled={disabled} onChange={(minutes) => onChange({ minutes })} />
+        <DurationChip
+          line={line}
+          index={index}
+          disabled={disabled}
+          onChange={(minutes) => {
+            onDurationSelect(minutes)
+            onChange({ minutes })
+          }}
+        />
       </div>
     </li>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { CalendarDays, Check, Sparkles } from 'lucide-react'
 import { Button, buttonClass } from '@/components/ui/Button'
@@ -12,6 +12,22 @@ import { GoalTaskForm } from '@/features/goal/ui/GoalTaskForm'
 import { useFillTimetable } from '@/features/timetable/api'
 import { formatMonthDay, hm } from '@/features/timetable/time'
 import type { TimeBlockTask } from '@/features/timetable/types'
+import { errorStatusOf } from '@/features/home/analytics'
+import { track } from '@/lib/client/analytics'
+import type { TaskAddSurface } from '../analytics'
+
+/** a → b 가 며칠인지 (YYYY-MM-DD) */
+const daysBetween = (a: string, b: string) =>
+  Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000)
+
+/** 폼에 적어 둔 내용이 있는지 — 기본값이 채워지는 날짜·선택 상자는 빼고, 글자·시간·숫자 입력만 봐요 */
+const formHasInput = (root: HTMLElement | null) =>
+  !!root &&
+  [
+    ...root.querySelectorAll<HTMLInputElement>(
+      'input:not([type]), input[type=text], input[type=number], input[type=time]'
+    ),
+  ].some((i) => i.value.trim() !== '')
 
 const field =
   'border-line-strong bg-surface focus:border-ink-3 h-10 w-full min-w-0 rounded-xl border px-3 text-[14px] outline-none'
@@ -23,7 +39,10 @@ const field =
 export function ManualTaskAdd({
   inPanel = false,
   onCreated,
+  surface = 'page',
 }: {
+  /** 분석용 — task_add_manual.* 의 surface */
+  surface?: TaskAddSurface
   /** 캘린더 옆 패널 안 — 캘린더가 이미 보이므로 "캘린더에서 보기"는 숨겨요 */
   inPanel?: boolean
   onCreated?: (t: TimeBlockTask) => void
@@ -38,6 +57,17 @@ export function ManualTaskAdd({
   // AI 배치를 요청한 Task (시간은 캘린더에서 확인)
   const [placed, setPlaced] = useState<Set<number>>(new Set())
   const fill = useFillTimetable()
+  const formRef = useRef<HTMLDivElement>(null)
+
+  // '연결할 목표 없음' 카드가 보일 때 한 번 (목록을 못 불러와도 같은 카드)
+  const noGoal = !goals.isPending && !ongoing.length
+  const goalListState = goals.isError ? 'error' : 'empty'
+  const noGoalSent = useRef(false)
+  useEffect(() => {
+    if (!noGoal || noGoalSent.current) return
+    noGoalSent.current = true
+    track('task_add_manual.no_goal_view', { surface, goal_list_state: goalListState })
+  }, [noGoal, goalListState, surface])
 
   if (goals.isPending) {
     return (
@@ -53,7 +83,11 @@ export function ManualTaskAdd({
         <p className="text-ink-3 mt-1 text-sm">
           목표를 먼저 만들거나, AI로 정리하기를 쓰면 임시 목표가 자동으로 만들어져요.
         </p>
-        <Link href="/goal/add" className={buttonClass('primary') + ' mt-4'}>
+        <Link
+          href="/goal/add"
+          className={buttonClass('primary') + ' mt-4'}
+          onClick={() => track('task_add_manual.goal_create_click', { surface })}
+        >
           목표 만들기
         </Link>
       </Card>
@@ -75,7 +109,14 @@ export function ManualTaskAdd({
         <select
           value={selectedId ?? ''}
           onChange={(e) => {
-            setGoalId(Number(e.target.value))
+            const id = Number(e.target.value)
+            track('task_add_manual.goal_select', {
+              surface,
+              goal_category_id: id,
+              is_temporary: !!ongoing.find((g) => g.goalCategoryId === id)?.temporary,
+              has_input: formHasInput(formRef.current),
+            })
+            setGoalId(id)
             setFormKey((k) => k + 1)
           }}
           className={field}
@@ -90,11 +131,12 @@ export function ManualTaskAdd({
         </select>
       </label>
 
-      <div className="mt-3">
+      <div className="mt-3" ref={formRef}>
         {goal.data ? (
           <GoalTaskForm
             key={`${selectedId}-${formKey}`}
             goal={goal.data}
+            surface="task_add_manual"
             // 저장하면 폼을 비우고 다음 Task 를 바로 적을 수 있게
             onDone={() => setFormKey((k) => k + 1)}
             onCreated={(t) => {
@@ -139,9 +181,25 @@ export function ManualTaskAdd({
                 loading={fill.isPending}
                 onClick={() => {
                   const sorted = [...unplacedDates].sort()
+                  track('task_add_manual.ai_fill_click', {
+                    surface,
+                    unscheduled_count: unplaced.length,
+                    day_count: daysBetween(sorted[0], sorted[sorted.length - 1]) + 1,
+                  })
                   fill.mutate(
                     { startDate: sorted[0], endDate: sorted[sorted.length - 1] },
-                    { onSuccess: () => setPlaced(new Set([...placed, ...unplaced.map((t) => t.taskId)])) }
+                    {
+                      onSuccess: () => {
+                        setPlaced(new Set([...placed, ...unplaced.map((t) => t.taskId)]))
+                        track('task_add_manual.ai_fill_result', { surface, result: 'success' })
+                      },
+                      onError: (e) =>
+                        track('task_add_manual.ai_fill_result', {
+                          surface,
+                          result: 'fail',
+                          error_status: errorStatusOf(e),
+                        }),
+                    }
                   )
                 }}
               >
@@ -153,6 +211,12 @@ export function ManualTaskAdd({
               <Link
                 href={`/calendar?view=week&date=${(added[0].plannedStartAt ?? added[0].date ?? '').slice(0, 10)}`}
                 className={buttonClass('secondary', 'sm')}
+                onClick={() =>
+                  track('task_add_manual.calendar_click', {
+                    item_count: added.length,
+                    has_date: !!(added[0].plannedStartAt ?? added[0].date ?? '').slice(0, 10),
+                  })
+                }
               >
                 <CalendarDays className="size-3.5" />
                 캘린더에서 보기

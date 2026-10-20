@@ -12,7 +12,8 @@ import { Field, InlineForm, inlineInput, toNum, type InlineCloseMethod, type Inl
 import { areasOf } from './SubGoalsSection'
 
 /** goal_task_list.* 이벤트의 surface — 같은 Task 목록이 쓰인 화면 */
-export type GoalTaskSurface = 'goal_detail' | 'habit'
+/** 폼이 쓰인 화면 — task_add_manual = Task 추가의 '직접 추가하기' */
+export type GoalTaskSurface = 'goal_detail' | 'habit' | 'task_add_manual'
 
 /** goal_task_list.* 전송 (surface 가 없으면 — 예: 브레인 덤프의 직접 추가 — 보내지 않아요) */
 export function trackTaskList(

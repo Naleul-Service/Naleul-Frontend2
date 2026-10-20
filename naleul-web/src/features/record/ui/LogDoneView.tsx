@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
 import { isApiError } from '@/lib/client/api'
+import { track } from '@/lib/client/analytics'
+import type { TaskAddSurface } from '@/features/brain-dump/analytics'
+import { errorStatusOf } from '@/features/home/analytics'
 import { toast } from '@/stores/toastStore'
 import { useParseBrainDump } from '@/features/brain-dump/api'
 import { parseLine } from '@/features/brain-dump/parseLine'
@@ -30,6 +33,10 @@ interface LogRow {
   link: string
 }
 
+/** 연결 값 → goal_match */
+const goalMatchOf = (link: string) =>
+  link.startsWith('goal:') ? 'existing' : link.startsWith('temp:') ? 'temp' : 'none'
+
 const toHm = (t?: string | null) => (t ? t.slice(0, 5) : null)
 const PAST_WORD = /(어제|그제|그저께)/
 
@@ -38,7 +45,7 @@ const PAST_WORD = /(어제|그제|그저께)/
  *   1. 한 줄에 하나씩 적기 → AI 가 제목·시간을 정리하고 목표를 연결 (있는 목표, 없으면 임시 목표 제안)
  *   2. 연결만 확인하고 저장 → TimeTable 의 "실제" 칸과 각 목표(기록형이면 타임라인)에 쌓여요
  */
-export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
+export function LogDoneView({ goals, surface = 'page' }: { goals: GoalCategory[]; surface?: TaskAddSurface }) {
   const today = todayKst()
   const [text, setText] = useState('')
   const [rows, setRows] = useState<LogRow[] | null>(null)
@@ -47,13 +54,13 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
   const parse = useParseBrainDump()
   const save = useLogActivities()
 
-  const lines = text
+  const allLines = text
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
-    .slice(0, MAX_LINES)
+  const lines = allLines.slice(0, MAX_LINES)
 
-  const goParse = () => {
+  const goParse = (method: 'button' | 'enter') => {
     if (!lines.length) return
     const req = lines.map((line) => {
       const p = parseLine(line, today)
@@ -65,32 +72,47 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
         estimatedMinutes: p.minutes,
       }
     })
+    track('task_add_log.parse_click', {
+      line_count: lines.length,
+      dropped_count: allLines.length - lines.length,
+      has_parsed_time: req.some((r) => !!r.startTime),
+      submit_method: method,
+    })
     parse.mutate(req, {
       onSuccess: (res) => {
-        setRows(
-          res.items.map((i) => {
-            const original = req.find((r) => r.clientKey === i.clientKey)!
-            return {
-              clientKey: i.clientKey,
-              text: original.text,
-              title: i.title,
-              // "어제"는 Task 기준 AI 가 오늘로 당겨 오니 서버가 문장으로 다시 읽게 비워요
-              date: PAST_WORD.test(original.text) ? null : (i.scheduledDate ?? null),
-              startTime: toHm(i.startTime),
-              endTime: toHm(i.endTime),
-              minutes: i.estimatedMinutes ?? null,
-              link:
-                i.goal.type === 'EXISTING' && i.goal.goalCategoryId
-                  ? `goal:${i.goal.goalCategoryId}`
-                  : i.goal.type === 'TEMP' && i.goal.tempKey
-                    ? `temp:${i.goal.tempKey}`
-                    : '',
-            }
-          })
-        )
+        const nextRows: LogRow[] = res.items.map((i) => {
+          const original = req.find((r) => r.clientKey === i.clientKey)!
+          return {
+            clientKey: i.clientKey,
+            text: original.text,
+            title: i.title,
+            // "어제"는 Task 기준 AI 가 오늘로 당겨 오니 서버가 문장으로 다시 읽게 비워요
+            date: PAST_WORD.test(original.text) ? null : (i.scheduledDate ?? null),
+            startTime: toHm(i.startTime),
+            endTime: toHm(i.endTime),
+            minutes: i.estimatedMinutes ?? null,
+            link:
+              i.goal.type === 'EXISTING' && i.goal.goalCategoryId
+                ? `goal:${i.goal.goalCategoryId}`
+                : i.goal.type === 'TEMP' && i.goal.tempKey
+                  ? `temp:${i.goal.tempKey}`
+                  : '',
+          }
+        })
+        setRows(nextRows)
         setTemps(res.tempGoals)
+        track('task_add_log.parse_result', {
+          result: 'success',
+          item_count: res.items.length,
+          ai_failed: res.aiFailed,
+          temp_count: res.tempGoals.length,
+          missing_goal_count: nextRows.filter((r) => !r.link).length,
+        })
       },
-      onError: (e) => toast.error(isApiError(e) ? e.message : '정리하지 못했어요. 다시 시도해 주세요.'),
+      onError: (e) => {
+        track('task_add_log.parse_result', { result: 'fail', error_status: errorStatusOf(e) })
+        toast.error(isApiError(e) ? e.message : '정리하지 못했어요. 다시 시도해 주세요.')
+      },
     })
   }
 
@@ -100,6 +122,11 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
   const goSave = () => {
     if (!rows?.length) return
     const usedTemps = new Set(rows.filter((r) => r.link.startsWith('temp:')).map((r) => r.link.slice(5)))
+    track('task_add_log.save_click', {
+      item_count: rows.length,
+      missing_goal_count: rows.filter((r) => !r.link).length,
+      temp_count: usedTemps.size,
+    })
     save.mutate(
       {
         items: rows.map((r) => ({
@@ -117,9 +144,15 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
       },
       {
         onSuccess: (res) => {
+          track('task_add_log.save_result', {
+            result: 'success',
+            created_count: res.activities.length,
+            temp_count: res.tempGoals.length,
+          })
           setDone(res)
           toast.success(`${res.activities.length}개를 기록했어요.`)
         },
+        onError: (e) => track('task_add_log.save_result', { result: 'fail', error_status: errorStatusOf(e) }),
       }
     )
   }
@@ -150,7 +183,11 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
               </span>
               <span className="min-w-0 flex-1 truncate font-medium">{a.title}</span>
               {a.goalCategoryId && (
-                <Link href={`/goal/${a.goalCategoryId}`} className="text-ink-3 hover:text-ink truncate text-xs">
+                <Link
+                  href={`/goal/${a.goalCategoryId}`}
+                  onClick={() => track('task_add_log.done_link_click', { destination: 'goal', surface })}
+                  className="text-ink-3 hover:text-ink truncate text-xs"
+                >
                   {a.goalCategoryName}
                 </Link>
               )}
@@ -158,8 +195,19 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
           ))}
         </ul>
         <div className="mt-4 flex gap-2">
-          <Button onClick={reset}>더 기록하기</Button>
-          <Link href="/" className="text-ink-2 px-3 py-2 text-sm font-semibold">
+          <Button
+            onClick={() => {
+              track('task_add_log.more_click', { created_count: done.activities.length })
+              reset()
+            }}
+          >
+            더 기록하기
+          </Button>
+          <Link
+            href="/"
+            onClick={() => track('task_add_log.done_link_click', { destination: 'home', surface })}
+            className="text-ink-2 px-3 py-2 text-sm font-semibold"
+          >
             TimeTable에서 보기
           </Link>
         </div>
@@ -175,7 +223,10 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
           <h2 className="text-[17px] font-bold">이렇게 기록할게요</h2>
           <button
             type="button"
-            onClick={() => setRows(null)}
+            onClick={() => {
+              track('task_add_log.rewrite_click', { item_count: rows.length })
+              setRows(null)
+            }}
             className="text-ink-3 hover:text-ink flex items-center gap-1 text-sm"
           >
             <ArrowLeft className="size-4" />
@@ -197,7 +248,10 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
                 />
                 <button
                   type="button"
-                  onClick={() => setRows((rs) => rs && rs.filter((x) => x.clientKey !== r.clientKey))}
+                  onClick={() => {
+                    track('task_add_log.row_remove', { line_count: rows.length - 1 })
+                    setRows((rs) => rs && rs.filter((x) => x.clientKey !== r.clientKey))
+                  }}
                   aria-label="빼기"
                   className="text-ink-4 hover:text-ink rounded-lg p-1"
                 >
@@ -218,7 +272,10 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
                 )}
                 <select
                   value={r.link}
-                  onChange={(e) => update(r.clientKey, { link: e.target.value })}
+                  onChange={(e) => {
+                    track('task_add_log.link_change', { goal_match: goalMatchOf(e.target.value) })
+                    update(r.clientKey, { link: e.target.value })
+                  }}
                   aria-label="연결할 목표"
                   className={cn(
                     'border-line-strong bg-surface ml-auto h-8 max-w-[220px] rounded-lg border px-2 text-[13px]',
@@ -267,7 +324,7 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault()
-            goParse()
+            goParse('enter')
           }
         }}
       />
@@ -278,7 +335,7 @@ export function LogDoneView({ goals }: { goals: GoalCategory[] }) {
         <Button
           className="ml-auto"
           variant="brand"
-          onClick={goParse}
+          onClick={() => goParse('button')}
           loading={parse.isPending}
           disabled={!lines.length}
         >

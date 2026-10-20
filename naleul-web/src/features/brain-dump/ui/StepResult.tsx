@@ -12,9 +12,16 @@ import { visibleHours, type Proposal } from '@/features/timetable/layout'
 import { addDays, formatMonthDay, hm } from '@/features/timetable/time'
 import { TimeGrid } from '@/features/timetable/ui/TimeGrid'
 import { useTimetableInteractions } from '@/features/timetable/ui/useTimetableInteractions'
+import { errorStatusOf } from '@/features/home/analytics'
+import { track } from '@/lib/client/analytics'
+import type { TaskAddSurface } from '../analytics'
 import type { ConfirmResponse } from '../types'
 
 const MAX_DAYS = 7
+
+/** a → b 가 며칠 뒤인지 (YYYY-MM-DD) */
+const daysBetween = (a: string, b: string) =>
+  Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000)
 
 /**
  * 3단계 · TimeBlock 확인 (명세 3-2)
@@ -28,10 +35,13 @@ export function StepResult({
   result,
   today,
   onAddMore,
+  surface = 'page',
 }: {
   result: ConfirmResponse
   today: string
   onAddMore: () => void
+  /** 분석용 — task_add_result.* 의 surface */
+  surface?: TaskAddSurface
 }) {
   const pending = useMemo(() => result.pending ?? [], [result])
   const titleOf = useMemo(() => new Map(pending.map((p) => [p.taskId, p.title])), [pending])
@@ -84,6 +94,37 @@ export function StepResult({
     fadeOthers,
   } = useTimetableInteractions(rawDays, start)
 
+  // 확인 바에서 Esc 로 닫으면 final 이 비어 와요 → 마지막 점선 자리를 기억해 둬요 (dragged_count 용)
+  const proposalsRef = useRef<Proposal[] | null>(null)
+  useEffect(() => {
+    if (proposals) proposalsRef.current = proposals
+  }, [proposals])
+  const previewUnscheduledRef = useRef<number[]>([])
+
+  // 3단계 노출 — 결과마다 한 번
+  const viewSent = useRef(false)
+  useEffect(() => {
+    if (viewSent.current) return
+    viewSent.current = true
+    track('task_add_result.view', {
+      surface,
+      placed_count: result.placements.length,
+      moved_count: result.movedToOtherDays.length,
+      unscheduled_count: result.unscheduled.length,
+      pending_count: (result.pending ?? []).length,
+      temp_count: result.tempGoals.length,
+    })
+  }, [result, surface])
+
+  // 7일 밖 결과 안내가 보일 때 한 번
+  const rangeCut = lastWanted > end
+  const rangeCutSent = useRef(false)
+  useEffect(() => {
+    if (!rangeCut || rangeCutSent.current) return
+    rangeCutSent.current = true
+    track('task_add_result.range_cut_view', { day_count: daysBetween(start, lastWanted) + 1 })
+  }, [rangeCut, start, lastWanted])
+
   // 들어오자마자 한 번만 점선 제안을 받아요 (개발 모드에서 effect 가 두 번 돌아도 한 번만)
   const asked = useRef(false)
   useEffect(() => {
@@ -96,16 +137,39 @@ export function StepResult({
         onPreview: (r) => {
           setProposalDates(r.proposals.map((p) => p.date))
           setPreviewUnscheduled(r.unscheduled)
+          previewUnscheduledRef.current = r.unscheduled
+          track('task_add_result.proposal_ready', {
+            surface,
+            result: 'success',
+            placed_count: r.proposals.length,
+            unscheduled_count: r.unscheduled.length,
+          })
         },
         onResolve: (applied, final) => {
           setPhase(applied ? 'applied' : 'declined')
           setFinalProposals(applied ? final : [])
+          const shown = final.length ? final : (proposalsRef.current ?? [])
+          track('task_add_result.proposal_resolve', {
+            surface,
+            proposal_applied: applied,
+            dragged_count: shown.filter((p) => p.start !== p.proposedStart || p.end !== p.proposedEnd).length,
+            placed_count: applied ? final.length : 0,
+            unscheduled_count: applied ? previewUnscheduledRef.current.length : pending.length,
+          })
         },
         // 자리를 못 받아 왔으면 Task 는 저장된 채 시간 미정으로 둬요
-        onError: () => setPhase('declined'),
+        onError: () => {
+          setPhase('declined')
+          track('task_add_result.proposal_ready', {
+            surface,
+            result: 'fail',
+            placed_count: 0,
+            unscheduled_count: pending.length,
+          })
+        },
       }
     )
-  }, [pending, previewFill])
+  }, [pending, previewFill, surface])
   const { startHour, endHour } = useMemo(() => visibleHours(days), [days])
 
   const replan = useReplan()
@@ -169,7 +233,22 @@ export function StepResult({
           </div>
           <div className="flex gap-2">
             {replanDates.length > 0 && !proposing && (
-              <Button variant="secondary" onClick={() => replan.mutate(replanDates)} loading={replan.isPending}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  track('task_add_result.replan_click', { surface, day_count: replanDates.length })
+                  replan.mutate(replanDates, {
+                    onSuccess: () => track('task_add_result.replan_result', { surface, result: 'success' }),
+                    onError: (e) =>
+                      track('task_add_result.replan_result', {
+                        surface,
+                        result: 'fail',
+                        error_status: errorStatusOf(e),
+                      }),
+                  })
+                }}
+                loading={replan.isPending}
+              >
                 <RotateCcw className="size-4" />
                 다시 배치
               </Button>
@@ -190,7 +269,13 @@ export function StepResult({
               </b>
               은(는) 임시 목표로 만들어졌어요. 목표를 구체화해볼까요?
             </p>
-            <Link href={`/goal/new?sourceGoalId=${t.goalCategoryId}`} className={buttonClass('secondary', 'sm')}>
+            <Link
+              href={`/goal/new?sourceGoalId=${t.goalCategoryId}`}
+              className={buttonClass('secondary', 'sm')}
+              onClick={() =>
+                track('task_add_result.temp_refine_click', { surface, goal_category_id: t.goalCategoryId })
+              }
+            >
               <Sparkles className="size-3.5" />
               AI로 구체화하기
             </Link>
@@ -220,7 +305,7 @@ export function StepResult({
           maxHeightClass="max-h-[560px]"
         />
       )}
-      {lastWanted > end && (
+      {rangeCut && (
         <p className="text-ink-3 text-xs">
           {formatMonthDay(addDays(end, 1))} 이후에 놓인 Task는 캘린더에서 확인할 수 있어요.
         </p>
@@ -298,10 +383,23 @@ export function StepResult({
       {/* 점선 확인 중에는 화면 아래 "이대로 진행할까요?" 바가 대신해요 */}
       {!proposing && (
         <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" onClick={onAddMore}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              track('task_add_result.add_more_click', {
+                surface,
+                placed_count: result.placements.length + finalProposals.length,
+              })
+              onAddMore()
+            }}
+          >
             Task 더 추가하기
           </Button>
-          <Link href={`/calendar?view=week&date=${start}`} className={cn(buttonClass('primary'))}>
+          <Link
+            href={`/calendar?view=week&date=${start}`}
+            className={cn(buttonClass('primary'))}
+            onClick={() => track('task_add_result.calendar_click', { days_from_today: daysBetween(today, start) })}
+          >
             캘린더에서 보기
             <ArrowRight className="size-4" />
           </Link>
