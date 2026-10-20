@@ -64,7 +64,8 @@ function NavLink({
   const Icon = item.icon
   return (
     <Link
-      href={item.href}
+      // 회고 모아보기는 들어온 길(reflections.pageview entry_source)을 주소에 붙여요
+      href={item.key === 'reflections' ? `${item.href}?from=sidebar` : item.href}
       onClick={() => {
         track(CE.sidebarNavClick, {
           nav_item: item.key,

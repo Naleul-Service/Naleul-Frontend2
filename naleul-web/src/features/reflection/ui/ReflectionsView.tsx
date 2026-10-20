@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Library, NotebookPen, PencilLine } from 'lucide-react'
@@ -9,6 +9,9 @@ import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/client/analytics'
+import { referrerType } from '@/lib/client/commonEvents'
+import { errorStatusOf } from '@/features/home/analytics'
 import { useGoalCategories, type GoalCategory } from '@/features/goal/api'
 import { MOODS, moodOf } from '@/features/goal/ui/progress/DailyCheckInCard'
 import { useReflectionRange, type ReflectionEntry, type ReflectionPeriod } from '@/features/home/api'
@@ -40,8 +43,11 @@ function byDate(entries: ReflectionEntry[]) {
   return out
 }
 
+/** 오늘부터 며칠 전 날짜인지 (오늘 0) */
+const daysAgo = (date: string, today: string) => Math.round((Date.parse(today) - Date.parse(date)) / 86_400_000)
+
 function relLabel(date: string, today: string) {
-  const diff = Math.round((Date.parse(today) - Date.parse(date)) / 86_400_000)
+  const diff = daysAgo(date, today)
   if (diff === 0) return '오늘'
   if (diff === 1) return '어제'
   return `${diff}일 전`
@@ -62,12 +68,58 @@ export function ReflectionsView() {
 
   const goals = useGoalCategories()
   const options = (goals.data ?? []).filter(filterable)
+  const optionCount = options.length
   const select = (id?: number) => {
+    const index = id ? options.findIndex((g) => g.goalCategoryId === id) : -1
+    track('reflections.goal_filter_select', {
+      goal_category_id: id,
+      goal_mode: index >= 0 ? (options[index].goalMode ?? 'ACHIEVEMENT') : undefined,
+      list_position: index + 1, // 칩 줄 순서 ('전체' 0, 목표 칩 1부터)
+      filter_option_count: optionCount,
+    })
     const q = new URLSearchParams(params)
     if (id) q.set('goal', String(id))
     else q.delete('goal')
     router.replace(`${pathname}${q.size ? `?${q}` : ''}`, { scroll: false })
   }
+
+  // 들어온 길 — 링크에 붙인 ?from= (없으면 주소 직접 · 새로고침). 주소에서 지우지 않아요 (로그인 ?from= 과 같은 관례)
+  const fromParam = params.get('from')
+  const entrySource =
+    fromParam === 'sidebar' || fromParam === 'home_retro' || fromParam === 'goal_detail' ? fromParam : 'url'
+  const goalsPending = goals.isPending
+  const goalsOk = goals.isSuccess
+  const pageviewSent = useRef(false)
+  useEffect(() => {
+    if (pageviewSent.current || goalsPending) return
+    pageviewSent.current = true
+    track('reflections.pageview', {
+      entry_source: entrySource,
+      referrer_type: referrerType(),
+      goal_category_id: goalId,
+      filter_option_count: goalsOk ? optionCount : undefined,
+    })
+  }, [goalsPending, goalsOk, entrySource, goalId, optionCount])
+
+  // 목표 칩을 못 불러와 '전체'만 남음 (실패할 때마다 한 번)
+  const goalsFailed = goals.isError && !goals.data
+  const goalsErrorAt = goals.errorUpdatedAt
+  const goalsError = goals.error
+  const goalsFailSent = useRef(0)
+  useEffect(() => {
+    if (!goalsFailed || goalsFailSent.current === goalsErrorAt) return
+    goalsFailSent.current = goalsErrorAt
+    track('reflections.goals_load_fail', { error_status: errorStatusOf(goalsError) })
+  }, [goalsFailed, goalsErrorAt, goalsError])
+
+  // ?goal= 이 칩에 없음 (생활 습관 · 임시 · 지운 목표 · 내 목표 아님) — 목표마다 한 번
+  const unmatched = goalsOk && goalId !== undefined && !options.some((g) => g.goalCategoryId === goalId)
+  const unmatchedSent = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    if (!unmatched || unmatchedSent.current === goalId) return
+    unmatchedSent.current = goalId
+    track('reflections.goal_param_unmatched', { goal_category_id: goalId })
+  }, [unmatched, goalId])
 
   return (
     <div className="mx-auto flex max-w-[860px] flex-col gap-5">
@@ -100,7 +152,7 @@ export function ReflectionsView() {
         ))}
       </div>
 
-      <ReflectionTimeline goalId={goalId} showGoal={!goalId} />
+      <ReflectionTimeline goalId={goalId} showGoal={!goalId} surface="reflections" />
     </div>
   )
 }
@@ -126,6 +178,17 @@ export function periodRange(period: ReflectionPeriod, anchor: string) {
   return { from: `${y}-${pad2(m)}-01`, to: `${y}-${pad2(m)}-${pad2(last)}` }
 }
 
+/** 지금 기간에서 몇 칸 떨어진 기간인지 (0 = 오늘 · 이번 주 · 이번 달, -1 = 바로 이전) */
+function periodOffset(period: ReflectionPeriod, from: string, today: string) {
+  const cur = periodRange(period, today).from
+  if (period === 'MONTH') return (yearOf(from) - yearOf(cur)) * 12 + monthOf(from) - monthOf(cur)
+  const days = Math.round((Date.parse(from) - Date.parse(cur)) / 86_400_000)
+  return period === 'WEEK' ? Math.round(days / 7) : days
+}
+
+/** 같은 타임라인이 쓰인 화면 (Amplitude surface) */
+export type ReflectionTimelineSurface = 'reflections' | 'goal_detail'
+
 /** 기간 이동 (‹ ›) */
 const shift = (period: ReflectionPeriod, anchor: string, n: number) =>
   period === 'DAY' ? addDays(anchor, n) : period === 'WEEK' ? addDays(anchor, n * 7) : addMonths(anchor, n)
@@ -147,15 +210,18 @@ function periodTitle(period: ReflectionPeriod, from: string, to: string, today: 
  * @param goalId    한 목표만 (없으면 전체)
  * @param showGoal  줄마다 목표 이름을 보일지 (한 목표만 볼 땐 끄기)
  * @param emptyHint 비었을 때 안내 문구
+ * @param surface   Amplitude surface — 회고 모아보기(reflections) / 목표 상세 회고 탭(goal_detail)
  */
 export function ReflectionTimeline({
   goalId,
   showGoal = true,
   emptyHint,
+  surface,
 }: {
   goalId?: number
   showGoal?: boolean
   emptyHint?: string
+  surface: ReflectionTimelineSurface
 }) {
   const today = todayKst()
   const [period, setPeriod] = useState<ReflectionPeriod>('WEEK')
@@ -174,6 +240,111 @@ export function ReflectionTimeline({
     Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000) + 1
   )
 
+  // ── Amplitude ──
+  const offset = periodOffset(period, from, today)
+  const viewKey = `${period}:${from}:${goalId ?? ''}`
+  const entryCount = entries.length
+  const checkInCount = checkIns.length
+  const retroCount = entries.filter((e) => e.kind === 'RETRO').length
+  const truncated = feed.data?.hasMore ?? false
+  // 지금 기간의 데이터를 그렸는지 (이전 기간 자리 표시 데이터는 빼요)
+  const shown = feed.isSuccess && !feed.isPlaceholderData
+
+  // 보기 · 빈 화면 — 처음 · 기간 탭 · ‹ › 이동 · 목표 칩마다 한 번
+  const lastViewKey = useRef('')
+  useEffect(() => {
+    if (!shown || lastViewKey.current === viewKey) return
+    lastViewKey.current = viewKey
+    track('reflection_timeline.view', {
+      surface,
+      goal_category_id: goalId,
+      period,
+      period_offset: offset,
+      entry_count: entryCount,
+      check_in_count: checkInCount,
+      retro_count: retroCount,
+      day_count: days,
+      elapsed_day_count: totalDays,
+      is_truncated: truncated,
+    })
+    if (entryCount === 0) {
+      track('reflection_timeline.empty_view', { surface, goal_category_id: goalId, period, period_offset: offset })
+    }
+  }, [
+    shown,
+    viewKey,
+    surface,
+    goalId,
+    period,
+    offset,
+    entryCount,
+    checkInCount,
+    retroCount,
+    days,
+    totalDays,
+    truncated,
+  ])
+
+  // 불러오기 실패 카드 (실패할 때마다 한 번)
+  const failed = feed.isError
+  const failedAt = feed.errorUpdatedAt
+  const feedError = feed.error
+  const lastFailAt = useRef(0)
+  useEffect(() => {
+    if (!failed || lastFailAt.current === failedAt) return
+    lastFailAt.current = failedAt
+    track('reflection_timeline.load_fail', {
+      surface,
+      period,
+      period_offset: offset,
+      error_status: errorStatusOf(feedError),
+    })
+  }, [failed, failedAt, feedError, surface, period, offset])
+
+  // 목록 스크롤 깊이 25 · 50 · 75 · 100% (목록 끝이 화면 아래에 얼마나 들어왔는지, 기간마다 구간별 한 번)
+  const listRef = useRef<HTMLOListElement>(null)
+  const scrollSent = useRef(new Set<string>())
+  useEffect(() => {
+    if (!shown || entryCount === 0) return
+    const onScroll = () => {
+      const el = listRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      if (rect.height <= 0) return
+      const pct = ((window.innerHeight - rect.top) / rect.height) * 100
+      for (const mark of [25, 50, 75, 100]) {
+        const key = `${viewKey}:${mark}`
+        if (pct >= mark - 1 && !scrollSent.current.has(key)) {
+          scrollSent.current.add(key)
+          track('reflection_timeline.scroll_depth', { surface, period, scroll_percent: mark, entry_count: entryCount })
+        }
+      }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [shown, viewKey, surface, period, entryCount])
+
+  const changePeriod = (p: ReflectionPeriod) => {
+    if (p === period) return
+    track('reflection_timeline.period_change', {
+      surface,
+      period: p,
+      from_period: period,
+      period_offset: periodOffset(p, periodRange(p, anchor).from, today),
+    })
+    setPeriod(p)
+  }
+  /** ‹ › · 오늘/이번 주/이번 달 — period_offset 은 이동한 뒤 기간 */
+  const move = (action: 'prev' | 'next' | 'today', next: string) => {
+    track('reflection_timeline.nav_click', {
+      surface,
+      period,
+      date_action: action,
+      period_offset: periodOffset(period, periodRange(period, next).from, today),
+    })
+    setAnchor(next)
+  }
+
   return (
     <div className="flex flex-col gap-4">
       {/* 기간 고르기 + 이동 */}
@@ -185,7 +356,7 @@ export function ReflectionTimeline({
               type="button"
               role="tab"
               aria-selected={period === p.value}
-              onClick={() => setPeriod(p.value)}
+              onClick={() => changePeriod(p.value)}
               className={cn(
                 'h-8 rounded-lg px-3.5 text-[13px] font-semibold transition-colors',
                 period === p.value ? 'bg-ink text-on-ink' : 'text-ink-2 hover:text-ink'
@@ -198,7 +369,7 @@ export function ReflectionTimeline({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => setAnchor(shift(period, anchor, -1))}
+            onClick={() => move('prev', shift(period, anchor, -1))}
             aria-label="이전 기간"
             className="text-ink-2 hover:bg-subtle grid size-8 place-items-center rounded-lg"
           >
@@ -209,7 +380,7 @@ export function ReflectionTimeline({
           </p>
           <button
             type="button"
-            onClick={() => setAnchor(shift(period, anchor, 1))}
+            onClick={() => move('next', shift(period, anchor, 1))}
             disabled={atLatest}
             aria-label="다음 기간"
             className="text-ink-2 hover:bg-subtle grid size-8 place-items-center rounded-lg disabled:opacity-30"
@@ -219,7 +390,7 @@ export function ReflectionTimeline({
           {!atLatest && (
             <button
               type="button"
-              onClick={() => setAnchor(today)}
+              onClick={() => move('today', today)}
               className="text-brand hover:bg-brand-soft h-8 rounded-lg px-2 text-[12px] font-semibold"
             >
               {period === 'DAY' ? '오늘' : period === 'WEEK' ? '이번 주' : '이번 달'}
@@ -235,7 +406,15 @@ export function ReflectionTimeline({
       ) : feed.isError ? (
         <Card className="p-6 text-center">
           <p className="text-ink-2 text-sm">회고를 불러오지 못했어요.</p>
-          <Button size="sm" variant="secondary" className="mt-3" onClick={() => feed.refetch()}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-3"
+            onClick={() => {
+              track('reflection_timeline.retry_click', { surface, period, error_status: errorStatusOf(feed.error) })
+              feed.refetch()
+            }}
+          >
             다시 불러오기
           </Button>
         </Card>
@@ -277,7 +456,7 @@ export function ReflectionTimeline({
               </p>
             </Card>
           ) : (
-            <ol className="flex flex-col gap-4">
+            <ol ref={listRef} className="flex flex-col gap-4">
               {groups.map((g) => (
                 <li key={g.date}>
                   {period !== 'DAY' && (
@@ -292,6 +471,8 @@ export function ReflectionTimeline({
                         key={`${e.kind}-${e.goalCategoryId}-${e.retrospectiveId ?? e.date}`}
                         entry={e}
                         showGoal={showGoal}
+                        surface={surface}
+                        today={today}
                       />
                     ))}
                   </Card>
@@ -351,11 +532,33 @@ function FilterChip({
   )
 }
 
-function EntryRow({ entry: e, showGoal }: { entry: ReflectionEntry; showGoal: boolean }) {
+function EntryRow({
+  entry: e,
+  showGoal,
+  surface,
+  today,
+}: {
+  entry: ReflectionEntry
+  showGoal: boolean
+  surface: ReflectionTimelineSurface
+  today: string
+}) {
   const mood = moodOf(e.mood)
   const isRetro = e.kind === 'RETRO'
+  const ago = daysAgo(e.date, today)
+  // 줄 본문을 눌렀지만 반응 없음 (목표 이름 링크 · 글자 고르기는 빼요)
+  const onDeadClick = (ev: React.MouseEvent<HTMLDivElement>) => {
+    if (ev.target instanceof Element && ev.target.closest('a')) return
+    if (window.getSelection()?.toString()) return
+    track('reflection_timeline.entry_dead_click', {
+      surface,
+      entry_kind: e.kind,
+      days_ago: ago,
+      goal_mode: e.goalMode ?? undefined,
+    })
+  }
   return (
-    <div className="flex gap-3 px-4 py-3">
+    <div className="flex gap-3 px-4 py-3" onClick={onDeadClick}>
       <span
         className={cn(
           'mt-0.5 grid size-7 shrink-0 place-items-center rounded-full',
@@ -370,6 +573,15 @@ function EntryRow({ entry: e, showGoal }: { entry: ReflectionEntry; showGoal: bo
           {showGoal && (
             <Link
               href={`/goal/${e.goalCategoryId}`}
+              onClick={() =>
+                track('reflection_timeline.goal_link_click', {
+                  surface,
+                  goal_category_id: e.goalCategoryId,
+                  goal_mode: e.goalMode ?? undefined,
+                  entry_kind: e.kind,
+                  days_ago: ago,
+                })
+              }
               className="flex min-w-0 items-center gap-1.5 text-[13px] font-bold hover:underline"
             >
               <span

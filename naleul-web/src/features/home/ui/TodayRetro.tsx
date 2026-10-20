@@ -257,7 +257,7 @@ export function RetroPanel({
         )}
       </div>
       <Link
-        href="/reflections"
+        href="/reflections?from=home_retro"
         onClick={() => trackHome(HE.retroReflectionsLinkClick)}
         className="text-brand hover:bg-brand-soft mt-1 -ml-1 inline-flex items-center gap-1 rounded-lg px-1 py-0.5 text-[12px] font-semibold"
       >

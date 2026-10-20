@@ -184,7 +184,7 @@ function ReflectionsPanel({ goal, hint }: { goal: GoalCategory; hint: string }) 
         <h2 className="text-[17px] font-bold">이 목표의 회고</h2>
         <p className="text-ink-3 text-[13px]">{hint}</p>
         <Link
-          href={`/reflections`}
+          href="/reflections?from=goal_detail"
           onClick={() =>
             track('goal_detail.reflections_all_click', {
               goal_category_id: goal.goalCategoryId,
@@ -197,7 +197,7 @@ function ReflectionsPanel({ goal, hint }: { goal: GoalCategory; hint: string }) 
           모든 목표 회고 보기
         </Link>
       </div>
-      <ReflectionTimeline goalId={goal.goalCategoryId} showGoal={false} emptyHint={hint} />
+      <ReflectionTimeline goalId={goal.goalCategoryId} showGoal={false} emptyHint={hint} surface="goal_detail" />
     </section>
   )
 }
