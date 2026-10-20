@@ -4,6 +4,7 @@
  */
 export const BACKEND_PATHS = {
   kakaoLogin: '/api/v1/auth/kakao/callback',
+  appleLogin: '/api/v1/auth/apple/login',
   tokenReissue: '/api/v1/auth/token-reissue',
   logout: '/api/v1/auth/logout',
   guest: '/api/v1/auth/guest',

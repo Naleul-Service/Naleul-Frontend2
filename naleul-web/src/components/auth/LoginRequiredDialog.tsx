@@ -6,6 +6,7 @@ import { buttonClass } from '@/components/ui/Button'
 import { LOGIN_REQUIRED_EVENT } from '@/lib/client/api'
 import { safeRedirectPath } from '@/lib/redirectPath'
 import { KakaoLoginButton } from './KakaoLoginButton'
+import { AppleLoginButton } from './AppleLoginButton'
 import { LOGIN_ERROR_PARAM, loginErrorMessage } from './kakaoAuth'
 import { currentPath, openLoginDialog, type LoginDialogDetail, type LoginDialogReason } from './loginHref'
 
@@ -16,7 +17,7 @@ const COPY: Record<LoginDialogReason, { title: string; description: string }> = 
   },
   login: {
     title: '나를 시작하기',
-    description: '카카오로 바로 시작해요. 로그인하면 만든 목표와 Task가 저장되고, 웹과 앱 어디서든 이어서 쓸 수 있어요.',
+    description: '카카오나 Apple로 바로 시작해요. 로그인하면 만든 목표와 Task가 저장되고, 웹과 앱 어디서든 이어서 쓸 수 있어요.',
   },
 }
 
@@ -78,6 +79,7 @@ export function LoginRequiredDialog() {
       footer={
         <div className="flex w-full flex-col gap-2">
           <KakaoLoginButton next={state.next} />
+          <AppleLoginButton next={state.next} />
           <button type="button" onClick={close} className={buttonClass('ghost', 'md', true)}>
             계속 둘러보기
           </button>

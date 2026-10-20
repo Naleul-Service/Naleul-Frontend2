@@ -107,6 +107,31 @@ export interface KakaoLoginData {
   userRole?: UserRole
 }
 
+/**
+ * Apple 로그인 — iOS 앱과 같은 백엔드 API 를 써요.
+ * identityToken 의 sub(Apple 사용자 ID)로 회원을 찾기 때문에, 앱에서 Apple 로 가입한 계정에 그대로 로그인돼요.
+ */
+export async function appleLogin(identityToken: string, fullName?: string): Promise<KakaoLoginData | null> {
+  try {
+    const res = await fetch(backendUrl(BACKEND_PATHS.appleLogin), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identityToken, fullName }),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15_000),
+    })
+    const body = (await res.json().catch(() => null)) as ApiEnvelope<KakaoLoginData> | null
+    if (!res.ok || !body?.success || !body.data?.accessToken) {
+      console.error('[auth] apple login failed', res.status, body?.message)
+      return null
+    }
+    return body.data
+  } catch (error) {
+    console.error('[auth] apple login error', error)
+    return null
+  }
+}
+
 export async function kakaoLogin(code: string): Promise<KakaoLoginData | null> {
   const url = new URL(backendUrl(BACKEND_PATHS.kakaoLogin))
   url.searchParams.set('code', code)

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Logo } from '@/components/brand/Logo'
 import { safeRedirectPath } from '@/lib/redirectPath'
 import { KakaoLoginButton } from '@/components/auth/KakaoLoginButton'
+import { AppleLoginButton } from '@/components/auth/AppleLoginButton'
 import { loginErrorMessage } from '@/components/auth/kakaoAuth'
 
 export const metadata: Metadata = { title: '로그인' }
@@ -44,6 +45,7 @@ export default async function LoginPage({
 
         <div className="mt-8 flex flex-col gap-3">
           <KakaoLoginButton next={next} />
+          <AppleLoginButton next={next} />
           <a
             href={IOS_APP_URL}
             target="_blank"
