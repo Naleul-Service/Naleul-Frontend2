@@ -14,7 +14,7 @@ export const TYPE_LABEL: Record<LifePatternType, string> = {
 
 /** 종류별 색 (주간 미리보기 막대) */
 export const TYPE_COLOR: Record<LifePatternType, string> = {
-  SLEEP: 'var(--color-goal-purple-accent)',
+  SLEEP: 'var(--color-goal-slate-accent)', // 명세 9.5 — 수면도 보라색 없이
   LUNCH: 'var(--color-goal-amber-accent)',
   DINNER: 'var(--color-goal-coral-accent)',
   CUSTOM: 'var(--color-goal-mint-accent)',

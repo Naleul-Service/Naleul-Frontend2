@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useRef, type MouseEvent } from 'react'
+import { useEffect, useRef, useState, type MouseEvent } from 'react'
 import { Flag } from 'lucide-react'
 import { CalendarDays, Check } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { Modal } from '@/components/ui/Modal'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { track } from '@/lib/client/analytics'
@@ -53,6 +54,8 @@ export function MonthView({
   const current = data && data.year === year && data.month === month ? data : undefined
   const byDate = new Map((current?.days ?? []).map((d) => [d.date, d]))
   const weeks = monthWeeks(year, month)
+  // 모바일(lg 미만): 날짜를 누르면 아래에서 올라오는 시트로 그날 실행률 · 할 일 (명세 9.9) — 넓은 화면은 옆 패널
+  const [sheetOpen, setSheetOpen] = useState(false)
 
   // calendar_month.load_fail — '다시 시도'가 보이게 될 때 한 번
   const loadFailed = isError && !current
@@ -126,6 +129,7 @@ export function MonthView({
                         task_count: byDate.get(d)?.taskCount ?? 0,
                       })
                       onSelectDate(d)
+                      if (window.matchMedia('(max-width: 1023.98px)').matches) setSheetOpen(true)
                     }}
                     onOpen={() => onOpenDay(d)}
                   />
@@ -136,18 +140,40 @@ export function MonthView({
         )}
       </Card>
 
-      <DayPanel
-        date={date}
-        today={today}
-        summary={byDate.get(date)}
-        detail={dayDetail}
-        loading={dayLoading}
-        deadlines={current?.deadlinesThisWeek ?? []}
-        onOpenDay={onOpenDay}
-        onSelectTask={onSelectTask}
-        onToggleComplete={onToggleComplete}
-        togglingId={togglingId}
-      />
+      {/* 넓은 화면: 옆 패널 */}
+      <div className="max-lg:hidden lg:contents">
+        <DayPanel
+          date={date}
+          today={today}
+          summary={byDate.get(date)}
+          detail={dayDetail}
+          loading={dayLoading}
+          deadlines={current?.deadlinesThisWeek ?? []}
+          onOpenDay={onOpenDay}
+          onSelectTask={onSelectTask}
+          onToggleComplete={onToggleComplete}
+          togglingId={togglingId}
+        />
+      </div>
+
+      {/* 모바일: 날짜를 누르면 바텀 시트 */}
+      <div className="lg:hidden">
+        <Modal open={sheetOpen} onClose={() => setSheetOpen(false)}>
+          <DayPanel
+            inSheet
+            date={date}
+            today={today}
+            summary={byDate.get(date)}
+            detail={dayDetail}
+            loading={dayLoading}
+            deadlines={current?.deadlinesThisWeek ?? []}
+            onOpenDay={onOpenDay}
+            onSelectTask={onSelectTask}
+            onToggleComplete={onToggleComplete}
+            togglingId={togglingId}
+          />
+        </Modal>
+      </div>
     </div>
   )
 }
@@ -246,16 +272,29 @@ function DayCell({
             ))}
             {day.moreCount > 0 && <span className="text-ink-3 text-[11px]">+{day.moreCount}개 더보기</span>}
           </span>
-          {/* 좁은 화면: 목표 색 점 5px · 간격 3 · 최대 4개 */}
-          <span className="flex flex-wrap items-center gap-[3px] sm:hidden" aria-hidden>
-            {day.milestones.length > 0 && <span className="text-[9px] leading-none">🏁</span>}
-            {day.chips.slice(0, 4).map((c) => (
+          {/* 좁은 화면: Task 칩 3개 (h14 · 모서리 3 · 목표 연한 바탕 + 왼쪽 2px 색 막대) + "+N" (명세 9.9) */}
+          <span className="flex min-w-0 flex-col gap-0.5 sm:hidden" aria-hidden>
+            {day.chips.slice(0, 3).map((c) => (
               <span
                 key={c.taskId}
-                className={cn('size-[5px] rounded-full', c.completed && 'opacity-40')}
-                style={{ backgroundColor: goalAccent(c.colorCode) }}
-              />
+                className={cn(
+                  'block h-3.5 min-w-0 truncate rounded-[3px] pr-0.5 pl-1 text-[9px] leading-[14px] font-medium',
+                  c.completed && 'line-through opacity-50'
+                )}
+                style={{
+                  backgroundColor: goalBg(c.colorCode),
+                  color: goalFg(c.colorCode),
+                  boxShadow: `inset 2px 0 0 ${goalAccent(c.colorCode)}`,
+                }}
+              >
+                {c.title}
+              </span>
             ))}
+            {Math.max(day.chips.length - 3, 0) + day.moreCount > 0 && (
+              <span className="text-caption-sm text-text-tertiary leading-none">
+                +{Math.max(day.chips.length - 3, 0) + day.moreCount}
+              </span>
+            )}
           </span>
         </>
       )}
@@ -274,7 +313,10 @@ function DayPanel({
   onSelectTask,
   onToggleComplete,
   togglingId,
+  inSheet = false,
 }: {
+  /** 바텀 시트 안 (카드 테두리 · 고정 위치 없이) */
+  inSheet?: boolean
   date: string
   today: string
   summary?: MonthlyDay
@@ -296,7 +338,10 @@ function DayPanel({
 
   return (
     <Card
-      className="flex flex-col gap-5 p-5 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-48px)] lg:overflow-y-auto"
+      className={cn(
+        'flex flex-col gap-5 p-5 lg:sticky lg:top-6 lg:max-h-[calc(100dvh-48px)] lg:overflow-y-auto',
+        inSheet && 'border-0 bg-transparent p-0 shadow-none'
+      )}
       aria-label="선택한 날짜"
     >
       <div className="flex items-center justify-between gap-2">

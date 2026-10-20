@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { segmentClass, segmentedClass } from '@/components/ui/SegmentedTabs'
+import { iconButtonClass } from '@/components/ui/IconButton'
 import { TaskAddPanel } from '@/features/brain-dump/ui/TaskAddPanel'
 import { track } from '@/lib/client/analytics'
 import { dateRelationOf, errorStatusOf } from '@/features/home/analytics'
@@ -136,7 +137,13 @@ export function CalendarView() {
 
   return (
     // 패널이 열려 있으면 xl 이상에서는 캘린더가 패널 폭만큼 비켜서 나란히 보여요
-    <div className={cn(add && 'xl:pr-[420px]')}>
+    // 모바일: 페이지 전체 흰 바탕 (명세 9.1) — 바깥 여백(px-5 · py-6)까지 덮어요
+    <div
+      className={cn(
+        add && 'xl:pr-[420px]',
+        'max-lg:bg-bg-surface max-lg:-mx-5 max-lg:-mt-6 max-lg:min-h-[calc(100dvh-48px-var(--tabbar-h))] max-lg:-mb-6 max-lg:px-5 max-lg:pt-6 max-lg:pb-6'
+      )}
+    >
       <PageHeader
         title="캘린더"
         description="블록을 눌러 배치 이유를 보고, 끌어서 시간을 바꿔요. 지난 빈 시간을 누르면 실제로 한 일을 남길 수 있어요."
@@ -206,7 +213,7 @@ export function CalendarView() {
             type="button"
             onClick={() => move(-1)}
             aria-label={`이전 ${unit}`}
-            className="text-ink-2 hover:bg-subtle rounded-lg p-1.5"
+            className={cn(iconButtonClass('md'), 'max-lg:size-7 max-lg:[&_svg]:size-4')}
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -214,12 +221,12 @@ export function CalendarView() {
             type="button"
             onClick={() => move(1)}
             aria-label={`다음 ${unit}`}
-            className="text-ink-2 hover:bg-subtle rounded-lg p-1.5"
+            className={cn(iconButtonClass('md'), 'max-lg:size-7 max-lg:[&_svg]:size-4')}
           >
             <ChevronRight className="size-5" />
           </button>
         </div>
-        <h2 className="text-h4" aria-live="polite">
+        <h2 className="text-h4 max-lg:text-h3" aria-live="polite">
           {view === 'month'
             ? `${date.slice(0, 4)}년 ${Number(date.slice(5, 7))}월`
             : view === 'week'

@@ -9,9 +9,10 @@ import { shownTime, type Placed, type PlacedSleep } from '../layout'
 import { formatMinutes, minutesToTime, todayKst } from '../time'
 import type { ActualActivity, FixedBlock, TimeBlockTask } from '../types'
 
-/** 고정 시간 바탕 (디자인 시스템 Fixed event: bg/subtle) */
+/** 고정 시간 바탕 (명세 9.5) — bg/sunken + 45° 빗금 1px · 6px 간격 (수면 포함 모두 같은 회색) */
 export const HATCH: CSSProperties = {
-  backgroundColor: 'var(--color-bg-subtle)',
+  backgroundColor: 'var(--color-hatch)',
+  backgroundImage: 'repeating-linear-gradient(45deg, var(--color-hatch-line) 0 1px, transparent 1px 6px)',
 }
 
 interface Geometry {
@@ -96,6 +97,7 @@ export function TaskBlock({
   planned,
   faded,
   focused,
+  dense,
 }: {
   placed: Placed<TimeBlockTask>
   geometry: Geometry
@@ -114,6 +116,8 @@ export function TaskBlock({
   faded?: boolean
   /** 확인을 기다리는 블록 (테두리 강조) */
   focused?: boolean
+  /** 주간처럼 좁은 칸 (명세 9.8): Caption/SM 11 Medium · 두 줄까지 · 안쪽 3/4 · 40px 미만이면 시간 숨김 */
+  dense?: boolean
 }) {
   const t = placed.item
   const heightPx = (placed.bottom - placed.top) * geometry.ppm
@@ -153,8 +157,12 @@ export function TaskBlock({
       style={style}
       aria-label={`${t.taskName} ${actual ? '실제 ' : ''}${formatMinutes(placed.start)}~${formatMinutes(placed.end)}`}
       className={cn(
-        'rounded-event absolute z-10 flex flex-col overflow-hidden pr-2 pl-3 text-left text-label-sm transition-[filter,box-shadow]',
-        short ? 'justify-center py-0 text-[11px]' : 'py-1.5',
+        'rounded-event text-label-sm absolute z-10 flex flex-col overflow-hidden pr-2 pl-3 text-left transition-[filter,box-shadow]',
+        dense
+          ? cn('pr-1 pl-2 text-[11px] leading-[1.25] font-medium', short ? 'justify-center py-0' : 'py-[3px]')
+          : short
+            ? 'justify-center py-0 text-[11px]'
+            : 'py-1.5',
         'hover:brightness-[.97]',
         drag && 'cursor-grab active:cursor-grabbing',
         dimmed && 'opacity-30',
@@ -167,7 +175,7 @@ export function TaskBlock({
         placed.clippedBottom && 'rounded-b-none'
       )}
     >
-      <span className="flex min-w-0 items-center gap-1">
+      <span className={cn('flex min-w-0 gap-1', dense && !short ? 'items-start' : 'items-center')}>
         {done && (
           <span className="grid size-3.5 shrink-0 place-items-center rounded-full bg-(--goal-accent) text-white">
             <Check className="size-2.5" />
@@ -179,7 +187,7 @@ export function TaskBlock({
           </span>
         )}
         {proposed && t.proposed && <Sparkles className="size-3.5 shrink-0 text-(--goal-accent)" />}
-        <span className="min-w-0 flex-1 truncate">
+        <span className={cn('min-w-0 flex-1', dense && !short ? 'line-clamp-2 break-all' : 'truncate')}>
           {t.emoji ? `${t.emoji} ` : ''}
           {t.taskName}
         </span>
@@ -205,8 +213,8 @@ export function TaskBlock({
           />
         )}
       </span>
-      {heightPx >= 34 && (
-        <span className="text-caption-sm text-text-secondary mt-0.5 truncate">
+      {heightPx >= (dense ? 40 : 34) && (
+        <span className={cn('text-caption-sm text-text-secondary truncate', dense ? 'mt-px text-[10px]' : 'mt-0.5')}>
           {actual && '실제 '}
           {formatMinutes(placed.start)} – {formatMinutes(placed.end)}
         </span>
@@ -255,7 +263,7 @@ export function FixedBlockView({
       )}
     >
       <span className="flex min-w-0 items-center gap-1 truncate">
-        <Clock className="size-3.5 shrink-0" aria-hidden />
+        <Clock className="text-text-tertiary size-3.5 shrink-0" aria-hidden />
         {b.emoji ? `${b.emoji} ` : ''}
         {b.title}
         {/* 기본 시간과 다르게 바꾼 날 (이날만·이번 주로 바꾼 경우). 지난 날짜는 "앞으로" 변경 때 예전 시간으로 고정해 둔 것이라 표시하지 않아요 */}
@@ -272,11 +280,8 @@ export function FixedBlockView({
   )
 }
 
-/** 수면 배경 (고정 시간 빗금보다 진한 남색 톤) */
-const SLEEP_BG: CSSProperties = {
-  backgroundColor: 'var(--color-sleep)',
-  backgroundImage: 'repeating-linear-gradient(135deg, var(--color-sleep-line) 0 1.5px, transparent 1.5px 9px)',
-}
+/** 수면 배경 — 다른 고정 시간과 같은 회색 빗금 (명세 9.5) */
+const SLEEP_BG: CSSProperties = HATCH
 
 /**
  * 수면 블록 — 기상 전(아침)·취침 후(밤) 2시간만큼 보여요.
@@ -311,7 +316,7 @@ export function SleepBlockView({
       style={{ ...pos(placed, geometry), ...SLEEP_BG, ...NO_CALLOUT }}
       aria-label={`수면 · ${label}`}
       className={cn(
-        'text-ink-3 absolute inset-x-0 z-0 flex flex-col overflow-hidden text-left text-[11px] leading-tight',
+        'text-text-secondary border-border-subtle absolute inset-x-0 z-0 flex flex-col overflow-hidden border text-left text-[11px] leading-tight',
         wake ? 'justify-end' : 'justify-start',
         dimmed && 'opacity-40',
         selected && 'ring-ink-3 ring-2'
@@ -322,9 +327,9 @@ export function SleepBlockView({
         aria-hidden
         onPointerDown={drag ? (e) => drag(e, wake ? 'resize' : 'resize-top') : undefined}
         className={cn(
-          'flex h-6 shrink-0 items-center gap-1 border-(--color-goal-purple-accent) px-2 font-semibold text-sleep-ink',
+          'border-border-subtle text-text-secondary flex h-6 shrink-0 items-center gap-1 px-2 font-semibold',
           wake ? 'border-b-2' : 'border-t-2',
-          drag && 'cursor-ns-resize hover:bg-sleep-line'
+          drag && 'hover:bg-bg-subtle cursor-ns-resize'
         )}
       >
         <span className="truncate">

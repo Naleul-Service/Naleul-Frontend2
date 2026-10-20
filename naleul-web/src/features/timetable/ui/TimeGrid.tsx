@@ -184,17 +184,29 @@ export function TimeGrid({
     [startHour, endHour]
   )
   const single = days.length === 1
+  // 시간 눈금 폭 — 주간은 좁게 36 (명세 9.8), 일간 56
+  const gutterPx = single ? 56 : 36
   const scrollRef = useRef<HTMLDivElement>(null)
   const rangeKey = `${days[0]?.date}_${days.length}`
 
-  // 처음 보거나 기간이 바뀌면: 오늘이 보이면 현재 시각 근처로, 아니면 맨 위로 스크롤
+  // 처음 보거나 기간이 바뀌면 (명세 9.6): 오늘이 보이면 지금 시각이 위에서 1/3 쯤에,
+  // 아니면 첫 블록(없으면 08:00) 이 보이게 스크롤
   const scrolledFor = useRef<string | null>(null)
   useEffect(() => {
     const el = scrollRef.current
     if (!el || !days.length || scrolledFor.current === rangeKey) return
     scrolledFor.current = rangeKey
     const hasToday = days.some((d) => d.date === now.date)
-    el.scrollTop = hasToday ? Math.max(0, (now.minutes - from - 90) * PPM) : 0
+    if (hasToday) {
+      el.scrollTop = Math.max(0, (now.minutes - from) * PPM - (el.clientHeight - HEADER_PX) / 3)
+      return
+    }
+    const raf = window.requestAnimationFrame(() => {
+      const tops = [...el.querySelectorAll<HTMLElement>('[data-date] [data-task-id]')].map((b) => b.offsetTop)
+      const first = tops.length ? Math.min(...tops) : (8 * 60 - from) * PPM
+      el.scrollTop = Math.max(0, first - 24)
+    })
+    return () => window.cancelAnimationFrame(raf)
   }, [rangeKey, days, now, from])
 
   // 확인을 기다리는 블록이 생기면 그 블록으로 화면을 옮겨요 (격자 안 스크롤 + 페이지 스크롤)
@@ -216,14 +228,14 @@ export function TimeGrid({
         top: root.scrollTop + (r.top - box.top) - HEADER_PX - 72,
         // 주간: 가로로도 그 날짜 칸이 보이게 (왼쪽 시간 눈금 56px 만큼 비켜서)
         left:
-          r.left < box.left + 56 || r.right > box.right ? root.scrollLeft + (r.left - box.left) - 72 : root.scrollLeft,
+          r.left < box.left + gutterPx || r.right > box.right ? root.scrollLeft + (r.left - box.left) - 72 : root.scrollLeft,
         behavior: 'smooth',
       })
       // 격자 자체가 화면 밖이면 페이지도 격자 쪽으로
       if (box.top < 0 || box.top > window.innerHeight * 0.6) root.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
     return () => window.cancelAnimationFrame(raf)
-  }, [focusKey])
+  }, [focusKey, gutterPx])
   const fadeTask = (id: number) => fadeOthers && !!focusIds?.size && !focusIds.has(id)
 
   // ── 드래그 ──
@@ -250,7 +262,7 @@ export function TimeGrid({
     },
     [days]
   )
-  const { drag, startDrag, consumeClick } = useGridDrag({
+  const { drag, startDrag: rawStartDrag, consumeClick } = useGridDrag({
     scrollRef,
     from,
     to,
@@ -264,6 +276,36 @@ export function TimeGrid({
     onCancel: onDragCancel,
   })
   const enabled = !!onDrop
+
+  /**
+   * 끌기 시작할 때 블록이 칸 안에서 차지하던 가로 자리(왼쪽 · 폭, 칸 너비에 대한 비율)를 기억해요 (명세 9.7)
+   * → 미리보기가 칸 전체로 넓어지지 않고 겹쳐서 반쪽이던 블록은 반쪽 그대로 움직여요.
+   */
+  const [ghostBox, setGhostBox] = useState<Record<string, { left: number; width: number }>>({})
+  const boxOf = (col: Element, el: Element | null) => {
+    if (!el) return undefined
+    const c = col.getBoundingClientRect()
+    const r = el.getBoundingClientRect()
+    if (!c.width) return undefined
+    return { left: (r.left - c.left) / c.width, width: r.width / c.width }
+  }
+  const startDrag: typeof rawStartDrag = (e, source, mode) => {
+    const target = e.currentTarget as HTMLElement
+    const col = target.closest('[data-date]')
+    if (col) {
+      const own = target.closest('[data-task-id],[data-fixed-id],[data-activity-id]')
+      const next: Record<string, { left: number; width: number }> = {}
+      const mine = boxOf(col, own)
+      if (mine) next.source = mine
+      if (source.kind === 'task')
+        for (const m of source.group ?? []) {
+          const b = boxOf(col, col.querySelector(`[data-task-id="${m.task.taskId}"]`))
+          if (b) next[`task-${m.task.taskId}`] = b
+        }
+      setGhostBox(next)
+    }
+    rawStartDrag(e, source, mode)
+  }
   const isDragging = (kind: 'task' | 'fixed', id: string | number) =>
     !!drag &&
     (kind === 'task'
@@ -310,14 +352,23 @@ export function TimeGrid({
   }
 
   // 날짜 수만큼 칸 (주간 7칸, Task 추가 결과 화면은 1~7칸)
-  const gridTemplateColumns = single ? '56px minmax(0,1fr)' : `56px repeat(${days.length}, minmax(112px, 1fr))`
+  const gridTemplateColumns = single
+    ? `${gutterPx}px minmax(0,1fr)`
+    : `${gutterPx}px repeat(${days.length}, minmax(112px, 1fr))`
+  // 지금 시각 선이 보이는 칸이 있으면 시간 눈금에 시각 표시 (명세 9.6)
+  const nowMinutes = days.map((d) => nowLine(d.date)).find((m) => m !== null) ?? null
   // Task 를 끌고 있으면 "시간 미정"으로 놓을 수 있게 빈 줄이라도 보여줘요
   const showUnscheduledRow = days.some((d) => d.unscheduledTasks.length > 0) || (!!drag && canUnschedule(drag.source))
 
   return (
     <div
       ref={scrollRef}
-      className={cn('border-line bg-surface relative overflow-auto rounded-2xl border', maxHeightClass)}
+      className={cn(
+        'border-line bg-surface relative overflow-auto rounded-2xl border',
+        // 일간 "계획 | 실제" 폭 — 넓은 화면 60/40, 모바일 50/50 (명세 9.4)
+        '[--actual-w:40%] max-lg:[--actual-w:50%]',
+        maxHeightClass
+      )}
       data-testid="time-grid"
     >
       <div className={cn('grid min-w-full', !single && 'w-max lg:w-full')} style={{ gridTemplateColumns }}>
@@ -373,12 +424,12 @@ export function TimeGrid({
                       : `실행률 ${d.stats.rate ?? 0}%`}
                 </span>
               </span>
-              {/* 일간 "계획 | 실제" 칸 이름 — 아래 격자의 60% · 40% 와 맞춰요 */}
+              {/* 일간 "계획 | 실제" 칸 이름 — 아래 격자의 폭(--actual-w)과 맞춰요 */}
               {compareHead && (
                 <span className="text-ink-3 absolute inset-x-0 bottom-0 flex text-[11px] font-semibold" aria-hidden>
                   {/* 좁은 칸(홈의 1/3 캘린더)에서도 두 줄로 넘쳐 날짜를 덮지 않게 한 줄로 자르기 */}
-                  <span className="w-[60%] truncate px-3 whitespace-nowrap">📋 계획한 일</span>
-                  <span className="border-line w-[40%] truncate border-l border-dashed px-2 whitespace-nowrap">
+                  <span className="w-[calc(100%-var(--actual-w))] truncate px-3 whitespace-nowrap">📋 계획한 일</span>
+                  <span className="border-line w-(--actual-w) truncate border-l border-dashed px-2 whitespace-nowrap">
                     ✅ 실제로 한 일
                   </span>
                 </span>
@@ -420,13 +471,28 @@ export function TimeGrid({
           {hours.map((h, i) => (
             <span
               key={h}
-              className="text-ink-4 absolute right-2 -translate-y-1/2 text-[11px] tabular-nums"
+              className={cn(
+                'text-ink-4 absolute -translate-y-1/2 tabular-nums',
+                single ? 'right-2 text-[11px]' : 'right-1 text-[10px]'
+              )}
               style={{ top: i * HOUR_PX }}
             >
               {/* 24시 이후는 다음 날 새벽 (취침이 자정 뒤일 때) */}
-              {i === 0 ? '' : `${String(h % 24).padStart(2, '0')}:00`}
+              {i === 0 ? '' : `${String(h % 24).padStart(2, '0')}${single ? ':00' : ''}`}
             </span>
           ))}
+          {/* 지금 시각 (Caption/SM · primary) */}
+          {nowMinutes !== null && (
+            <span
+              className={cn(
+                'text-caption-sm text-action-primary-bg bg-bg-surface absolute z-[1] -translate-y-1/2 font-medium tabular-nums',
+                single ? 'right-1.5' : 'right-0.5 text-[10px]'
+              )}
+              style={{ top: (nowMinutes - from) * PPM }}
+            >
+              {formatMinutes(nowMinutes % 1440)}
+            </span>
+          )}
         </div>
 
         {/* ── 날짜 칸 ── */}
@@ -460,7 +526,7 @@ export function TimeGrid({
               {hours.map((h, i) => (
                 <div
                   key={h}
-                  className="border-line pointer-events-none absolute inset-x-0 border-t"
+                  className="border-border-soft pointer-events-none absolute inset-x-0 border-t"
                   style={{ top: i * HOUR_PX }}
                 />
               ))}
@@ -496,11 +562,11 @@ export function TimeGrid({
                   }
                 />
               ))}
-              <HabitBlocks day={d} from={from} to={to} right={split ? '40%' : '0'} onToggle={onHabitToggle} />
+              <HabitBlocks day={d} from={from} to={to} right={split ? 'var(--actual-w)' : '0'} onToggle={onHabitToggle} />
               <div
                 className={cn(
                   'pointer-events-none absolute inset-y-0 left-0 *:pointer-events-auto',
-                  split ? 'right-[40%]' : 'right-0'
+                  split ? 'right-(--actual-w)' : 'right-0'
                 )}
               >
                 {tasks.map((p) => {
@@ -526,6 +592,7 @@ export function TimeGrid({
                       isNew={highlightIds?.has(p.item.taskId)}
                       grouped={grouped}
                       planned={compare}
+                      dense={!single}
                       drag={
                         enabled && canDragTask(p.item)
                           ? (e, mode) =>
@@ -583,7 +650,7 @@ export function TimeGrid({
               {split && (
                 <div
                   className={cn(
-                    'border-border-soft pointer-events-none absolute inset-y-0 right-0 w-[40%] border-l border-dashed *:pointer-events-auto',
+                    'border-border-soft pointer-events-none absolute inset-y-0 right-0 w-(--actual-w) border-l border-dashed *:pointer-events-auto',
                     fadeOthers && !!focusIds?.size && 'opacity-55'
                   )}
                 >
@@ -631,19 +698,28 @@ export function TimeGrid({
                 </div>
               )}
               {drag?.target?.type === 'grid' && drag.target.date === d.date && (
-                <DragGhost drag={drag} target={drag.target} from={from} />
+                <DragGhost drag={drag} target={drag.target} from={from} box={ghostBox.source} />
               )}
               {drag &&
                 groupGhosts
                   .filter((m) => m.date === d.date)
-                  .map((m) => <GroupGhost key={m.task.taskId} member={m} from={from} invalid={!!drag.invalid} />)}
+                  .map((m) => (
+                    <GroupGhost
+                      key={m.task.taskId}
+                      member={m}
+                      from={from}
+                      invalid={!!drag.invalid}
+                      box={ghostBox[`task-${m.task.taskId}`]}
+                    />
+                  ))}
               {nowLine(d.date) !== null && (
+                // 지금 시각 선 (명세 9.6) — 1.5px primary · 왼쪽 끝 8px 원
                 <div
-                  className="pointer-events-none absolute inset-x-0 z-20 h-0 border-t-2 border-action-danger-bg"
+                  className="border-action-primary-bg pointer-events-none absolute inset-x-0 z-20 h-0 border-t-[1.5px]"
                   style={{ top: (nowLine(d.date)! - from) * PPM }}
                   aria-hidden
                 >
-                  <span className="absolute -top-[5px] -left-[5px] size-2 rounded-full bg-action-danger-bg" />
+                  <span className="bg-action-primary-bg absolute -top-[4.75px] -left-1 size-2 rounded-full" />
                 </div>
               )}
             </div>
@@ -724,17 +800,32 @@ function UnscheduledCell({
 }
 
 /** 묶음 드래그 중 같이 움직이는 Task 의 새 자리 */
-function GroupGhost({ member, from, invalid }: { member: GroupMember; from: number; invalid: boolean }) {
+/** 미리보기 가로 자리 — 끌기 시작할 때 블록 자리(비율) 그대로, 모르면 칸 전체 */
+const ghostX = (box?: { left: number; width: number }) =>
+  box ? { left: `${box.left * 100}%`, width: `${box.width * 100}%` } : { left: 2, right: 2 }
+
+function GroupGhost({
+  member,
+  from,
+  invalid,
+  box,
+}: {
+  member: GroupMember
+  from: number
+  invalid: boolean
+  box?: { left: number; width: number }
+}) {
   const t = member.task
   return (
     <div
       aria-hidden
       className={cn(
-        'rounded-event text-label-sm shadow-pop pointer-events-none absolute inset-x-0.5 z-30 flex flex-col overflow-hidden border py-1 pr-2 pl-3 opacity-90',
+        'rounded-event text-label-sm shadow-pop pointer-events-none absolute z-30 flex flex-col overflow-hidden border py-1 pr-2 pl-3 opacity-90',
         invalid ? 'border-danger ring-danger ring-2' : 'border-(--goal-accent)'
       )}
       style={{
         ...taskColors(t),
+        ...ghostX(box),
         top: (member.start - from) * PPM,
         height: Math.max((member.end - member.start) * PPM - 2, 14),
       }}
@@ -757,10 +848,12 @@ function DragGhost({
   drag,
   target,
   from,
+  box,
 }: {
   drag: DragState
   target: Extract<DropTarget, { type: 'grid' }>
   from: number
+  box?: { left: number; width: number }
 }) {
   const { source, invalid } = drag
   const title =
@@ -776,11 +869,12 @@ function DragGhost({
       data-drag-ghost
       aria-live="polite"
       className={cn(
-        'rounded-event text-label-sm shadow-pop pointer-events-none absolute inset-x-0.5 z-30 flex flex-col overflow-hidden border py-1 pr-2 pl-3',
+        'rounded-event text-label-sm shadow-pop pointer-events-none absolute z-30 flex flex-col overflow-hidden border py-1 pr-2 pl-3',
         invalid ? 'border-danger ring-danger ring-2' : 'border-[var(--goal-accent,var(--color-border-subtle))]'
       )}
       style={{
         ...style,
+        ...ghostX(box),
         top: (target.start - from) * PPM,
         height: Math.max((target.end - target.start) * PPM - 2, 18),
       }}

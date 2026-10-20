@@ -35,10 +35,11 @@
   --color-warning-ink: #805a12;
   --color-warning-ink-strong: #6b4a0e;
   --color-hatch: #f6f8fb;
-  --color-hatch-line: #ebeff4;
-  --color-sleep: #efeafd;
-  --color-sleep-line: #ded5fa;
-  --color-sleep-ink: #5c49a8;
+  --color-hatch-line: #e3e8ee;
+  /* 수면도 다른 고정 시간과 같은 회색 빗금 (명세 9.5 — 보라색 없앰) */
+  --color-sleep: #f6f8fb;
+  --color-sleep-line: #e3e8ee;
+  --color-sleep-ink: #6b7685;
   --color-heat-1: #dcebee;
   --color-heat-2: #a9d1dc;
   --color-heat-3: #5fb0c6;
@@ -356,9 +357,9 @@
   --color-warning-ink-strong: #f0d89a;
   --color-hatch: #1a2129;
   --color-hatch-line: #2a323d;
-  --color-sleep: #25213d;
-  --color-sleep-line: #352f55;
-  --color-sleep-ink: #d0c5f9;
+  --color-sleep: #1a2129;
+  --color-sleep-line: #2a323d;
+  --color-sleep-ink: #a3aebd;
   --color-heat-1: #1a3540;
   --color-heat-2: #1f4f60;
   --color-heat-3: #22708a;
