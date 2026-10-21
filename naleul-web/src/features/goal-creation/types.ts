@@ -65,7 +65,8 @@ export interface GoalMessage {
   messageId: number
   role: 'USER' | 'ASSISTANT'
   content: string | null
-  targetSlot?: SlotKey | null
+  /** 'extraNote' = 인터뷰 마지막 "이밖에 알아둬야 할 정보" 질문 (슬롯 아님, 2026-10) */
+  targetSlot?: SlotKey | 'extraNote' | null
   quickReplies?: string[] | null
   skippable?: boolean
   skip?: boolean

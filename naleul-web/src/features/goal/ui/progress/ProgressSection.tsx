@@ -22,6 +22,7 @@ import { InlineConfirm, RowActions, inlineInput, useEditing } from '../../edit/i
 import { Section } from '../sections'
 import { moodOf } from './DailyCheckInCard'
 import { ProgressChart, dayNum, type ChartSeries } from './ProgressChart'
+import { MetricEditForm, type MetricEditEntry } from './MetricEditForm'
 
 /**
  * 목표 상세 "지금 어디쯤?" — 목표 지점까지 지금 어디에 있는지 보여줘요.
@@ -163,6 +164,53 @@ export function Insight({ m, endDate }: { m: MetricProgress; endDate: string | n
   )
 }
 
+// ─── 수치 마감일 + "수치 수정" (목표 전체 수정과 따로, 2026-10) ─────────────
+
+const trackMetricEditOpen = (goalId: number, entry: MetricEditEntry, hadMetric: boolean) =>
+  track('goal_detail.metric_edit_open', { goal_category_id: goalId, entry_point: entry, had_metric: hadMetric })
+
+function MetricHead({
+  goalId,
+  m,
+  metricEnd,
+  own,
+  goalEnd,
+  onEdit,
+  editing,
+}: {
+  goalId: number
+  m: MetricProgress
+  metricEnd: string | null
+  /** 수치 마감일을 따로 정했는지 */
+  own: boolean
+  goalEnd: string | null
+  onEdit: () => void
+  editing: boolean
+}) {
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+      <span className="text-ink-2 font-semibold">{m.name || '수치'}</span>
+      <span className="text-ink-3">
+        {metricEnd ? `${md(metricEnd)}까지` : '마감일 없음'}
+        {own && goalEnd && metricEnd !== goalEnd ? ` · 목표 종료 ${md(goalEnd)}` : ''}
+      </span>
+      {!editing && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="ml-auto h-7"
+          onClick={() => {
+            trackMetricEditOpen(goalId, 'progress_section', true)
+            onEdit()
+          }}
+        >
+          수치 수정
+        </Button>
+      )}
+    </div>
+  )
+}
+
 // ─── 지난 기록 ────────────────────────────────────────────────
 
 function RecentLogs({
@@ -279,7 +327,10 @@ function RecentLogs({
 
 // ─── 수치 목표 ────────────────────────────────────────────────
 
-function MetricView({ goalId, p, m }: { goalId: number; p: GoalProgress; m: MetricProgress }) {
+function MetricView({ goal, p, m }: { goal: GoalCategory; p: GoalProgress; m: MetricProgress }) {
+  const goalId = goal.goalCategoryId
+  const [editingMetric, setEditingMetric] = useState(false)
+  const metricEnd = m.targetDate ?? p.endDate
   // 지난 기록 "수정" → 입력창에 불러오기 (CheckIn 을 새 key 로 다시 띄워 초기값을 넣어요)
   const [loaded, setLoaded] = useState<{ date: string; value: number; n: number } | null>(null)
 
@@ -303,8 +354,18 @@ function MetricView({ goalId, p, m }: { goalId: number; p: GoalProgress; m: Metr
 
   return (
     <>
+      <MetricHead
+        goalId={goalId}
+        m={m}
+        metricEnd={metricEnd}
+        own={!!goal.metricTargetDate}
+        goalEnd={p.endDate}
+        onEdit={() => setEditingMetric(true)}
+        editing={editingMetric}
+      />
+      {editingMetric && <MetricEditForm goal={goal} entry="progress_section" onDone={() => setEditingMetric(false)} />}
       <TrackBar m={m} />
-      <Insight m={m} endDate={p.endDate} />
+      <Insight m={m} endDate={metricEnd} />
 
       {/* 오늘 기록은 화면 위 "오늘 기록" 카드에서 해요. 여기서는 지난 기록을 고칠 때만 입력창을 열어요 */}
       {loaded && (
@@ -486,9 +547,10 @@ function TaskLine({ t }: { t: TaskProgress }) {
 
 // ─── 수치 없는 목표: Task 누적 ───────────────────────────────────
 
-function TaskView({ goalId, p }: { goalId: number; p: GoalProgress }) {
+function TaskView({ goal, p }: { goal: GoalCategory; p: GoalProgress }) {
+  const goalId = goal.goalCategoryId
   const t = p.tasks
-  const edit = useEditing('goal')
+  const [metricForm, setMetricForm] = useState(false)
   const behind = Math.max(t.dueByToday - t.completed, 0)
   const ratio = t.dueByToday === 0 ? 0 : Math.min(t.completed / t.dueByToday, 1)
 
@@ -575,23 +637,21 @@ function TaskView({ goalId, p }: { goalId: number; p: GoalProgress }) {
           몸무게·점수·권수처럼 숫자로 잴 수 있는 목표라면, 목표 수치를 정하고 매일 기록해 보세요. 목표까지 남은 거리를
           그래프로 보여드려요.
         </p>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => {
-            // 헤더 '수정'과 같은 목표 수정 입력창이 열려요 (수치 없는 목표 = 목표형)
-            track('goal_detail.edit_open', {
-              goal_category_id: goalId,
-              goal_mode: 'ACHIEVEMENT',
-              entry_point: 'progress_cta',
-            })
-            edit.open()
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-          }}
-        >
-          목표 수치 정하기
-        </Button>
+        {!metricForm && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              // 목표 전체 수정 대신 수치만 정하는 입력창 (2026-10)
+              trackMetricEditOpen(goalId, 'progress_cta', false)
+              setMetricForm(true)
+            }}
+          >
+            목표 수치 정하기
+          </Button>
+        )}
       </div>
+      {metricForm && <MetricEditForm goal={goal} entry="progress_cta" onDone={() => setMetricForm(false)} />}
     </>
   )
 }
@@ -615,7 +675,7 @@ export function ProgressSection({ goal }: { goal: GoalCategory }) {
   const m = p.metric
   return (
     <Section title="지금 어디쯤?" aside={m ? <StatusChip status={m.status} /> : undefined}>
-      {m ? <MetricView goalId={goal.goalCategoryId} p={p} m={m} /> : <TaskView goalId={goal.goalCategoryId} p={p} />}
+      {m ? <MetricView goal={goal} p={p} m={m} /> : <TaskView goal={goal} p={p} />}
     </Section>
   )
 }

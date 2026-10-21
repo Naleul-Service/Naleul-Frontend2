@@ -125,6 +125,29 @@ export function useRescheduleTask() {
   )
 }
 
+/**
+ * 다른 날로 옮기기 (2026-10) — 블록 상세 "다른 날로"(내일 · 모레 · 날짜 지정) · 시간 미정끼리 드래그.
+ *  - keepTime true: 그날 같은 시각으로 놓아 봐요. 자리가 없으면 그날 "시간 미정"으로 (응답 plannedStartAt 이 null)
+ *  - keepTime false: 그날 "시간 미정"으로
+ * 루틴은 시간 미정이 될 수 없어 같은 시각에 자리가 없으면 409 예요.
+ */
+export function useMoveTaskDate() {
+  return useTimetableMutation(
+    (v: { taskId: number; date: string; keepTime: boolean; label?: string }) =>
+      api.patch<TimeBlockTask>(`/v1/tasks/${v.taskId}/date`, { date: v.date, keepTime: v.keepTime }),
+    {
+      success: (r, v) => {
+        const day = v.label ?? `${Number(v.date.slice(5, 7))}/${Number(v.date.slice(8, 10))}`
+        if (!r?.plannedStartAt)
+          return v.keepTime
+            ? `${day} 같은 시간엔 자리가 없어서 그날 시간 미정으로 옮겼어요.`
+            : `${day} 시간 미정으로 옮겼어요.`
+        return `${day}로 옮겼어요.`
+      },
+    }
+  )
+}
+
 /** 여러 Task 를 한 번에 옮기기 (묶음 드래그) — 하나라도 자리가 없으면 아무것도 바뀌지 않아요 */
 export function useRescheduleBatch() {
   return useTimetableMutation(

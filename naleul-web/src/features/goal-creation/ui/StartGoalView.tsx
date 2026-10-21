@@ -202,6 +202,7 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             value={kind}
             onChange={setKind}
             disabled={busy}
+            achievementOnly
             onPickType={(t) => track('goal_new.kind_type_select', { goal_type: t })}
             onPickSub={(t, s) => track('goal_new.kind_sub_select', { goal_type: t, goal_sub_type: s })}
           />
@@ -250,7 +251,9 @@ export function StartGoalView({ sourceGoalId }: { sourceGoalId?: number }) {
             {goalText ? (
               <>
                 <span className="text-text-brand">
-                  &ldquo;{goalText.length > 24 ? `${goalText.slice(0, 24)}…` : goalText}&rdquo;
+                  &ldquo;
+                  {goalText.length > 24 ? `${goalText.slice(0, 24)}…` : goalText}
+                  &rdquo;
                 </span>{' '}
                 목표를 이루기 위해 꼭 해야 할 일들이 있나요?
               </>

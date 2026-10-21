@@ -7,7 +7,7 @@ import { CalendarClock, Check, Clock, Pin, Pencil, Repeat, Trash, X } from '@/co
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
-import { track } from '@/lib/client/analytics'
+import { track, type EventProps } from '@/lib/client/analytics'
 import { errorStatusOf } from '@/features/home/analytics'
 import { useGoalCategory } from '@/features/goal/api'
 import { InlineConfirm } from '@/features/goal/edit/inline'
@@ -15,6 +15,7 @@ import { useUpdateGoalTask, type GoalTaskInput } from '@/features/goal/edit/muta
 import { useRescheduleTask, useRoutineScopedReschedule, type ChangeScope } from '../api'
 import { goalAccent } from '@/lib/goalTone'
 import {
+  addDays,
   formatDuration,
   formatMonthDay,
   minutesFrom,
@@ -33,6 +34,8 @@ export interface TaskActions {
   onToggleComplete: (t: TimeBlockTask) => void
   onUnlock: (t: TimeBlockTask) => void
   onUnschedule: (t: TimeBlockTask) => void
+  /** 다른 날로 옮기기 (2026-10) — 같은 시각으로 놓아 보고, 자리가 없으면 그날 시간 미정 */
+  onMoveDate?: (t: TimeBlockTask, date: string, label: string) => void
   /** 삭제 확인 띄우기 (Delete 키와 같은 동작) */
   onDelete: (t: TimeBlockTask) => void
   /** "계획과 다른 시간에 했어요" — 실제 시각을 입력하고 완료 (나의 패턴 시작 지연 계산용) */
@@ -55,6 +58,8 @@ export function taskPermissions(t: TimeBlockTask) {
     editContent: t.sourceType === 'MANUAL' && !!t.goalCategoryId && !!t.generalCategoryId,
     unlock: t.locked && !done && !mission,
     unschedule: t.sourceType === 'MANUAL' && !!t.plannedStartAt && !done, // 루틴·미션은 400
+    // 다른 날로: 완료·미션 X. 루틴은 시간이 있을 때만 (시간 미정이 될 수 없어서 같은 시각으로만 옮겨요)
+    moveDate: !done && !mission && (t.sourceType !== 'ROUTINE' || !!t.plannedStartAt),
     delete: !mission,
   }
 }
@@ -255,6 +260,7 @@ export function TaskDetail({
   surface?: TimetableSurface
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [movePanel, setMovePanel] = useState(false)
   const [editing, setEditing] = useState<EditKey>(null)
   const [draft, setDraft] = useState({ emoji: '', name: '' })
   const perm = taskPermissions(t)
@@ -292,7 +298,13 @@ export function TaskDetail({
    * 완료·고정 풀기·시간 미정·삭제 요청은 훅(useTimetableInteractions)이 보내요.
    * 방금 시작된 요청을 MutationCache 에서 찾아 결과를 기다려요 (성공하면 이 창은 곧 닫혀요).
    */
-  const runAction = (action: 'complete' | 'uncomplete' | 'unlock' | 'unschedule' | 'delete', fn: () => void) => {
+  const runAction = (
+    action: 'complete' | 'uncomplete' | 'unlock' | 'unschedule' | 'move_date' | 'delete',
+    fn: () => void,
+    /** 결과 이벤트에 더할 속성 (move_date: move_option · to_date, 성공하면 kept_time) */
+    extra?: EventProps,
+    onData?: (data: unknown) => EventProps
+  ) => {
     const cache = qc.getMutationCache()
     const before = new Set(cache.getAll())
     fn()
@@ -302,7 +314,13 @@ export function TaskDetail({
       if (ev.type !== 'updated' || ev.mutation !== m) return
       if (ev.action.type === 'success') {
         unsub()
-        track('task_detail.action_result', { surface, task_action: action, result: 'success' })
+        track('task_detail.action_result', {
+          surface,
+          task_action: action,
+          result: 'success',
+          ...extra,
+          ...onData?.(ev.action.data),
+        })
       } else if (ev.action.type === 'error') {
         unsub()
         track('task_detail.action_result', {
@@ -310,6 +328,7 @@ export function TaskDetail({
           task_action: action,
           result: 'fail',
           error_status: errorStatusOf(ev.action.error),
+          ...extra,
         })
       }
     })
@@ -723,7 +742,7 @@ export function TaskDetail({
             {!done && <Check className="size-4" />}
             {done ? '완료 취소' : '완료'}
           </Button>
-          {(perm.unlock || perm.unschedule || perm.delete || chain > 1) && (
+          {(perm.unlock || perm.unschedule || perm.moveDate || perm.delete || chain > 1) && (
             <div className="relative">
               <Button
                 variant="secondary"
@@ -733,6 +752,7 @@ export function TaskDetail({
                 onClick={() => {
                   if (!menuOpen) track('task_detail.menu_open', { ...base, source_type: t.sourceType })
                   setMenuOpen((v) => !v)
+                  setMovePanel(false)
                 }}
               >
                 <Ellipsis className="size-4" />
@@ -775,6 +795,40 @@ export function TaskDetail({
                       <Clock className="size-4" />
                       시간 미정으로
                     </MenuItem>
+                  )}
+                  {perm.moveDate && actions.onMoveDate && (
+                    <MenuItem
+                      onClick={() => {
+                        if (!movePanel) track('task_detail.move_date_click', { ...base, source_type: t.sourceType })
+                        setMovePanel((v) => !v)
+                      }}
+                    >
+                      <CalendarClock className="size-4" />
+                      다른 날로
+                      <span className="text-ink-4 ml-auto text-[11px]">{movePanel ? '▴' : '▾'}</span>
+                    </MenuItem>
+                  )}
+                  {perm.moveDate && actions.onMoveDate && movePanel && (
+                    <MoveDatePanel
+                      t={t}
+                      onPick={(date, label, option) => {
+                        track('task_detail.move_date_select', {
+                          ...base,
+                          source_type: t.sourceType,
+                          move_option: option,
+                          day_offset: Math.round((Date.parse(date) - Date.parse(todayKst())) / 86_400_000),
+                          is_scheduled: !!t.plannedStartAt,
+                        })
+                        setMenuOpen(false)
+                        setMovePanel(false)
+                        runAction(
+                          'move_date',
+                          () => actions.onMoveDate?.(t, date, label),
+                          { move_option: option, to_date: date },
+                          (data) => ({ kept_time: !!(data as TimeBlockTask | undefined)?.plannedStartAt })
+                        )
+                      }}
+                    />
                   )}
                   {perm.delete && (
                     <MenuItem
@@ -825,6 +879,65 @@ export function TaskDetail({
             이 시간에 다른 일을 했어요
           </button>
         )}
+    </div>
+  )
+}
+
+/** "다른 날로" — 내일 · 모레 · 날짜 지정 (오늘 기준). 지금 있는 날은 고를 수 없어요 */
+function MoveDatePanel({
+  t,
+  onPick,
+}: {
+  t: TimeBlockTask
+  onPick: (date: string, label: string, option: 'tomorrow' | 'day_after' | 'custom') => void
+}) {
+  const today = todayKst()
+  const current = t.plannedStartAt?.slice(0, 10) ?? t.date ?? t.scheduledDate ?? null
+  const [custom, setCustom] = useState('')
+  const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8, 10))}`
+  const quick: { key: 'tomorrow' | 'day_after'; label: string; date: string }[] = [
+    { key: 'tomorrow', label: '내일', date: addDays(today, 1) },
+    { key: 'day_after', label: '모레', date: addDays(today, 2) },
+  ]
+  return (
+    <div className="bg-subtle/60 border-line border-y px-2 py-2">
+      <div className="flex gap-1.5">
+        {quick.map((q) => (
+          <button
+            key={q.key}
+            type="button"
+            disabled={q.date === current}
+            onClick={() => onPick(q.date, q.label, q.key)}
+            className="bg-surface border-line hover:border-line-strong flex-1 rounded-lg border px-2 py-1.5 text-[13px] font-semibold disabled:opacity-40"
+          >
+            {q.label}
+            <span className="text-ink-3 ml-1 text-[11px] font-normal tabular-nums">{md(q.date)}</span>
+          </button>
+        ))}
+      </div>
+      <div className="mt-1.5 flex items-center gap-1.5">
+        <input
+          type="date"
+          value={custom}
+          min={today}
+          onChange={(e) => setCustom(e.target.value)}
+          aria-label="옮길 날짜"
+          className="bg-surface border-line h-8 min-w-0 flex-1 rounded-lg border px-2 text-[13px]"
+        />
+        <button
+          type="button"
+          disabled={!custom || custom < today || custom === current}
+          onClick={() => onPick(custom, md(custom), 'custom')}
+          className="bg-action-primary-bg text-action-primary-fg h-8 shrink-0 rounded-lg px-2.5 text-[12px] font-semibold disabled:opacity-40"
+        >
+          옮기기
+        </button>
+      </div>
+      <p className="text-ink-4 mt-1.5 px-0.5 text-[11px] leading-snug">
+        {t.plannedStartAt
+          ? '같은 시간으로 옮겨요. 자리가 없으면 그날 시간 미정으로 가요.'
+          : '그날 시간 미정으로 옮겨요.'}
+      </p>
     </div>
   )
 }

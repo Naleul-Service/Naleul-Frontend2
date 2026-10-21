@@ -356,12 +356,12 @@ function AddHabit({ existing, dueCount }: { existing: Habit[]; dueCount: number 
  *  - 오른쪽: 습관별 잔디 (‹ › 로 한 달씩, 세로 요일 × 가로 주)
  *  - 아래: 일회성 할 일 (병원 가기 · 친구 만나기) — 습관과 달리 한 번 하고 끝나요
  */
-/** 기본 생활 습관 탭 (명세 12.5) — 오늘(체크) · 진행(잔디) · 할 일 */
-type HabitTab = 'today' | 'progress' | 'tasks'
+/** 기본 생활 습관 탭 (명세 12.5) — 오늘(체크) · 할 일 · 진행(잔디) */
+type HabitTab = 'today' | 'tasks' | 'progress'
 const HABIT_TABS: TabDef<HabitTab>[] = [
   { value: 'today', label: '오늘', icon: CalendarCheck },
-  { value: 'progress', label: '진행', icon: BarChart3 },
   { value: 'tasks', label: '할 일', icon: ListChecks },
+  { value: 'progress', label: '진행', icon: BarChart3 },
 ]
 
 export function HabitView({ goal }: { goal: GoalCategory }) {

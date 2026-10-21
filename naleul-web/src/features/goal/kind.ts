@@ -118,6 +118,23 @@ export const GOAL_TYPES: { value: GoalType; label: string; emoji: string; hint: 
 ]
 
 /**
+ * AI 목표형 만들기에서 고를 수 있는 카테고리 (2026-10).
+ * 세수 · 물 마시기 · 기상 같은 "기본 생활 패턴"은 생활 습관(HABIT)으로 따로 체크하니 빼고,
+ * 이뤄야 하고 수치로 잴 수 있는 것만 남겨요. 개수가 적어서 1·2단계 없이 칩 한 줄로 보여줘요.
+ */
+export const AI_KIND_CHIPS: { goalType: GoalType; goalSubType: GoalSubType }[] = [
+  { goalType: 'HEALTH', goalSubType: 'EXERCISE' },
+  { goalType: 'HEALTH', goalSubType: 'DIET' },
+  { goalType: 'HEALTH', goalSubType: 'NO_ALCOHOL' },
+  { goalType: 'HEALTH', goalSubType: 'NO_SMOKING' },
+  { goalType: 'LEARNING', goalSubType: 'LANGUAGE' },
+  { goalType: 'LEARNING', goalSubType: 'CERTIFICATE' },
+  { goalType: 'LEARNING', goalSubType: 'READING' },
+  { goalType: 'LEARNING', goalSubType: 'CODING' },
+  { goalType: 'ETC', goalSubType: 'OTHER' },
+]
+
+/**
  * "이 목표를 위해 꼭 하고 싶은 일" 추천 칩 (AI 목표 시작 화면).
  * 고른 일은 계획 AI 가 반드시 루틴으로 넣어요. 기타는 추천 없이 직접 적어요.
  */

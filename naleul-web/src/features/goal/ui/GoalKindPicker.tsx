@@ -3,7 +3,15 @@
 import { useState } from 'react'
 import { Chip } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
-import { GOAL_TYPES, KIND_LABEL_MAX, subOption, type GoalKindValue, type GoalSubType, type GoalType } from '../kind'
+import {
+  AI_KIND_CHIPS,
+  GOAL_TYPES,
+  KIND_LABEL_MAX,
+  subOption,
+  type GoalKindValue,
+  type GoalSubType,
+  type GoalType,
+} from '../kind'
 
 /**
  * 목표 카테고리 2단계 선택 (명세 6.A.1.2).
@@ -19,6 +27,7 @@ export function GoalKindPicker({
   compact = false,
   onPickType,
   onPickSub,
+  achievementOnly = false,
 }: {
   value: GoalKindValue | null
   onChange: (v: GoalKindValue | null) => void
@@ -28,6 +37,8 @@ export function GoalKindPicker({
   /** 분석용: 1단계 · 2단계를 눌렀을 때 */
   onPickType?: (t: GoalType) => void
   onPickSub?: (t: GoalType, s: GoalSubType) => void
+  /** AI 목표형 만들기 — 기본 생활 패턴(물 마시기 · 생활습관)을 빼고 칩 한 줄로 (2026-10) */
+  achievementOnly?: boolean
 }) {
   // 1단계만 고르고 2단계는 아직인 상태
   const [pendingType, setPendingType] = useState<GoalType | null>(value?.goalType ?? null)
@@ -54,6 +65,42 @@ export function GoalKindPicker({
 
   const custom = value && subOption(value.goalSubType)?.custom
   const label = value?.goalKindLabel ?? ''
+
+  if (achievementOnly) {
+    return (
+      <div className="space-y-3">
+        <div role="radiogroup" aria-label="목표 카테고리" className="flex flex-wrap gap-2">
+          {AI_KIND_CHIPS.map((k) => {
+            const o = subOption(k.goalSubType)
+            const selected = value?.goalSubType === k.goalSubType
+            return (
+              <Chip
+                key={k.goalSubType}
+                size={compact ? 'sm' : 'md'}
+                selected={selected}
+                disabled={disabled}
+                role="radio"
+                aria-checked={selected}
+                onClick={() => {
+                  onPickType?.(k.goalType)
+                  onPickSub?.(k.goalType, k.goalSubType)
+                  onChange({
+                    goalType: k.goalType,
+                    goalSubType: k.goalSubType,
+                    goalKindLabel: o.custom ? (value?.goalKindLabel ?? '') : undefined,
+                  })
+                }}
+              >
+                <span className="mr-1">{o.emoji}</span>
+                {o.custom ? '기타 (직접 적기)' : o.label}
+              </Chip>
+            )
+          })}
+        </div>
+        {custom && <CustomLabel value={value!} label={label} disabled={disabled} onChange={onChange} />}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-3">
@@ -135,6 +182,36 @@ export function GoalKindPicker({
           </span>
         </div>
       )}
+    </div>
+  )
+}
+
+function CustomLabel({
+  value,
+  label,
+  disabled,
+  onChange,
+}: {
+  value: GoalKindValue
+  label: string
+  disabled?: boolean
+  onChange: (v: GoalKindValue | null) => void
+}) {
+  return (
+    <div className="relative max-w-[320px]">
+      <input
+        value={label}
+        maxLength={KIND_LABEL_MAX}
+        autoFocus
+        disabled={disabled}
+        onChange={(e) => onChange({ ...value, goalKindLabel: e.target.value })}
+        placeholder="예) 악기 연습 · 포트폴리오"
+        aria-label="카테고리 이름 직접 입력"
+        className="border-border-subtle bg-surface placeholder:text-text-placeholder focus:border-border-focus rounded-input h-10 w-full border pr-14 pl-3 text-[14px] outline-none"
+      />
+      <span className="text-ink-4 absolute top-1/2 right-3 -translate-y-1/2 text-[12px] tabular-nums">
+        {label.length}/{KIND_LABEL_MAX}
+      </span>
     </div>
   )
 }

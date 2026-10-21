@@ -7,7 +7,7 @@ import { track } from '@/lib/client/analytics'
 import { dateRelationOf } from '@/features/home/analytics'
 import { goalAccent } from '@/lib/goalTone'
 import { formatMonthDay, hm, minutesFrom } from '../time'
-import type { TimeBlockTask, TimetableDay } from '../types'
+import type { CarriedOutBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 
 /** 그날 정렬용 시작 분 (시간 미정은 맨 뒤) */
@@ -26,6 +26,7 @@ export function DayTaskList({
   onToggle,
   togglingId,
   analytics = true,
+  onCarriedClick,
 }: {
   day: TimetableDay | undefined
   today: string
@@ -34,6 +35,8 @@ export function DayTaskList({
   togglingId: number | null
   /** calendar_day_list.* 를 보낼지 — 캘린더 밖에서 쓰면 false */
   analytics?: boolean
+  /** 다른 날로 옮긴 일(흔적)을 눌렀을 때 */
+  onCarriedClick?: (c: CarriedOutBlock, fromDate: string) => void
 }) {
   if (!day) return null
   const dayDate = day.date
@@ -69,6 +72,8 @@ export function DayTaskList({
   const todo = sorted.filter((t) => t.taskStatus !== 'COMPLETED')
   const done = sorted.filter((t) => t.taskStatus === 'COMPLETED')
   const title = day.date === today ? '오늘 할 일' : `${formatMonthDay(day.date)} 할 일`
+  // 이날 못 해서 다른 날로 옮겨진 일 — 목록 맨 아래에 흔적으로 (개수 · 진행률에는 넣지 않아요)
+  const carried = (day.carriedOut ?? []).filter((c) => !all.some((t) => t.taskId === c.taskId))
 
   return (
     <section
@@ -85,7 +90,7 @@ export function DayTaskList({
         <ProgressBar value={done.length / all.length} className="mx-4 mt-3 shrink-0" />
       )}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
-        {all.length === 0 ? (
+        {all.length === 0 && !carried.length ? (
           <p className="text-ink-3 px-2 py-8 text-center text-[13px]">이날 할 일이 없어요.</p>
         ) : (
           <>
@@ -94,7 +99,37 @@ export function DayTaskList({
                 <Row key={t.taskId} t={t} onSelect={select} onToggle={toggle} busy={togglingId === t.taskId} />
               ))}
             </ul>
-            {todo.length === 0 && <p className="text-success px-2 py-3 text-[13px] font-semibold">모두 끝냈어요 🎉</p>}
+            {todo.length === 0 && all.length > 0 && (
+              <p className="text-success px-2 py-3 text-[13px] font-semibold">모두 끝냈어요 🎉</p>
+            )}
+            {carried.length > 0 && (
+              <>
+                <p className="text-ink-3 mt-3 px-2 pb-1 text-[12px] font-semibold">
+                  못 해서 다른 날로 옮긴 일 {carried.length}
+                </p>
+                <ul>
+                  {carried.map((c) => (
+                    <li key={`carried-${c.taskId}`}>
+                      <button
+                        type="button"
+                        disabled={!onCarriedClick}
+                        onClick={() => onCarriedClick?.(c, dayDate)}
+                        className="hover:bg-subtle flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-[14px] disabled:hover:bg-transparent"
+                      >
+                        <b className="text-danger w-[18px] shrink-0 text-center">*</b>
+                        <s className="text-ink-3 decoration-ink-4 min-w-0 flex-1 truncate">
+                          {c.emoji ? `${c.emoji} ` : ''}
+                          {c.taskName}
+                        </s>
+                        <span className="text-ink-3 shrink-0 text-[12px] font-semibold">
+                          → {formatMonthDay(c.toDate)}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             {done.length > 0 && (
               <>
                 <p className="text-ink-3 mt-3 px-2 pb-1 text-[12px] font-semibold">완료 {done.length}</p>

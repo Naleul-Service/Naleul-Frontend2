@@ -101,6 +101,8 @@ export interface GoalCategory {
   startValue?: number | null
   currentValue?: number | null
   targetValue?: number | null
+  /** 수치 목표 마감일 (V58). null 이면 목표 종료일을 따라요 */
+  metricTargetDate?: string | null
   milestones?: MilestoneInfo[] | null
   /** 목록 조회에서만 — 마지막 활동일 (Task 완료 · 수치 기록) */
   lastActivityDate?: string | null
@@ -192,6 +194,20 @@ export interface RoutineHeatmap {
   completedDates: string[]
   currentStreak: number
   longestStreak: number
+  /** 주로 몇 시부터 몇 시에 했는지. 시각 기록이 없으면 null */
+  timeStats?: RoutineTimeStats | null
+}
+
+export interface RoutineTimeStats {
+  /** "HH:mm" */
+  bestStart: string
+  bestEnd: string
+  /** 시각을 알 수 있는 실천 횟수 */
+  practiceCount: number
+  /** 그중 bestStart~bestEnd 에 걸친 횟수 */
+  inWindowCount: number
+  /** 0~23시 각 시간에 걸친 실천 횟수 */
+  hourly: number[]
 }
 
 export function useRoutineHeatmap(goalId: number) {
@@ -236,6 +252,8 @@ export interface MetricProgress {
   loggedToday: boolean
   planLine: ProgressPoint[]
   logs: MetricLog[]
+  /** 수치 목표 마감일 (V58) — 따로 정하지 않았으면 목표 종료일. 추가 그래프는 목표 종료일 */
+  targetDate?: string | null
 }
 
 export interface TaskProgressPoint {

@@ -7,15 +7,17 @@ import { useToggleHabitBlock } from '../api'
 import {
   MAX_TASKS_AT_ONCE,
   crowdedTasks,
+  hexOf,
   layoutColumns,
   placeActivities,
   placeFixed,
   placeSleep,
   placeTasks,
+  withAlpha,
   type Placed,
 } from '../layout'
 import { WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, hm, minutesFrom, nowKst, weekdayIndex } from '../time'
-import type { ActualActivity, FixedBlock, HabitBlock, TimeBlockTask, TimetableDay } from '../types'
+import type { ActualActivity, CarriedOutBlock, FixedBlock, HabitBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityBlock, FixedBlockView, HATCH, SleepBlockView, TaskBlock, taskColors } from './Blocks'
 import {
   canUnschedule,
@@ -103,6 +105,8 @@ interface Props {
   onGroupClear?: () => void
   /** 앞날 · 지금 이후 빈 칸도 onEmptyClick 으로 (캘린더 + 메뉴 — 명세 11.4) */
   allowFutureEmpty?: boolean
+  /** 다른 날로 옮겨진 Task 흔적을 눌렀을 때 (옮겨 간 날로 이동) — 없으면 흔적을 누를 수 없어요 */
+  onCarriedClick?: (c: CarriedOutBlock, fromDate: string) => void
 }
 
 /** 기상은 취침보다, 취침은 기상보다 30분 이상 떨어져야 해요 (같은 날 칸 기준) */
@@ -143,7 +147,8 @@ function validateActual(
 }
 
 function sameAsSource(source: DragSource, target: DropTarget) {
-  if (target.type === 'unscheduled') return source.start === null
+  // 시간 미정 → 같은 날 시간 미정은 그대로 (다른 날 시간 미정 칸이면 날짜만 옮겨요)
+  if (target.type === 'unscheduled') return source.start === null && source.date === target.date
   return target.date === source.date && target.start === source.start && target.end === source.end
 }
 
@@ -183,6 +188,7 @@ export function TimeGrid({
   onTaskHold,
   onGroupClear,
   allowFutureEmpty = false,
+  onCarriedClick,
 }: Props) {
   const now = useNowKst()
   const from = startHour * 60
@@ -375,7 +381,9 @@ export function TimeGrid({
   // 지금 시각 선이 보이는 칸이 있으면 시간 눈금에 시각 표시 (명세 9.6)
   const nowMinutes = days.map((d) => nowLine(d.date)).find((m) => m !== null) ?? null
   // Task 를 끌고 있으면 "시간 미정"으로 놓을 수 있게 빈 줄이라도 보여줘요
-  const showUnscheduledRow = days.some((d) => d.unscheduledTasks.length > 0) || (!!drag && canUnschedule(drag.source))
+  const showUnscheduledRow =
+    days.some((d) => d.unscheduledTasks.length > 0 || (d.carriedOut ?? []).some((c) => !c.start)) ||
+    (!!drag && canUnschedule(drag.source))
 
   return (
     <div
@@ -469,6 +477,8 @@ export function TimeGrid({
                 key={d.date}
                 date={d.date}
                 tasks={d.unscheduledTasks}
+                carried={(d.carriedOut ?? []).filter((c) => !c.start)}
+                onCarriedClick={onCarriedClick}
                 selection={selection}
                 onSelect={selectTask}
                 drag={drag}
@@ -580,6 +590,7 @@ export function TimeGrid({
                 />
               ))}
               <HabitBlocks day={d} from={from} to={to} right={split ? 'var(--actual-w)' : '0'} onToggle={onHabitToggle} />
+              <CarriedTraces day={d} from={from} to={to} right={split ? 'var(--actual-w)' : '0'} onClick={onCarriedClick} />
               <div
                 className={cn(
                   'pointer-events-none absolute inset-y-0 left-0 *:pointer-events-auto',
@@ -751,6 +762,8 @@ export function TimeGrid({
 function UnscheduledCell({
   date,
   tasks,
+  carried = [],
+  onCarriedClick,
   selection,
   onSelect,
   drag,
@@ -759,6 +772,9 @@ function UnscheduledCell({
 }: {
   date: string
   tasks: TimeBlockTask[]
+  /** 시간 미정이던 Task 가 다른 날로 옮겨진 흔적 */
+  carried?: CarriedOutBlock[]
+  onCarriedClick?: (c: CarriedOutBlock, fromDate: string) => void
   selection: Selection
   onSelect: (t: TimeBlockTask, e: MouseEvent<HTMLElement>) => void
   drag: DragState | null
@@ -777,7 +793,14 @@ function UnscheduledCell({
         isTarget && 'bg-brand-soft outline-brand outline-2 -outline-offset-2 outline-dashed'
       )}
     >
-      {isTarget && <p className="text-text-brand px-1 text-[11px] font-semibold">여기에 놓으면 시간 미정</p>}
+      {isTarget && (
+        <p className="text-text-brand px-1 text-[11px] font-semibold">
+          {drag?.source.date !== date ? '여기에 놓으면 이날 시간 미정' : '여기에 놓으면 시간 미정'}
+        </p>
+      )}
+      {carried.map((c) => (
+        <CarriedChip key={`carried-${c.taskId}`} c={c} fromDate={date} onClick={onCarriedClick} />
+      ))}
       {shown.map((t) => {
         const draggable = !!onDragDown && canDragTask(t)
         return (
@@ -814,6 +837,97 @@ function UnscheduledCell({
         </button>
       )}
     </div>
+  )
+}
+
+/** "11/19" */
+const shortDate = (ymd: string) => `${Number(ymd.slice(5, 7))}/${Number(ymd.slice(8, 10))}`
+
+/**
+ * 못 해서 다른 날로 옮겨진 Task 의 흔적 (2026-10) — 원래 자리에 흐린 점선 "* 이름 → 11/19".
+ * 끌 수 없고 실행률에도 안 들어가요. 누르면 옮겨 간 날로 가요.
+ */
+function CarriedTraces({
+  day,
+  from,
+  to,
+  right,
+  onClick,
+}: {
+  day: TimetableDay
+  from: number
+  to: number
+  right: string
+  onClick?: (c: CarriedOutBlock, fromDate: string) => void
+}) {
+  const list = (day.carriedOut ?? []).flatMap((c) => {
+    if (!c.start) return []
+    const s = Math.max(minutesFrom(day.date, c.start), from)
+    const e = Math.min(c.end ? minutesFrom(day.date, c.end) : s + 30, to)
+    return e > s ? [{ c, s, e }] : []
+  })
+  if (!list.length) return null
+  return (
+    <div className="pointer-events-none absolute inset-y-0 left-0" style={{ right }}>
+      {list.map(({ c, s, e }) => {
+        const h = Math.max((e - s) * PPM - 2, 16)
+        return (
+          <button
+            key={`carried-${c.taskId}`}
+            type="button"
+            disabled={!onClick}
+            onClick={(ev) => {
+              ev.stopPropagation()
+              onClick?.(c, day.date)
+            }}
+            title={`못 한 일 · ${shortDate(c.toDate)}로 옮겼어요`}
+            className="rounded-event text-label-sm text-ink-3 pointer-events-auto absolute inset-x-[2px] flex flex-col overflow-hidden border border-dashed py-0.5 pr-1.5 pl-2 text-left opacity-70 hover:opacity-100 disabled:cursor-default"
+            style={{
+              top: (s - from) * PPM,
+              height: h,
+              borderColor: withAlpha(hexOf(c.goalColorCode), 0.7),
+              background: withAlpha(hexOf(c.goalColorCode), 0.06),
+            }}
+          >
+            <span className="truncate">
+              <b className="text-danger mr-0.5">*</b>
+              <s className="decoration-ink-4">
+                {c.emoji ? `${c.emoji} ` : ''}
+                {c.taskName}
+              </s>
+            </span>
+            {h >= 30 && <span className="truncate text-[10px] font-semibold">→ {shortDate(c.toDate)}로 옮김</span>}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function CarriedChip({
+  c,
+  fromDate,
+  onClick,
+}: {
+  c: CarriedOutBlock
+  fromDate: string
+  onClick?: (c: CarriedOutBlock, fromDate: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={!onClick}
+      onClick={() => onClick?.(c, fromDate)}
+      title={`못 한 일 · ${shortDate(c.toDate)}로 옮겼어요`}
+      className="rounded-event text-label-sm text-ink-3 border-line shrink-0 truncate border border-dashed py-1 pr-2 pl-2 text-left opacity-75 hover:opacity-100 disabled:cursor-default"
+    >
+      <b className="text-danger mr-0.5">*</b>
+      <s className="decoration-ink-4">
+        {c.emoji ? `${c.emoji} ` : ''}
+        {c.taskName}
+      </s>
+      <span className="ml-1 text-[10px] font-semibold">→ {shortDate(c.toDate)}</span>
+    </button>
   )
 }
 

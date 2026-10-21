@@ -95,13 +95,12 @@ export const durationOf = (s: DragSource) =>
       ? (s.task.plannedDurationMinutes ?? DEFAULT_MINUTES)
       : DEFAULT_MINUTES
 
-/** 시간 미정으로 보낼 수 있는 Task (백엔드: 루틴·미션은 400) */
+/**
+ * 시간 미정 칸에 놓을 수 있는 Task (백엔드: 루틴·미션은 400).
+ * 시간 미정 Task 도 다른 날의 시간 미정 칸으로 옮길 수 있어요 (2026-10 · PATCH /tasks/{id}/date)
+ */
 export const canUnschedule = (s: DragSource) =>
-  s.kind === 'task' &&
-  s.start !== null &&
-  !s.group?.length &&
-  s.task.sourceType === 'MANUAL' &&
-  s.task.taskStatus !== 'COMPLETED'
+  s.kind === 'task' && !s.group?.length && s.task.sourceType === 'MANUAL' && s.task.taskStatus !== 'COMPLETED'
 
 /**
  * 묶음 드래그 결과: 끈 Task 를 포함해 묶음 전체가 놓일 자리.

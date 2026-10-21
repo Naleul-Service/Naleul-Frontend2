@@ -3,8 +3,19 @@
  * — 노션 Tracking Plan 「회고」 분류의 event 컬럼 그대로예요. track('reflections.pageview', ...) 처럼 써요.
  */
 export const REFLECTION_EVENTS = [
+  'reflection_detail.close',
+  'reflection_detail.delete_cancel',
+  'reflection_detail.delete_click',
+  'reflection_detail.delete_confirm',
+  'reflection_detail.delete_fail',
+  'reflection_detail.edit_cancel',
+  'reflection_detail.edit_click',
+  'reflection_detail.edit_fail',
+  'reflection_detail.edit_save',
+  'reflection_detail.goal_link_click',
+  'reflection_detail.view',
   'reflection_timeline.empty_view',
-  'reflection_timeline.entry_dead_click',
+  'reflection_timeline.entry_click',
   'reflection_timeline.goal_link_click',
   'reflection_timeline.load_fail',
   'reflection_timeline.nav_click',

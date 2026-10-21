@@ -156,7 +156,7 @@ export const LIMITS = {
   milestones: [0, 8],
   routines: [0, 10],
   oneTimes: [0, 30],
-  routineMinutes: [1, 240],
+  routineMinutes: [1, 480],
   oneTimeMinutes: [1, 480],
   routineDescription: 300,
 } as const

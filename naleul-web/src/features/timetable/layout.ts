@@ -232,8 +232,8 @@ export function withAlpha(hex: string, alpha: number) {
 // ─── 드래그 결과를 서버 응답 전에 먼저 보여주기 (낙관적 표시) ─────────────────
 
 export type Pending =
-  /** Task 를 date 의 start~end 로 옮김. date 가 null 이면 "시간 미정"으로 보냄 */
-  | { kind: 'task'; taskId: number; date: string | null; start: number; end: number }
+  /** Task 를 date 의 start~end 로 옮김. date 가 null 이면 "시간 미정"으로 보냄 (toDate 가 있으면 그날 시간 미정) */
+  | { kind: 'task'; taskId: number; date: string | null; start: number; end: number; toDate?: string }
   /** 고정 블록(fixedKey)을 그날 start~end 로 바꿈 */
   | { kind: 'fixed'; key: string; date: string; start: number; end: number }
 
@@ -272,7 +272,7 @@ export function applyPending(
           placedBy: 'USER',
           missed: false,
         })
-      } else if (p.date === null && (t.date ?? t.plannedStartAt?.slice(0, 10)) === d.date) {
+      } else if (p.date === null && (p.toDate ?? t.date ?? t.plannedStartAt?.slice(0, 10)) === d.date) {
         unscheduledTasks.push({ ...t, plannedStartAt: null, plannedEndAt: null, locked: false })
       }
     }

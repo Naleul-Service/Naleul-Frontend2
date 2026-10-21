@@ -4,7 +4,8 @@ import { useLayoutEffect, useRef, type KeyboardEvent } from 'react'
 import { ArrowUp } from '@/components/icons'
 import { cn } from '@/lib/cn'
 
-const MAX_LENGTH = 500
+/** 서버 USER_ANSWER_MAX_LENGTH 와 같아요 (마지막 "더 알려줄 정보" 질문은 길게 적을 수 있게 600) */
+const MAX_LENGTH = 600
 
 interface ChatComposerProps {
   value: string

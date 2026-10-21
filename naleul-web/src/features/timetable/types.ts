@@ -116,6 +116,23 @@ export interface TimetableDay {
   sleep?: { wake: FixedBlock | null; bed: FixedBlock | null } | null
   /** 시간대를 정한 기본 생활 습관 (예: 샤워 20:00~20:30) — 체크할 수 있는 블록 */
   habits?: HabitBlock[]
+  /**
+   * 이날 못 해서 다른 날로 옮겨진 Task 의 흔적 (2026-10) — 원래 자리에 흐린 점선 "* 이름 → 11/19로 옮김".
+   * 끌 수 없고 실행률 · 개수에도 넣지 않아요. 누르면 옮겨 간 날로 가요.
+   */
+  carriedOut?: CarriedOutBlock[]
+}
+
+export interface CarriedOutBlock {
+  taskId: number
+  taskName: string
+  emoji: string | null
+  goalColorCode: string | null
+  /** 원래 계획 시각 (시간 미정이었으면 null) */
+  start: string | null
+  end: string | null
+  /** 옮겨 간 날짜 */
+  toDate: string
 }
 
 export interface HabitBlock {

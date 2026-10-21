@@ -24,6 +24,7 @@ import {
   type ReflectionPeriod,
 } from '@/features/home/api'
 import { goalAccent } from '@/lib/goalTone'
+import { ReflectionDetailModal } from './ReflectionDetailModal'
 import {
   addDays,
   addMonths,
@@ -608,69 +609,100 @@ function EntryRow({
   const mood = moodOf(e.mood)
   const isRetro = e.kind === 'RETRO'
   const ago = daysAgo(e.date, today)
-  // 줄 본문을 눌렀지만 반응 없음 (목표 이름 링크 · 글자 고르기는 빼요)
-  const onDeadClick = (ev: React.MouseEvent<HTMLDivElement>) => {
+  const [detailOpen, setDetailOpen] = useState(false)
+  // 줄을 누르면 자세히 보기 모달 (목표 이름 링크 · 글자 고르기는 빼요)
+  const onRowClick = (ev: React.MouseEvent<HTMLDivElement>) => {
     if (ev.target instanceof Element && ev.target.closest('a')) return
     if (window.getSelection()?.toString()) return
-    track('reflection_timeline.entry_dead_click', {
+    track('reflection_timeline.entry_click', {
       surface,
       entry_kind: e.kind,
       days_ago: ago,
       goal_mode: e.goalMode ?? undefined,
     })
+    setDetailOpen(true)
   }
   return (
     // 회고 카드 줄 — 목표 줄 → 배지 줄(한 줄) → 내용
-    <div className="px-4 py-3" onClick={onDeadClick}>
-      {showGoal && (
-        <Link
-          href={`/goal/${e.goalCategoryId}`}
-          onClick={() =>
-            track('reflection_timeline.goal_link_click', {
-              surface,
-              goal_category_id: e.goalCategoryId,
-              goal_mode: e.goalMode ?? undefined,
-              entry_kind: e.kind,
-              days_ago: ago,
-            })
+    // 모달은 줄 밖에 둬요 (포털 안 클릭이 React 트리로 줄까지 올라와 다시 열리지 않게)
+    <>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-haspopup="dialog"
+        className="hover:bg-bg-sunken/60 cursor-pointer px-4 py-3 transition-colors"
+        onClick={onRowClick}
+        onKeyDown={(ev) => {
+          if (ev.target !== ev.currentTarget) return
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault()
+            setDetailOpen(true)
           }
-          className="text-label-sm text-text-secondary mb-1.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 hover:underline"
-        >
-          <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: goalAccent(e.colorCode) }} aria-hidden />
-          <span className="truncate">
-            {e.goalEmoji ? `${e.goalEmoji} ` : ''}
-            {e.goalName}
-          </span>
-        </Link>
-      )}
-      {(e.value != null || mood || (isRetro && e.reviewType && e.reviewType !== 'DAILY')) && (
-        <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
-          {e.value != null && (
-            <span className="bg-badge-bg flex min-w-0 shrink items-center gap-1 rounded-full px-2 py-1 text-[13px] whitespace-nowrap">
-              <span className="text-text-secondary truncate font-medium">{e.metricName ?? '수치'}</span>
-              <span className="text-text-primary shrink-0 font-semibold">
-                {fmt(e.value)}
-                {e.unit ?? ''}
+        }}
+      >
+        {showGoal && (
+          <Link
+            href={`/goal/${e.goalCategoryId}`}
+            onClick={() =>
+              track('reflection_timeline.goal_link_click', {
+                surface,
+                goal_category_id: e.goalCategoryId,
+                goal_mode: e.goalMode ?? undefined,
+                entry_kind: e.kind,
+                days_ago: ago,
+              })
+            }
+            className="text-label-sm text-text-secondary mb-1.5 flex w-fit max-w-full min-w-0 items-center gap-1.5 hover:underline"
+          >
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: goalAccent(e.colorCode) }}
+              aria-hidden
+            />
+            <span className="truncate">
+              {e.goalEmoji ? `${e.goalEmoji} ` : ''}
+              {e.goalName}
+            </span>
+          </Link>
+        )}
+        {(e.value != null || mood || (isRetro && e.reviewType && e.reviewType !== 'DAILY')) && (
+          <div className="flex min-w-0 flex-nowrap items-center gap-1.5">
+            {e.value != null && (
+              <span className="bg-badge-bg flex min-w-0 shrink items-center gap-1 rounded-full px-2 py-1 text-[13px] whitespace-nowrap">
+                <span className="text-text-secondary truncate font-medium">{e.metricName ?? '수치'}</span>
+                <span className="text-text-primary shrink-0 font-semibold">
+                  {fmt(e.value)}
+                  {e.unit ?? ''}
+                </span>
               </span>
-            </span>
-          )}
-          {mood && (
-            <span className="bg-badge-bg min-w-0 shrink truncate rounded-full px-2 py-1 text-[12px] font-semibold whitespace-nowrap">
-              {mood.emoji} {mood.label}
-            </span>
-          )}
-          {isRetro && e.reviewType && e.reviewType !== 'DAILY' && (
-            <span className="text-text-secondary shrink-0 text-[11px] font-semibold whitespace-nowrap">
-              {e.reviewType === 'WEEKLY' ? '주간 회고' : '월간 회고'}
-            </span>
-          )}
-        </div>
+            )}
+            {mood && (
+              <span className="bg-badge-bg min-w-0 shrink truncate rounded-full px-2 py-1 text-[12px] font-semibold whitespace-nowrap">
+                {mood.emoji} {mood.label}
+              </span>
+            )}
+            {isRetro && e.reviewType && e.reviewType !== 'DAILY' && (
+              <span className="text-text-secondary shrink-0 text-[11px] font-semibold whitespace-nowrap">
+                {e.reviewType === 'WEEKLY' ? '주간 회고' : '월간 회고'}
+              </span>
+            )}
+          </div>
+        )}
+        {e.note ? (
+          <p className="text-ink-2 mt-1.5 line-clamp-4 text-[14px] leading-relaxed whitespace-pre-wrap">{e.note}</p>
+        ) : (
+          !isRetro && <p className="text-ink-4 mt-1.5 text-[12px]">수치만 남겼어요</p>
+        )}
+      </div>
+      {detailOpen && (
+        <ReflectionDetailModal
+          entry={e}
+          open={detailOpen}
+          onClose={() => setDetailOpen(false)}
+          surface={surface}
+          daysAgo={ago}
+        />
       )}
-      {e.note ? (
-        <p className="text-ink-2 mt-1.5 text-[14px] leading-relaxed whitespace-pre-wrap">{e.note}</p>
-      ) : (
-        !isRetro && <p className="text-ink-4 mt-1.5 text-[12px]">수치만 남겼어요</p>
-      )}
-    </div>
+    </>
   )
 }

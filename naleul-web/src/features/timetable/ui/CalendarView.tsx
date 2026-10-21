@@ -15,6 +15,7 @@ import { TaskAddPanel } from '@/features/brain-dump/ui/TaskAddPanel'
 import { track } from '@/lib/client/analytics'
 import { dateRelationOf, errorStatusOf } from '@/features/home/analytics'
 import { useActivities, useTimetable } from '../api'
+import type { CarriedOutBlock } from '../types'
 import { visibleHours } from '../layout'
 import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst } from '../time'
 import { HATCH } from './Blocks'
@@ -119,6 +120,18 @@ export function CalendarView() {
     go({ date: next })
   }
   const unit = view === 'month' ? '달' : view === 'week' ? '주' : '날'
+  /** 다른 날로 옮겨진 Task 흔적 → 옮겨 간 날로 (2026-10) */
+  const onCarriedClick = (c: CarriedOutBlock, fromDate: string) => {
+    track('timetable.carried_trace_click', {
+      surface: 'calendar',
+      view_mode: view,
+      task_id: c.taskId,
+      is_scheduled: !!c.start,
+      day_offset: Math.round((Date.parse(c.toDate) - Date.parse(fromDate)) / 86_400_000),
+    })
+    close()
+    go({ date: c.toDate })
+  }
 
   const today = todayKst()
 
@@ -443,6 +456,7 @@ export function CalendarView() {
                 go({ view: 'day', date: d })
               }}
               planVsActual={view === 'day'}
+              onCarriedClick={onCarriedClick}
             />
             {view === 'day' && !add && (
               <div className="lg:sticky lg:top-4">
@@ -452,6 +466,7 @@ export function CalendarView() {
                   onSelect={onSelectTask}
                   onToggle={(t) => toggleComplete.mutate(t)}
                   togglingId={toggleComplete.isPending ? (toggleComplete.variables?.taskId ?? null) : null}
+                  onCarriedClick={onCarriedClick}
                 />
               </div>
             )}

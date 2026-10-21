@@ -16,6 +16,8 @@ export interface ChatItem {
   skip: boolean
   quickReplies: string[]
   skippable: boolean
+  /** 질문이 채우려는 슬롯 ('extraNote' = 마지막 자유 질문) */
+  targetSlot?: string | null
   /** USER 말풍선 전송 상태 */
   sendState?: 'sending' | 'failed'
   /** 실패 시 다시 보낼 내용 */
@@ -41,6 +43,7 @@ const toItem = (m: GoalMessage): ChatItem => ({
   skip: !!m.skip,
   quickReplies: m.quickReplies ?? [],
   skippable: !!m.skippable,
+  targetSlot: m.targetSlot ?? null,
 })
 
 let tempSeq = 0

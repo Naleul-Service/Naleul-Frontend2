@@ -96,6 +96,10 @@ export interface GoalUpdateInput {
   startValue?: number | null
   currentValue?: number | null
   targetValue?: number | null
+  /** 수치 목표 마감일 (목표 종료일과 따로 움직여요). 없으면 목표 종료일을 따라요 */
+  metricTargetDate?: string
+  /** true 면 수치 마감일을 지워 다시 목표 종료일을 따라요 */
+  clearMetricTargetDate?: boolean
   /** true 면 수치 목표를 지워요 ("수치 없이 진행하기") — 점검 시점 수치도 함께 */
   clearMetric?: boolean
   /** 목표 카테고리 — "기타"면 goalKindLabel 1~10자 */
@@ -103,6 +107,13 @@ export interface GoalUpdateInput {
   goalSubType?: GoalSubType
   goalKindLabel?: string
 }
+
+/** 목표 상세 "지금 어디쯤?"에서 수치만 고치기 (목표 전체 수정과 따로) */
+export const useUpdateGoalMetric = (goalId: number) =>
+  useGoalMutation(
+    (v: GoalUpdateInput) => api.patch<GoalCategory>(`/v1/goal-categories/${goalId}`, v),
+    '수치를 수정했어요.'
+  )
 
 export const useUpdateGoal = (goalId: number) =>
   useGoalMutation(

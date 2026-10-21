@@ -5,7 +5,7 @@ import { Flame } from 'lucide-react'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { addDays, startOfWeek, todayKst, weekdayIndex } from '@/features/timetable/time'
-import { useRoutineHeatmap, type GoalCategory, type RoutineHeatmap } from '../api'
+import { useRoutineHeatmap, type GoalCategory, type RoutineHeatmap, type RoutineTimeStats } from '../api'
 import { JAVA_DAYS, JAVA_DAY_LABEL } from '../format'
 import { Section } from './sections'
 
@@ -170,6 +170,8 @@ export function RoutineHeatmapSection({ goal }: { goal: GoalCategory }) {
         </div>
       </div>
 
+      <RoutineTimeStatsList routines={routines} />
+
       {/* 범례 */}
       <div className="text-ink-3 mt-3 flex flex-wrap items-center gap-3 text-[12px]">
         {(['done', 'missed', 'today', 'future'] as const).map((k) => (
@@ -188,4 +190,61 @@ const STATE_LABEL: Record<Exclude<CellState, 'none'>, string> = {
   missed: '놓침',
   today: '오늘',
   future: '예정',
+}
+
+/**
+ * 루틴마다 "주로 몇 시~몇 시에 실천했는지" + 0~23시 막대 (2026-10).
+ * 완료 기록의 실제 시각(없으면 계획 시각)으로 서버가 계산해 줘요.
+ */
+function RoutineTimeStatsList({ routines }: { routines: RoutineHeatmap[] }) {
+  return (
+    <div className="border-line mt-5 border-t pt-4">
+      <h3 className="mb-3 text-[14px] font-semibold">주로 실천한 시간</h3>
+      <ul className="flex flex-col gap-3.5">
+        {routines.map((r) => (
+          <li key={r.routineId} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-4">
+            <div className="min-w-0 sm:w-56 sm:shrink-0">
+              <p className="truncate text-[13px] font-semibold">{r.routineName}</p>
+              <p className="text-ink-3 text-[12px] tabular-nums">{timeStatsSentence(r.timeStats)}</p>
+            </div>
+            {r.timeStats && r.timeStats.practiceCount > 0 && <HourBars stats={r.timeStats} />}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+export function timeStatsSentence(t: RoutineTimeStats | null | undefined) {
+  if (!t || t.practiceCount === 0) return '아직 시간 기록이 없어요'
+  return `주로 ${t.bestStart}~${t.bestEnd}에 실천 · ${t.practiceCount}회 중 ${t.inWindowCount}회`
+}
+
+function HourBars({ stats }: { stats: RoutineTimeStats }) {
+  const max = Math.max(1, ...stats.hourly)
+  const startH = Number(stats.bestStart.slice(0, 2))
+  const endRaw =
+    stats.bestEnd === '00:00' ? 24 : Number(stats.bestEnd.slice(0, 2)) + (stats.bestEnd.slice(3) === '00' ? 0 : 1)
+  const inBest = (h: number) => (startH <= endRaw ? h >= startH && h < endRaw : h >= startH || h < endRaw)
+  return (
+    <div className="min-w-0 flex-1" aria-hidden>
+      <div className="flex h-8 items-end gap-[2px]">
+        {stats.hourly.map((v, h) => (
+          <span
+            key={h}
+            title={`${h}시 · ${v}회`}
+            className={cn('flex-1 rounded-[2px]', v === 0 ? 'bg-subtle' : inBest(h) ? 'bg-brand' : 'bg-brand/35')}
+            style={{ height: v === 0 ? 2 : `${Math.max(12, (v / max) * 100)}%` }}
+          />
+        ))}
+      </div>
+      <div className="text-ink-3 mt-0.5 flex justify-between text-[10px] tabular-nums">
+        <span>0시</span>
+        <span>6시</span>
+        <span>12시</span>
+        <span>18시</span>
+        <span>24시</span>
+      </div>
+    </div>
+  )
 }

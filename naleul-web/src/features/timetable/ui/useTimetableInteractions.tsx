@@ -23,10 +23,14 @@ import {
   useToggleComplete,
   useUnlockTask,
   useUnscheduleTask,
+  useMoveTaskDate,
   type FillPreviewResponse,
   type FillPreviewTarget,
 } from '../api'
 import { applyPending, applyProposals, type Pending, type Proposal } from '../layout'
+
+/** 두 날짜 사이 일 수 (b - a) */
+const dayDiff = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000)
 import {
   SNAP_MINUTES,
   WEEKDAY_LABEL,
@@ -241,6 +245,7 @@ export function useTimetableInteractions(
   const deleteTask = useDeleteTask()
   const unlock = useUnlockTask()
   const unschedule = useUnscheduleTask()
+  const moveDate = useMoveTaskDate()
   const reschedule = useRescheduleTask()
   const fillPreview = useFillPreview()
   const fillApply = useFillApply()
@@ -555,6 +560,8 @@ export function useTimetableInteractions(
     },
     onUnlock: (t: TimeBlockTask) => unlock.mutate(t.taskId, { onSuccess: close }),
     onUnschedule: (t: TimeBlockTask) => unschedule.mutate(t.taskId, { onSuccess: close }),
+    onMoveDate: (t: TimeBlockTask, date: string, label: string) =>
+      moveDate.mutate({ taskId: t.taskId, date, keepTime: true, label }, { onSuccess: close }),
     // 삭제는 바로 지우지 않고 상세 창 안에 "삭제할까요?"를 띄워요 (Delete 키와 같음)
     onDelete: (t: TimeBlockTask) => setConfirmDeleteId(t.taskId),
     chainSize: (t: TimeBlockTask) => chainOf(t, days).length,
@@ -736,6 +743,9 @@ export function useTimetableInteractions(
             source.task.sourceType === 'ROUTINE' &&
             routineDay(source.task) === target.date)),
       group_size: groupSizeOf,
+      // 2026-10: 다른 날로 옮겼는지 (시간 미정 → 다른 날 시간 미정 포함)
+      day_offset: source.kind === 'task' && target.date !== source.date ? dayDiff(source.date, target.date) : undefined,
+      from_unscheduled: source.kind === 'task' ? source.start === null : undefined,
     })
     /** timetable.move_result — 저장 요청이 끝난 직후 */
     const moveResult = (props: EventProps) => ({
@@ -817,7 +827,14 @@ export function useTimetableInteractions(
       source.kind === 'task'
         ? target.type === 'grid'
           ? { kind: 'task', taskId: source.task.taskId, date: target.date, start: target.start, end: target.end }
-          : { kind: 'task', taskId: source.task.taskId, date: null, start: 0, end: 0 }
+          : {
+              kind: 'task',
+              taskId: source.task.taskId,
+              date: null,
+              start: 0,
+              end: 0,
+              toDate: target.date !== source.date ? target.date : undefined,
+            }
         : target.type === 'grid'
           ? { kind: 'fixed', key: fixedKey(source.block), date: target.date, start: target.start, end: target.end }
           : null
@@ -867,6 +884,9 @@ export function useTimetableInteractions(
         },
         done
       )
+    } else if (source.kind === 'task' && target.type === 'unscheduled' && target.date !== source.date) {
+      // 다른 날의 시간 미정 칸 → 그날 시간 미정으로 (시간 미정 → 시간 미정도 여기로, 2026-10)
+      moveDate.mutate({ taskId: source.task.taskId, date: target.date, keepTime: false }, done)
     } else if (source.kind === 'task') {
       unschedule.mutate(source.task.taskId, done)
     }

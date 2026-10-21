@@ -194,7 +194,11 @@ export function InterviewChatView({ initial, onResync }: Props) {
                   <button
                     type="button"
                     onClick={() => {
-                      track('goal_chat.skip_click', { session_id: sid, question_index: qc })
+                      track('goal_chat.skip_click', {
+                        session_id: sid,
+                        question_index: qc,
+                        extra_note: currentQuestion?.targetSlot === 'extraNote',
+                      })
                       chat.skip()
                     }}
                     disabled={!canInteract}
@@ -213,11 +217,17 @@ export function InterviewChatView({ initial, onResync }: Props) {
                     question_index: qc,
                     answer_length: chat.input.trim().length,
                     submit_method: method,
+                    extra_note: currentQuestion?.targetSlot === 'extraNote',
                   })
                   chat.sendText()
                 }}
                 disabled={!canInteract}
                 autoFocus
+                placeholder={
+                  currentQuestion?.targetSlot === 'extraNote'
+                    ? '예) 평일엔 저녁 9시 이후만 가능해요, 지난번 시험은 60점이었어요'
+                    : undefined
+                }
               />
             </>
           )}
