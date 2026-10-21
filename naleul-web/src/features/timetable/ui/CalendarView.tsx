@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CalendarClock, ChevronLeft, ChevronRight, NotebookPen, Plus, Sparkles, SquarePen } from '@/components/icons'
+import { CalendarClock, ChevronLeft, ChevronRight, NotebookPen, Pencil, Pin, Plus, Sparkles, SquarePen, Trash2 } from '@/components/icons'
 import { rectOf, type AnchorRect } from '@/components/ui/Popover'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -14,10 +14,13 @@ import { iconButtonClass } from '@/components/ui/IconButton'
 import { TaskAddPanel } from '@/features/brain-dump/ui/TaskAddPanel'
 import { track } from '@/lib/client/analytics'
 import { dateRelationOf, errorStatusOf } from '@/features/home/analytics'
-import { useActivities, useTimetable } from '../api'
-import type { CarriedOutBlock } from '../types'
+import { useActivities, useLifePatterns, useTimetable } from '../api'
+import { useCreateLifePattern } from '@/features/life-pattern/api'
+import { ALL_DAYS } from '@/features/life-pattern/presets'
+import { LifePatternFormModal, type LifePatternFormValue } from '@/features/life-pattern/ui/LifePatternFormModal'
+import type { CarriedOutBlock, TimeBlockTask } from '../types'
 import { visibleHours } from '../layout'
-import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst } from '../time'
+import { addDays, addMonths, formatRange, isYmd, nowKst, startOfWeek, todayKst, weekdayIndex } from '../time'
 import { HATCH } from './Blocks'
 import { MonthView } from './MonthView'
 import { ActionMenu } from './ActionMenu'
@@ -64,11 +67,18 @@ export function CalendarView() {
   // 패널에서 방금 추가한 Task — 캘린더에 NEW 로 표시
   const [newIds, setNewIds] = useState<ReadonlySet<number>>(new Set())
   // + 메뉴 · AI 메뉴 (명세 11) — slot 이 있으면 빈 곳을 눌러 연 것 (그 날짜 · 시각을 미리 채워요)
+  // context = 빈 곳 우클릭 (실제 · 계획 · 고정 추가), task = Task 블록 우클릭 (수정 · 삭제)
   const [menu, setMenu] = useState<{
-    kind: 'add' | 'ai'
+    kind: 'add' | 'ai' | 'context' | 'task'
     anchor: AnchorRect
     slot?: { date: string; minutes: number }
+    task?: TimeBlockTask
   } | null>(null)
+  // 우클릭 "고정할 일 추가" → 기본 생활 패턴(고정 시간) 추가 창에 미리 채울 값
+  const [fixedForm, setFixedForm] = useState<LifePatternFormValue | null>(null)
+  const lifePatterns = useLifePatterns(!!fixedForm)
+  const router = useRouter()
+  const createPattern = useCreateLifePattern()
   // 계획 할 일 추가 패널에 미리 채울 날짜 · 시각
   const [prefill, setPrefill] = useState<{ date: string; startTime: string; endTime: string } | undefined>()
   // 월간은 오른쪽 패널에 보여줄 "선택한 날" 하루만 불러와요 (달 전체 요약은 MonthView 가 따로)
@@ -89,6 +99,8 @@ export function CalendarView() {
     onSelectActivity,
     onEmptyClick,
     openActivity,
+    openTaskDetail,
+    requestDeleteTask,
     onDrop,
     close,
     toggleComplete,
@@ -165,14 +177,18 @@ export function CalendarView() {
   // ── + 메뉴 (명세 11.2) — AI로 자동 Task 추가 · 계획 할 일 추가 · 실제 한 일 추가 ──
   const pad = (n: number) => String(n).padStart(2, '0')
   const hhmm = (m: number) => `${pad(Math.floor(m / 60) % 24)}:${pad(m % 60)}`
-  const addMenuItems = (slot: { date: string; minutes: number } | undefined, anchor: AnchorRect) => {
+  const addMenuItems = (
+    slot: { date: string; minutes: number } | undefined,
+    anchor: AnchorRect,
+    source: 'empty_tap' | 'header_button' | 'context_menu' = slot ? 'empty_tap' : 'header_button'
+  ) => {
     // 자정 뒤 칸(24:00~)은 다음 날
     const at = slot && slot.minutes >= 1440 ? { date: addDays(slot.date, 1), minutes: slot.minutes - 1440 } : slot
     const nowMin = nowKst().minutes
     const future = !!at && (at.date > today || (at.date === today && at.minutes >= nowMin))
     const panelView = view === 'month' ? 'week' : view
     // 분석: 어느 메뉴에서 골랐는지 — 머리글 "Task 추가" 버튼 메뉴 / 빈 곳을 눌러 연 메뉴
-    const src = slot ? 'empty_tap' : 'header_button'
+    const src = source
     return [
       {
         key: 'ai',
@@ -224,6 +240,101 @@ export function CalendarView() {
       },
     ]
   }
+
+  // ── 우클릭 메뉴 — 빈 곳: 실제로 한 일 · 계획한 일 · 고정할 일 추가 / Task 블록: 수정 · 삭제 ──
+  const contextBase = (slot: { date: string; minutes: number }) => {
+    const at = slot.minutes >= 1440 ? { date: addDays(slot.date, 1), minutes: slot.minutes - 1440 } : slot
+    const nowMin = nowKst().minutes
+    return {
+      at,
+      view_mode: view,
+      view_date: at.date,
+      date_relation: dateRelationOf(at.date),
+      slot_minutes: at.minutes,
+      is_past: at.date < today || (at.date === today && at.minutes < nowMin),
+    }
+  }
+  const contextMenuItems = (slot: { date: string; minutes: number }, anchor: AnchorRect) => {
+    const { at, ...props } = contextBase(slot)
+    const base = addMenuItems(slot, anchor, 'context_menu')
+    const pick = (key: string, label: string, option: string) => {
+      const item = base.find((i) => i.key === key)!
+      return {
+        ...item,
+        label,
+        onSelect: () => {
+          track('calendar.context_menu_select', { ...props, target: 'empty_slot', option })
+          item.onSelect()
+        },
+      }
+    }
+    const hhmm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+    return [
+      pick('log', '실제로 한 일 추가', 'actual_add'),
+      pick('manual', '계획한 일 추가', 'plan_add'),
+      {
+        key: 'fixed',
+        label: '고정할 일 추가',
+        icon: <Pin />,
+        hint: '매주 이 요일 · 이 시간 (기본 생활 패턴)',
+        onSelect: () => {
+          track('calendar.context_menu_select', { ...props, target: 'empty_slot', option: 'fixed_add' })
+          setFixedForm({
+            patternType: 'CUSTOM',
+            title: '',
+            emoji: '',
+            startTime: hhmm(at.minutes),
+            endTime: hhmm(Math.min(at.minutes + 60, 1439)),
+            days: [ALL_DAYS[weekdayIndex(at.date)]],
+          })
+        },
+      },
+    ]
+  }
+  const taskMenuItems = (t: TimeBlockTask, anchor: AnchorRect) => {
+    const props = {
+      view_mode: view,
+      task_id: t.taskId,
+      source_type: t.sourceType,
+      task_status: t.taskStatus,
+      is_scheduled: !!t.plannedStartAt,
+    }
+    return [
+      {
+        key: 'edit',
+        label: '수정',
+        icon: <Pencil />,
+        onSelect: () => {
+          track('calendar.context_menu_select', { ...props, target: 'task_block', option: 'edit' })
+          openTaskDetail(t, anchor)
+        },
+      },
+      ...(t.sourceType === 'MISSION'
+        ? []
+        : [
+            {
+              key: 'delete',
+              label: '삭제',
+              icon: <Trash2 />,
+              onSelect: () => {
+                track('calendar.context_menu_select', { ...props, target: 'task_block', option: 'delete' })
+                requestDeleteTask(t, anchor)
+              },
+            },
+          ]),
+    ]
+  }
+  /** 지금 시각 "YYYY-MM-DDTHH:mm" (plannedEndAt 앞 16자와 비교) */
+  const nowStamp = () => {
+    const n = nowKst()
+    return `${n.date}T${String(Math.floor(n.minutes / 60)).padStart(2, '0')}:${String(n.minutes % 60).padStart(2, '0')}`
+  }
+  const pointAnchor = (e: { clientX: number; clientY: number }): AnchorRect => ({
+    top: e.clientY,
+    bottom: e.clientY,
+    left: e.clientX,
+    right: e.clientX,
+  })
 
   // ── AI 메뉴 (명세 11.1) — AI로 일정 조정 · AI로 TimeTable 자동 배치 ──
   const unplaced = unplacedOf(rawDays, today)
@@ -457,6 +568,26 @@ export function CalendarView() {
               }}
               planVsActual={view === 'day'}
               onCarriedClick={onCarriedClick}
+              onEmptyContextMenu={(d, minutes, e) => {
+                close()
+                const { at, ...props } = contextBase({ date: d, minutes })
+                void at
+                track('calendar.context_menu_open', { ...props, target: 'empty_slot' })
+                setMenu({ kind: 'context', anchor: pointAnchor(e), slot: { date: d, minutes } })
+              }}
+              onTaskContextMenu={(t, e) => {
+                close()
+                track('calendar.context_menu_open', {
+                  view_mode: view,
+                  target: 'task_block',
+                  task_id: t.taskId,
+                  source_type: t.sourceType,
+                  task_status: t.taskStatus,
+                  is_scheduled: !!t.plannedStartAt,
+                  is_past: !!t.plannedEndAt && t.plannedEndAt.slice(0, 16) < nowStamp(),
+                })
+                setMenu({ kind: 'task', anchor: pointAnchor(e), task: t })
+              }}
             />
             {view === 'day' && !add && (
               <div className="lg:sticky lg:top-4">
@@ -483,6 +614,55 @@ export function CalendarView() {
           onClose={() => setMenu(null)}
           label="추가"
           items={addMenuItems(menu.slot, menu.anchor)}
+        />
+      )}
+      {menu?.kind === 'context' && menu.slot && (
+        <ActionMenu
+          anchor={menu.anchor}
+          onClose={() => setMenu(null)}
+          label="이 시간에 추가"
+          items={contextMenuItems(menu.slot, menu.anchor)}
+        />
+      )}
+      {menu?.kind === 'task' && menu.task && (
+        <ActionMenu
+          anchor={menu.anchor}
+          onClose={() => setMenu(null)}
+          label="Task"
+          items={taskMenuItems(menu.task, menu.anchor)}
+        />
+      )}
+      {fixedForm && (
+        <LifePatternFormModal
+          initial={fixedForm}
+          patterns={lifePatterns.data ?? []}
+          loading={createPattern.isPending}
+          onEditExisting={() => {
+            setFixedForm(null)
+            router.push('/settings/life-pattern')
+          }}
+          onClose={() => setFixedForm(null)}
+          onSubmit={(v) =>
+            createPattern.mutate(v, {
+              onSuccess: () => {
+                track('life_pattern.save_result', {
+                  is_new: true,
+                  result: 'success',
+                  pattern_type: v.patternType,
+                  entry_source: 'calendar_context_menu',
+                })
+                setFixedForm(null)
+              },
+              onError: (err: unknown) =>
+                track('life_pattern.save_result', {
+                  is_new: true,
+                  result: 'fail',
+                  error_status: errorStatusOf(err),
+                  pattern_type: v.patternType,
+                  entry_source: 'calendar_context_menu',
+                }),
+            })
+          }
         />
       )}
       {menu?.kind === 'ai' && (

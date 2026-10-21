@@ -48,6 +48,8 @@
 
   /* ── 새 시맨틱 토큰 (Figma Component_ver.2 · Semantic Color) ── */
   --color-bg-canvas: #ffffff;
+  /* 데스크톱 웹 페이지 바탕 (모바일 반응형 제외, AppShell lg:bg-bg-page). 되돌리려면 #ffffff 로 */
+  --color-bg-page: #f8fafc;
   --color-bg-surface: #ffffff;
   --color-bg-elevated: #ffffff;
   --color-bg-subtle: #f1f4f8;
@@ -368,6 +370,7 @@
 
   /* ── 새 시맨틱 토큰 (Figma Component_ver.2 · Semantic Color) ── */
   --color-bg-canvas: #121820;
+  --color-bg-page: var(--color-bg-canvas);
   --color-bg-surface: #1c232c;
   --color-bg-elevated: #252d38;
   --color-bg-subtle: #252d38;

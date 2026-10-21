@@ -21,6 +21,9 @@ export const CALENDAR_EVENTS = [
   'calendar.auto_place_click',
   'calendar.date_nav_click',
   'calendar.day_header_click',
+  // 우클릭 메뉴 (빈 곳: 실제 · 계획 · 고정 추가 / Task 블록: 수정 · 삭제)
+  'calendar.context_menu_open',
+  'calendar.context_menu_select',
   'calendar.load_fail',
   'calendar.pageview',
   'calendar.retry_click',

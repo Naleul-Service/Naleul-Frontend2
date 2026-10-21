@@ -601,6 +601,18 @@ export function useTimetableInteractions(
     return () => document.removeEventListener('keydown', onKey)
   }, [opened, days, surface])
 
+  /** 우클릭 메뉴 "수정" — 블록을 누른 것과 같은 상세 창 */
+  const openTaskDetail = (task: TimeBlockTask, anchor: AnchorRect) => {
+    setConfirmDeleteId(null)
+    setOpened({ kind: 'task', task, anchor })
+  }
+  /** 우클릭 메뉴 "삭제" — 상세 창을 열고 그 안에서 "삭제할까요?" (Delete 키와 같음) */
+  const requestDeleteTask = (task: TimeBlockTask, anchor: AnchorRect) => {
+    if (task.sourceType === 'MISSION') return
+    setOpened({ kind: 'task', task, anchor })
+    setConfirmDeleteId(task.taskId)
+  }
+
   const confirmDeleteTask = () => {
     if (confirmDeleteId === null) return
     deleteTask.mutate(confirmDeleteId, { onSuccess: close })
@@ -1082,6 +1094,8 @@ export function useTimetableInteractions(
     onSelectActivity,
     onEmptyClick,
     openActivity,
+    openTaskDetail,
+    requestDeleteTask,
     onDrop,
     close,
     toggleComplete,

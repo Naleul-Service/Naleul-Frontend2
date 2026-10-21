@@ -53,7 +53,7 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
   }, [drawerOpen])
 
   return (
-    <div className="min-h-dvh">
+    <div className="lg:bg-bg-page min-h-dvh">
       <GuestSessionTracker isGuest={isGuestUser(user)} />
       {/* 디자인 시스템 Sidebar — 240 · bg/surface · 오른쪽 1px border/subtle */}
       <aside className="border-border-subtle bg-bg-surface fixed inset-y-0 left-0 z-30 hidden w-60 border-r lg:block">
@@ -104,7 +104,10 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
       {/* 모바일: 아래 탭바만큼 비워요 (--tabbar-h) */}
       <main className="pb-(--tabbar-h) lg:pb-0 lg:pl-60">
         {isGuestUser(user) && <GuestBanner />}
-        <div className="mx-auto w-full max-w-[1440px] px-5 py-6 sm:px-6 lg:px-10 lg:py-8">{children}</div>
+        {/* 아주 넓은 모니터: 내용 폭을 넓히되(1440 → 1760 → 2000) 양옆 여백은 화면에 맞춰 남겨요 */}
+        <div className="mx-auto w-full max-w-[1440px] px-5 py-6 sm:px-6 lg:px-10 lg:py-8 min-[1800px]:max-w-[1760px] min-[1800px]:px-[clamp(40px,3vw,72px)] min-[2200px]:max-w-[2000px]">
+          {children}
+        </div>
       </main>
 
       <MobileTabBar />

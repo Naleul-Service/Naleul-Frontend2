@@ -16,7 +16,7 @@ import {
   withAlpha,
   type Placed,
 } from '../layout'
-import { WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, hm, minutesFrom, nowKst, weekdayIndex } from '../time'
+import { SNAP_MINUTES, WEEKDAY_LABEL, addDays, dayOfMonth, formatMinutes, hm, minutesFrom, nowKst, weekdayIndex } from '../time'
 import type { ActualActivity, CarriedOutBlock, FixedBlock, HabitBlock, TimeBlockTask, TimetableDay } from '../types'
 import { ActivityBlock, FixedBlockView, HATCH, SleepBlockView, TaskBlock, taskColors } from './Blocks'
 import {
@@ -107,6 +107,10 @@ interface Props {
   allowFutureEmpty?: boolean
   /** 다른 날로 옮겨진 Task 흔적을 눌렀을 때 (옮겨 간 날로 이동) — 없으면 흔적을 누를 수 없어요 */
   onCarriedClick?: (c: CarriedOutBlock, fromDate: string) => void
+  /** 빈 칸 우클릭 → 그 시각(10분 단위)으로 추가 메뉴 (캘린더에서만). 없으면 브라우저 기본 메뉴 */
+  onEmptyContextMenu?: (date: string, minutes: number, e: MouseEvent<HTMLElement>) => void
+  /** Task 블록 우클릭 → 수정 · 삭제 메뉴 (캘린더에서만) */
+  onTaskContextMenu?: (t: TimeBlockTask, e: MouseEvent<HTMLElement>) => void
 }
 
 /** 기상은 취침보다, 취침은 기상보다 30분 이상 떨어져야 해요 (같은 날 칸 기준) */
@@ -189,6 +193,8 @@ export function TimeGrid({
   onGroupClear,
   allowFutureEmpty = false,
   onCarriedClick,
+  onEmptyContextMenu,
+  onTaskContextMenu,
 }: Props) {
   const now = useNowKst()
   const from = startHour * 60
@@ -374,6 +380,29 @@ export function TimeGrid({
     onEmptyClick(date, minutes, e)
   }
 
+  // 우클릭: Task 블록이면 수정 · 삭제, 블록 없는 빈 곳이면 추가 메뉴. 고정 시간 · 실제 기록 · 제안 블록은 기본 메뉴 그대로
+  const contextMenu = (d: TimetableDay, e: MouseEvent<HTMLDivElement>) => {
+    if (drag) return
+    // 터치 길게 누르기(묶음 고르기)와 겹치지 않게 마우스 우클릭만
+    if ('pointerType' in e.nativeEvent && (e.nativeEvent as globalThis.PointerEvent).pointerType === 'touch') return
+    const el = e.target instanceof HTMLElement ? e.target : null
+    const block = el?.closest<HTMLElement>('[data-task-id]')
+    if (block && e.currentTarget.contains(block)) {
+      if (!onTaskContextMenu) return
+      const id = Number(block.dataset.taskId)
+      const t = d.tasks.find((x) => x.taskId === id) ?? days.flatMap((x) => x.tasks).find((x) => x.taskId === id)
+      if (!t || t.proposed) return
+      e.preventDefault()
+      onTaskContextMenu(t, e)
+      return
+    }
+    if (!onEmptyContextMenu || e.target !== e.currentTarget) return
+    e.preventDefault()
+    const rect = e.currentTarget.getBoundingClientRect()
+    const minutes = Math.floor((from + (e.clientY - rect.top) / PPM) / SNAP_MINUTES) * SNAP_MINUTES
+    onEmptyContextMenu(d.date, minutes, e)
+  }
+
   // 날짜 수만큼 칸 (주간 7칸, Task 추가 결과 화면은 1~7칸)
   const gridTemplateColumns = single
     ? `${gutterPx}px minmax(0,1fr)`
@@ -543,6 +572,7 @@ export function TimeGrid({
               key={d.date}
               data-date={d.date}
               onClick={(e) => clickEmpty(d.date, e)}
+              onContextMenu={(e) => contextMenu(d, e)}
               className={cn(
                 'border-line relative border-l',
                 isToday && 'bg-ai-tint-soft/40',
