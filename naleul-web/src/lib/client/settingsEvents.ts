@@ -48,6 +48,8 @@ export const SETTINGS_EVENTS = [
   'membership.not_ready_view',
   'membership.pageview',
   'membership.past_due_view',
+  'membership.pay_method_select',
+  'membership.pay_window_fail',
   'membership.plan_select',
   'membership.result_cta_click',
   'membership.resume_click',

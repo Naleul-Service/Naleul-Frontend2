@@ -1,4 +1,4 @@
-import type { BillingStatus, WebPlan } from './types'
+import type { BillingStatus, PayMethod, WebPlan } from './types'
 
 /**
  * 멤버십 이벤트 공통 도구 (노션 Tracking Plan 「설정 > 멤버십」, membership.*).
@@ -47,6 +47,30 @@ export function rememberedPlan(): WebPlan | undefined {
     return undefined
   }
 }
+
+const METHOD_KEY = 'naleul.billing.pay_method'
+
+/** 결제 창 → 성공 · 실패 페이지 사이에 고른 결제 방식을 기억 (pay_method 속성용) */
+export function rememberPayMethod(method: PayMethod) {
+  try {
+    sessionStorage.setItem(METHOD_KEY, method)
+  } catch {
+    /* 저장소를 못 쓰면 주소의 method 로만 알아요 */
+  }
+}
+
+export function rememberedPayMethod(): PayMethod | undefined {
+  try {
+    const v = sessionStorage.getItem(METHOD_KEY)
+    return v === 'toss_pay' || v === 'card_subscription' ? v : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** 구독의 결제하는 곳 → pay_method 값 */
+export const payMethodOf = (provider: 'TOSS_PAYMENTS_CARD' | 'TOSS_PAY' | undefined): PayMethod | undefined =>
+  provider === 'TOSS_PAY' ? 'toss_pay' : provider === 'TOSS_PAYMENTS_CARD' ? 'card_subscription' : undefined
 
 /** 문자열 → 짧은 해시 (돌아온 주소를 그대로 저장하지 않으려고) */
 function hash(s: string) {

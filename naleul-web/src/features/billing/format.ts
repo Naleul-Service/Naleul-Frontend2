@@ -1,4 +1,4 @@
-import type { WebPlan, WebSubscriptionStatus } from './types'
+import type { WebPayProvider, WebPlan, WebSubscriptionStatus } from './types'
 
 export const won = (n: number) => `${n.toLocaleString('ko-KR')}원`
 
@@ -17,4 +17,9 @@ export const STATUS_LABEL: Record<WebSubscriptionStatus, string> = {
   PAST_DUE: '결제 실패 · 다시 시도 중',
   CANCELED: '해지 예정',
   EXPIRED: '종료',
+}
+
+export const PROVIDER_LABEL: Record<WebPayProvider, string> = {
+  TOSS_PAYMENTS_CARD: '카드 정기구독',
+  TOSS_PAY: '토스페이 정기구독',
 }
