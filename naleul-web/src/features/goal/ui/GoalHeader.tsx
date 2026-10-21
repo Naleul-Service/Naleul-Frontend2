@@ -435,13 +435,13 @@ export function GoalHeader({
         </div>
       ) : (
         embedded ? (
+          // 업무형 요약 카드 안 (명세 13.8) — 이름 H3 18 (두 줄까지) · 태그(작게) · 시작일 글
           <>
-            <div className="flex min-w-0 items-center gap-2">
-              <h1 className="text-h2 text-text-primary min-w-0 truncate">
+            <div className="flex min-w-0 items-start gap-1">
+              <h1 className="text-h3 text-text-primary line-clamp-2 min-w-0">
                 {goal.emoji ? `${goal.emoji} ` : ''}
                 {goal.goalCategoryName}
               </h1>
-              <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: goalColor(goal.colorCode) }} />
               <button
                 type="button"
                 onClick={() => {
@@ -454,25 +454,32 @@ export function GoalHeader({
                 <Pencil className="size-4" />
               </button>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <Badge tone={goal.goalCategoryStatus === 'COMPLETED' ? 'success' : 'neutral'} className="bg-bg-surface/70">
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <Badge
+                tone={goal.goalCategoryStatus === 'COMPLETED' ? 'success' : 'neutral'}
+                className="bg-bg-surface/70 h-5 px-2"
+              >
                 {statusLabel(goal.goalCategoryStatus)}
               </Badge>
-              {goal.temporary && <Badge tone="warning">임시 목표</Badge>}
+              {goal.temporary && (
+                <Badge tone="warning" className="h-5 px-2">
+                  임시 목표
+                </Badge>
+              )}
               {goal.goalMode === 'RECORD' && (
-                <Badge tone="neutral" className="bg-bg-surface/70">
+                <Badge tone="neutral" className="bg-bg-surface/70 h-5 px-2">
                   업무형
                 </Badge>
               )}
               {goal.goalCategoryStartDate && (
-                <Badge tone="neutral" className="bg-bg-surface/70">
-                  📅 {formatDot(goal.goalCategoryStartDate)} –{' '}
+                <span className="text-caption-md text-text-secondary">
+                  {formatDot(goal.goalCategoryStartDate)} 시작
                   {goal.goalMode === 'RECORD'
-                    ? ''
+                    ? ' · 마감은 주제마다'
                     : goal.goalCategoryEndDate
-                      ? formatDot(goal.goalCategoryEndDate)
-                      : '종료일 미정'}
-                </Badge>
+                      ? ` · ${formatDot(goal.goalCategoryEndDate)} 마감`
+                      : ''}
+                </span>
               )}
             </div>
           </>

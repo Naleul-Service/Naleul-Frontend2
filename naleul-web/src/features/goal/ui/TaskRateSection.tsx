@@ -21,7 +21,7 @@ interface WeekBar {
 }
 
 /** 주(월요일 시작)마다: 그 주에 하기로 했던 Task 중 오늘까지 날짜가 온 것 → 몇 개 실천했나 */
-function weekly(tasks: TimeBlockTask[], today: string): WeekBar[] {
+export function weekly(tasks: TimeBlockTask[], today: string): WeekBar[] {
   const byWeek = new Map<string, { due: number; done: number }>()
   for (const t of tasks) {
     const day = dayOf(t)

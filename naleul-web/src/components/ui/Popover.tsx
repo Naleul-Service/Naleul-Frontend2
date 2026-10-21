@@ -105,14 +105,20 @@ export function Popover({ anchor, onClose, children, width = 320, label, classNa
         aria-label={label}
         style={sheet ? undefined : { top: anchor.top, left: anchor.right + GAP, width, visibility: 'hidden' }}
         className={cn(
-          'bg-bg-elevated shadow-pop border-border-subtle fixed z-50 border',
+          'bg-bg-elevated shadow-pop border-border-subtle fixed z-50',
           sheet
-            ? 'rounded-t-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]'
-            : 'rounded-card max-h-[calc(100dvh-24px)] overflow-y-auto',
+            ? // 명세 13.2 — 모바일 시트: 위 모서리 24 · 테두리 없이 · 손잡이
+              'rounded-t-sheet bg-bg-surface inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto pb-[env(safe-area-inset-bottom)]'
+            : 'rounded-card max-h-[calc(100dvh-24px)] overflow-y-auto border',
           'animate-[modal-in_140ms_ease-out]',
           className
         )}
       >
+        {sheet && (
+          <div className="flex justify-center pt-4 pb-3" aria-hidden>
+            <span className="bg-border-subtle h-1 w-9 rounded-[2px]" />
+          </div>
+        )}
         {!hideClose && (
         <button
           type="button"

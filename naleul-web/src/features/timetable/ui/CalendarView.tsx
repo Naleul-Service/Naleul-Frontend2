@@ -158,13 +158,15 @@ export function CalendarView() {
     const nowMin = nowKst().minutes
     const future = !!at && (at.date > today || (at.date === today && at.minutes >= nowMin))
     const panelView = view === 'month' ? 'week' : view
+    // 분석: 어느 메뉴에서 골랐는지 — 머리글 "Task 추가" 버튼 메뉴 / 빈 곳을 눌러 연 메뉴
+    const src = slot ? 'empty_tap' : 'header_button'
     return [
       {
         key: 'ai',
         label: ADD_MODE_LABEL.ai,
         icon: <Sparkles />,
         onSelect: () => {
-          track('calendar.task_add_click', { view_mode: view, view_date: at?.date ?? date, add_mode: 'ai' })
+          track('calendar.task_add_click', { view_mode: view, view_date: at?.date ?? date, add_mode: 'ai', entry_source: src })
           setPrefill(undefined)
           go({ add: 'ai', view: panelView, ...(at ? { date: at.date } : {}) })
         },
@@ -174,7 +176,7 @@ export function CalendarView() {
         label: ADD_MODE_LABEL.manual,
         icon: <SquarePen />,
         onSelect: () => {
-          track('calendar.task_add_click', { view_mode: view, view_date: at?.date ?? date, add_mode: 'manual' })
+          track('calendar.task_add_click', { view_mode: view, view_date: at?.date ?? date, add_mode: 'manual', entry_source: src })
           setPrefill(
             at
               ? { date: at.date, startTime: hhmm(at.minutes), endTime: hhmm(Math.min(at.minutes + 60, 1439)) }
@@ -194,6 +196,7 @@ export function CalendarView() {
             track('calendar.activity_add_click', {
               view_mode: view,
               date_relation: dateRelationOf(at.date),
+              entry_source: src,
             })
             openActivity({ date: at.date, start: at.minutes, end: at.minutes + 60 }, anchor)
             return
@@ -202,7 +205,7 @@ export function CalendarView() {
           const now = nowKst()
           const day = view === 'day' && date < today ? date : today
           const endMin = day === today ? Math.floor(now.minutes / 10) * 10 : 13 * 60
-          track('calendar.activity_add_click', { view_mode: view, date_relation: dateRelationOf(day) })
+          track('calendar.activity_add_click', { view_mode: view, date_relation: dateRelationOf(day), entry_source: src })
           openActivity({ date: day, start: Math.max(endMin - 60, 0), end: endMin }, anchor)
         },
       },

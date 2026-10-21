@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import { CalendarMinus, CalendarPlus, Flag } from 'lucide-react'
 import { X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
@@ -76,7 +76,21 @@ function OutcomePicker({
 // ─── 진행 중: 목표 마무리 ───────────────────────────────────────
 
 /** 진행 중인 달성형 목표를 결과와 함께 끝내요. 고른 결과는 다음 목표 추천의 근거가 돼요 */
-export function GoalWrapUpSection({ goal }: { goal: GoalCategory }) {
+/** 목표 마무리 창을 밖에서 열기 (⋯ 더보기 메뉴 — 명세 13.5) */
+export interface GoalWrapUpHandle {
+  open: (entryPoint: 'menu') => void
+}
+
+export function GoalWrapUpSection({
+  goal,
+  headless = false,
+  ref,
+}: {
+  goal: GoalCategory
+  /** 카드 없이 창만 (⋯ 더보기 메뉴에서 열어요) */
+  headless?: boolean
+  ref?: Ref<GoalWrapUpHandle>
+}) {
   const progress = useGoalProgress(goal.goalCategoryId)
   const complete = useCompleteGoal(goal.goalCategoryId)
   const [open, setOpen] = useState(false)
@@ -94,12 +108,18 @@ export function GoalWrapUpSection({ goal }: { goal: GoalCategory }) {
       ? '기간이 끝났어요. 어땠는지 남기고 마무리해요.'
       : '목표를 끝냈다면 결과를 남겨 주세요. 다음 목표를 짤 때 참고해요.'
 
-  const openModal = () => {
-    track('goal_detail.wrapup_open', { goal_category_id: gid, wrapup_prompt: wrapupPrompt })
+  const openModal = (entryPoint?: 'menu') => {
+    track('goal_detail.wrapup_open', {
+      goal_category_id: gid,
+      wrapup_prompt: wrapupPrompt,
+      ...(entryPoint ? { entry_point: entryPoint } : {}),
+    })
     setResult(metricDone ? 'ACHIEVED' : null)
     setAchievement('')
     setOpen(true)
   }
+
+  useImperativeHandle(ref, () => ({ open: (entryPoint) => openModal(entryPoint) }))
 
   const close = (method: ModalCloseMethod | 'cancel_button') => {
     if (complete.isPending) return
@@ -142,19 +162,7 @@ export function GoalWrapUpSection({ goal }: { goal: GoalCategory }) {
       )
   }
 
-  return (
-    <Section title="목표 마무리">
-      <p className={cn('text-[14px]', metricDone || periodOver ? 'text-ink font-semibold' : 'text-ink-2')}>{lead}</p>
-      <Button
-        variant={metricDone || periodOver ? 'primary' : 'secondary'}
-        fullWidth
-        className="mt-3"
-        onClick={openModal}
-      >
-        <Flag className="size-4" />
-        마무리하기
-      </Button>
-
+  const modal = (
       <Modal
         open={open}
         onClose={close}
@@ -185,6 +193,21 @@ export function GoalWrapUpSection({ goal }: { goal: GoalCategory }) {
           />
         </label>
       </Modal>
+  )
+  if (headless) return modal
+  return (
+    <Section title="목표 마무리">
+      <p className={cn('text-[14px]', metricDone || periodOver ? 'text-ink font-semibold' : 'text-ink-2')}>{lead}</p>
+      <Button
+        variant={metricDone || periodOver ? 'primary' : 'secondary'}
+        fullWidth
+        className="mt-3"
+        onClick={() => openModal()}
+      >
+        <Flag className="size-4" />
+        마무리하기
+      </Button>
+      {modal}
     </Section>
   )
 }

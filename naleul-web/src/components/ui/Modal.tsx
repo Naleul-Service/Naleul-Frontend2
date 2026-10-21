@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from '@/components/icons'
 import { cn } from '@/lib/cn'
@@ -22,7 +22,8 @@ interface ModalProps {
   dismissible?: boolean
 }
 
-const WIDTH = { sm: 'sm:max-w-[340px]', md: 'sm:max-w-md', lg: 'sm:max-w-xl' }
+// 명세 13.2 — 기본 480 · 넓게 640 · 확인창 400
+const WIDTH = { sm: 'sm:max-w-[400px]', md: 'sm:max-w-[480px]', lg: 'sm:max-w-[640px]' }
 
 export function Modal({
   open,
@@ -36,6 +37,19 @@ export function Modal({
 }: ModalProps) {
   const titleId = useId()
   const panelRef = useRef<HTMLDivElement>(null)
+  // 내용이 스크롤될 때만 아래 버튼 줄 위에 1px border/soft
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [scrolls, setScrolls] = useState(false)
+  useEffect(() => {
+    const el = contentRef.current
+    if (!open || !el) return
+    const check = () => setScrolls(el.scrollHeight > el.clientHeight + 1)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    if (el.firstElementChild) ro.observe(el.firstElementChild)
+    return () => ro.disconnect()
+  }, [open])
   // onClose 가 렌더링마다 새 함수여도 아래 effect 가 다시 돌지 않도록 ref 에 보관
   const onCloseRef = useRef(onClose)
   useEffect(() => {
@@ -67,6 +81,12 @@ export function Modal({
         onClick={dismissible ? () => onClose('backdrop') : undefined}
         aria-hidden
       />
+      {/*
+        명세 13.2 — 하나의 시트/모달 디자인
+         · 모바일: 아래 시트 (위 모서리 24 · 손잡이 36×4 위 16 · 아래 12) · 넓은 화면: 가운데 모달 (모서리 20)
+         · 머리: 제목 H3 왼쪽 · 부제목 Body/SM · 닫기 IconButton MD — 좌우 24
+         · 내용: 좌우 24 · 위 20 · 아래 버튼 줄: 16/24 + safe area, 내용이 스크롤될 때만 위 1px border/soft
+      */}
       <div
         ref={panelRef}
         role="dialog"
@@ -74,22 +94,25 @@ export function Modal({
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
         className={cn(
-          // 디자인 시스템 Dialog — glass (반투명 바탕 + blur 16 + 1px glass 테두리) · 모서리 16 · 여백 20 · 간격 16
-          'bg-glass-bg border-glass-border shadow-pop relative flex max-h-[90dvh] w-full flex-col border outline-none backdrop-blur-[16px]',
-          'rounded-t-sheet sm:rounded-dialog',
+          'bg-bg-surface shadow-pop relative flex max-h-[90dvh] w-full flex-col outline-none',
+          'rounded-t-sheet sm:rounded-[20px]',
           'animate-[modal-in_180ms_ease-out]',
           WIDTH[size]
         )}
       >
+        {/* 모바일 손잡이 */}
+        <div className="flex shrink-0 justify-center pt-4 pb-3 sm:hidden" aria-hidden>
+          <span className="bg-border-subtle h-1 w-9 rounded-[2px]" />
+        </div>
         {(title || dismissible) && (
-          <div className="flex items-start justify-between gap-4 px-5 pt-5">
+          <div className="flex shrink-0 items-start justify-between gap-4 px-6 sm:pt-6">
             <div className="min-w-0">
               {title && (
                 <h2 id={titleId} className="text-h3 text-text-primary">
                   {title}
                 </h2>
               )}
-              {description && <p className="text-body-md text-text-secondary mt-1.5">{description}</p>}
+              {description && <p className="text-body-sm text-text-secondary mt-1">{description}</p>}
             </div>
             {dismissible && (
               <button
@@ -103,11 +126,24 @@ export function Modal({
             )}
           </div>
         )}
-        {children && <div className="overflow-y-auto px-5 pt-4 pb-1">{children}</div>}
-        {footer && (
-          <div className="flex justify-end gap-2 px-5 pt-4 pb-[max(20px,env(safe-area-inset-bottom))] sm:pb-5">{footer}</div>
+        {children && (
+          <div ref={contentRef} className={cn('min-h-0 overflow-y-auto px-6 pt-5', footer ? 'pb-5' : 'pb-1')}>
+            <div>{children}</div>
+          </div>
         )}
-        {!footer && <div className="pb-4" />}
+        {footer && (
+          <div
+            className={cn(
+              'flex shrink-0 gap-2 px-6 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] sm:justify-end sm:pb-6',
+              // 모바일: 버튼은 LG 높이로 줄을 꽉 채워요 (보조 + 주 버튼이면 반씩)
+              'max-sm:[&>button]:h-12 max-sm:[&>button]:flex-1',
+              scrolls && 'border-border-soft border-t'
+            )}
+          >
+            {footer}
+          </div>
+        )}
+        {!footer && <div className="pb-[max(24px,env(safe-area-inset-bottom))] sm:pb-6" />}
       </div>
     </div>,
     document.body

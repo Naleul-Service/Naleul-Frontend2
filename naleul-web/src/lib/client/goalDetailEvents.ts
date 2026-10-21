@@ -101,6 +101,7 @@ export const GOAL_DETAIL_EVENTS = [
   'goal_detail.routine_period_open',
   'goal_detail.routine_result',
   'goal_detail.routine_save_click',
+  'goal_detail.progress_view_change',
   'goal_detail.routine_weekmap_pick',
   'goal_detail.routine_weekmap_toggle',
   'goal_detail.tab_click',

@@ -72,7 +72,7 @@ interface Options {
   onActivate?: () => void
   /** 끌기 시작 후 저장 없이 끝났을 때 (분석용) — invalid 면 놓을 수 없던 이유 문구 */
   onCancel?: (source: DragSource, mode: DragMode, reason: DragCancelReason, invalid?: string) => void
-  /** 터치로 Task 를 3초 꾹 눌렀을 때 (드래그는 접혀요) — 묶음 고르기 */
+  /** 터치로 Task 를 2초 꾹 눌렀을 때 (드래그는 접혀요) — 묶음 고르기 */
   onHold?: (source: DragSource) => void
 }
 
@@ -82,8 +82,8 @@ export type DragCancelReason = 'esc' | 'pointer_cancel' | 'no_target' | 'invalid
 const MOUSE_THRESHOLD = 4
 const TOUCH_HOLD_MS = 350
 const TOUCH_SLOP = 8
-/** 터치로 이만큼 꾹 누르고 있으면 묶음 고르기 (명세 10.5) */
-const GROUP_HOLD_MS = 3000
+/** 터치로 이만큼 꾹 누르고 있으면 묶음 고르기 (명세 10.5 · 13.1 — 2초) */
+const GROUP_HOLD_MS = 2000
 const EDGE = 48
 const MAX_SCROLL_SPEED = 14
 const DEFAULT_MINUTES = 60
@@ -369,7 +369,7 @@ export function useGridDrag({
         grab,
         active: false,
         holdTimer: touch ? window.setTimeout(activate, TOUCH_HOLD_MS) : null,
-        // 터치로 Task 를 움직이지 않고 3초 꾹 누르면 → 드래그를 접고 묶음 고르기로 (Shift+클릭과 같은 묶음)
+        // 터치로 Task 를 움직이지 않고 2초 꾹 누르면 → 드래그를 접고 묶음 고르기로 (Shift+클릭과 같은 묶음)
         groupTimer:
           touch && source.kind === 'task' && mode === 'move' && opts.current.onHold
             ? window.setTimeout(() => {

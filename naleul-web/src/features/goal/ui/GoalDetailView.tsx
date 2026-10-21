@@ -4,7 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { KanbanSquare, LayoutDashboard, Library } from 'lucide-react'
-import { BarChart3, NotebookPen } from '@/components/icons'
+import { BarChart3, EllipsisVertical, NotebookPen } from '@/components/icons'
+import { Flag } from 'lucide-react'
+import { IconButton } from '@/components/ui/IconButton'
+import { rectOf, type AnchorRect } from '@/components/ui/Popover'
+import { ActionMenu } from '@/features/timetable/ui/ActionMenu'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -24,17 +28,22 @@ import { GoalScrollTitle, GoalTabBar, useGoalTab, type TabDef } from './GoalTabs
 import { GoalFab, GoalFabs } from './GoalFab'
 import { Modal } from '@/components/ui/Modal'
 import { WorkBoardView, WorkSummaryCard } from '@/features/work/ui/WorkBoardView'
-import { GoalAdjustmentBanner, GoalOutcomeSection, GoalWrapUpSection } from './GoalOutcomeSection'
+import {
+  GoalAdjustmentBanner,
+  GoalOutcomeSection,
+  GoalWrapUpSection,
+  type GoalWrapUpHandle,
+} from './GoalOutcomeSection'
 import { GoalTaskList } from './GoalTaskList'
 import { PlaceAfterCreateCard } from './PlaceAfterCreateCard'
 import { DailyCheckInCard } from './progress/DailyCheckInCard'
 import { ExtraMetricsSection } from './progress/ExtraMetricsSection'
-import { ProgressSection } from './progress/ProgressSection'
+import { ProgressOverview } from './progress/ProgressOverview'
+import { MilestonesSection } from './MilestonesSection'
 import { RefineWithAiCard } from './RefineWithAiCard'
 import { RoutineHeatmapSection } from './RoutineHeatmapSection'
 import { RoutinesSection } from './RoutinesSection'
 import { Section } from './sections'
-import { TaskRateSection } from './TaskRateSection'
 
 // ─── 작은 조각들 ───────────────────────────────────────────────
 
@@ -147,7 +156,7 @@ function ReflectionsPanel({ goal, hint }: { goal: GoalCategory; hint: string }) 
 type RecordTab = 'board' | 'stats' | 'reflections'
 
 const RECORD_TABS: TabDef<RecordTab>[] = [
-  { value: 'board', label: '보드', icon: KanbanSquare },
+  { value: 'board', label: '업무관리', icon: KanbanSquare }, // 명세 13.9 — 분석 값은 그대로 board
   { value: 'stats', label: '통계', icon: BarChart3 },
   { value: 'reflections', label: '회고', icon: Library },
 ]
@@ -178,7 +187,7 @@ function RecordGoalBody({ goal }: { goal: GoalCategory }) {
           </div>
         </section>
       ) : (
-        <ReflectionsPanel goal={goal} hint="보드의 '적기 → 회고'나 홈의 '오늘 회고'에서 남기면 여기 모여요." />
+        <ReflectionsPanel goal={goal} hint="업무관리 탭의 '적기' 버튼(회고)이나 홈의 '오늘 회고'에서 남기면 여기 모여요." />
       )}
     </>
   )
@@ -191,6 +200,8 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
   const { data: goal, isPending, isError, error, refetch } = useGoalCategory(goalId)
   // 한 번에 하나의 입력창만 열어요 (다른 걸 열면 앞의 것은 닫힘)
   const [editing, setEditing] = useState<string | null>(null)
+  const [moreAt, setMoreAt] = useState<AnchorRect | null>(null)
+  const wrapUp = useRef<GoalWrapUpHandle>(null)
   const editingCtx = useMemo(
     () => ({ editing, open: (key: string) => setEditing(key), close: () => setEditing(null) }),
     [editing]
@@ -279,18 +290,48 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
     )
   }
 
+  // ⋯ 더보기 (명세 13.5) — 진행 중인 달성형 목표: 목표 마무리 (예전엔 개요 맨 아래 카드)
+  const canWrapUp = !isRecordGoal(goal) && !goal.temporary && goal.goalCategoryStatus === 'IN_PROGRESS'
+  const moreButton = canWrapUp ? (
+    <IconButton label="더보기" onClick={(e) => setMoreAt(rectOf(e.currentTarget))}>
+      <EllipsisVertical />
+    </IconButton>
+  ) : undefined
+
   return (
     <EditingContext.Provider value={editingCtx}>
       {/* goal-detail: 이 화면 카드 그림자는 더 연하게 (명세 12.3 — globals.css) */}
       <div className="goal-detail">
-        <GoalScrollTitle title={`${goal.emoji ? `${goal.emoji} ` : ''}${goal.goalCategoryName}`} />
+        <GoalScrollTitle
+          title={`${goal.emoji ? `${goal.emoji} ` : ''}${goal.goalCategoryName}`}
+          more={moreButton}
+        />
+        {canWrapUp && (
+          <>
+            <GoalWrapUpSection goal={goal} headless ref={wrapUp} />
+            {moreAt && (
+              <ActionMenu
+                anchor={moreAt}
+                onClose={() => setMoreAt(null)}
+                label="더보기"
+                items={[
+                  { key: 'wrapup', label: '목표 마무리', icon: <Flag />, onSelect: () => wrapUp.current?.open('menu') },
+                ]}
+              />
+            )}
+          </>
+        )}
         {isRecordGoal(goal) ? (
           // 업무형: 머리말 + 다음 마감 · 진행 · 공유를 한 요약 카드로 (명세 12.1)
           <div id="goal-summary">
             <WorkSummaryCard goal={goal} header={<GoalHeader goal={goal} embedded />} />
           </div>
         ) : (
-          <GoalHeader goal={goal} />
+          <div className="relative">
+            <GoalHeader goal={goal} />
+            {/* 넓은 화면: 머리말 오른쪽 위 ⋯ (모바일은 위 내비 줄에) */}
+            {moreButton && <div className="absolute top-0 right-0 max-lg:hidden">{moreButton}</div>}
+          </div>
         )}
 
         {/* 기록형은 만들 때 루틴·Task 가 없어서 "TimeTable 에 배치할까요?"를 묻지 않아요 */}
@@ -323,12 +364,6 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
   const [checkInOpen, setCheckInOpen] = useState(false)
   return (
     <>
-      {/* 이 목표를 시작한 이유 — 요약 바로 위, 맨 위쪽 (명세 12.6) */}
-      {(goal.motive || goal.aiNote) && (
-        <div className="mt-5">
-          <GoalNotes goal={goal} />
-        </div>
-      )}
       {/* 요약 (진행 링 · 경과) — 탭 위에 두어 어느 탭에서도 보여요. 임시 목표는 기간·수치가 없어 빼요 */}
       <div id="goal-summary">
         {!goal.temporary && (
@@ -337,6 +372,12 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
           </div>
         )}
       </div>
+      {/* 이 목표를 시작한 이유 — 요약 카드 바로 아래 (명세 13.3) */}
+      {(goal.motive || goal.aiNote) && (
+        <div className="mt-4">
+          <GoalNotes goal={goal} />
+        </div>
+      )}
 
       {/* 오늘 기록(수치 · 기분 · 한 줄 회고) — 카드 대신 떠 있는 버튼으로 (명세 12.7 · 12.9) */}
       {goal.goalCategoryStatus !== 'COMPLETED' && (
@@ -345,7 +386,10 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
             <GoalFab label="오늘 기록" icon={<NotebookPen />} onClick={() => setCheckInOpen(true)} />
           </GoalFabs>
           <Modal open={checkInOpen} onClose={() => setCheckInOpen(false)} size="md">
-            <DailyCheckInCard goal={goal} />
+            {/* 시트 안에서는 카드 테두리 · 여백 없이 (명세 13.2) */}
+            <div className="[&>section]:border-0 [&>section]:bg-transparent [&>section]:p-0">
+              <DailyCheckInCard goal={goal} />
+            </div>
           </Modal>
         </>
       )}
@@ -369,6 +413,7 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
 function AchievementOverview({ goal }: { goal: GoalCategory }) {
   const completed = goal.goalCategoryStatus === 'COMPLETED'
   const ongoing = !goal.temporary && goal.goalCategoryStatus === 'IN_PROGRESS'
+  const hasMilestones = (goal.milestones ?? []).length > 0
   return (
     <>
       {/* 주간 점검: 2주 연속 너무 힘들거나 너무 쉬우면 루틴 하루 빼기/더하기 제안 */}
@@ -377,35 +422,33 @@ function AchievementOverview({ goal }: { goal: GoalCategory }) {
           <GoalAdjustmentBanner goal={goal} />
         </div>
       )}
-      {!goal.temporary && goal.goalCategoryStatus !== 'COMPLETED' && (
-        <div className="mt-4">
-          <GoalAiEditBar goal={goal} />
-        </div>
-      )}
-      <div className="mt-5 grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
-        <div className="space-y-5">
-          <RoutinesSection goal={goal} />
-          <RoutineHeatmapSection goal={goal} />
-          <GoalTaskList goal={goal} />
-        </div>
 
-        <div className="space-y-5">
-          {completed && !goal.temporary && <GoalOutcomeSection goal={goal} />}
-          {/* 목표 지점까지 지금 어디쯤인지 (수치 기록 그래프 · Task 누적) */}
-          {!goal.temporary && <ProgressSection goal={goal} />}
-          {/* 그래프 여러 개 (V52) — 예: 메인 "모의고사 점수" + 추가 "기출 회독" */}
-          {!goal.temporary && !completed && <ExtraMetricsSection goal={goal} />}
-          {!goal.temporary && completed && <ExtraMetricsSection goal={goal} readOnly />}
-          <TaskRateSection goal={goal} />
-          {/* 마일스톤 · 세부 목표(세부 구조)는 V52 부터 화면에서 숨겨요 — "그래서 오늘 뭘 해야 해?"에 집중 (데이터는 그대로) */}
-          {ongoing && <GoalWrapUpSection goal={goal} />}
-          {goal.achievement && (
-            <Section title="달성 기록">
-              <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{goal.achievement}</p>
-            </Section>
-          )}
-        </div>
-      </div>
+      {/* ── 진행 (명세 13.5 · 13.7): 칩으로 고르는 그래프 · 결과 · 추가 그래프 ── */}
+      <section className="mt-6 space-y-5" aria-labelledby="overview-progress">
+        <h2 id="overview-progress" className="text-h3">
+          진행
+        </h2>
+        {completed && !goal.temporary && <GoalOutcomeSection goal={goal} />}
+        <ProgressOverview goal={goal} />
+        {/* 그래프 여러 개 (V52) — 예: 메인 "모의고사 점수" + 추가 "기출 회독" */}
+        {!goal.temporary && <ExtraMetricsSection goal={goal} readOnly={completed} />}
+        {goal.achievement && (
+          <Section title="달성 기록">
+            <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{goal.achievement}</p>
+          </Section>
+        )}
+      </section>
+
+      {/* ── 계획: 마일스톤 → 루틴 → Task (목표 마무리는 ⋯ 더보기로 옮겼어요) ── */}
+      <section className="mt-8 space-y-5" aria-labelledby="overview-plan">
+        <h2 id="overview-plan" className="text-h3">
+          계획
+        </h2>
+        {!goal.temporary && !completed && <GoalAiEditBar goal={goal} />}
+        {hasMilestones && <MilestonesSection goal={goal} />}
+        <RoutinesSection goal={goal} />
+        <GoalTaskList goal={goal} />
+      </section>
     </>
   )
 }

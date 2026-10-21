@@ -228,12 +228,12 @@ export function ScopeChooser({
         ref={dialogRef}
         role="dialog"
         aria-label="적용 범위 고르기"
-        className="bg-surface shadow-pop border-line pointer-events-auto w-full max-w-[560px] animate-[modal-in_160ms_ease-out] rounded-2xl border p-4"
+        className="bg-bg-surface shadow-pop pointer-events-auto w-full max-w-[560px] animate-[modal-in_160ms_ease-out] rounded-[20px] px-6 pt-5 pb-4"
       >
         <div className="flex items-start gap-2">
           <div className="min-w-0 flex-1">
-            <p className="text-[15px] font-bold">{title}</p>
-            <p className="text-ink-3 mt-0.5 text-xs">어디까지 바꿀까요?</p>
+            <p className="text-h3 text-text-primary">{title}</p>
+            <p className="text-body-sm text-text-secondary mt-1">어디까지 바꿀까요?</p>
           </div>
           <button
             type="button"

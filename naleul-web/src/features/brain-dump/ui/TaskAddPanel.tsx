@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { X } from '@/components/icons'
+import { iconButtonClass } from '@/components/ui/IconButton'
 import { track } from '@/lib/client/analytics'
 import { TaskAddView, type TaskAddedInfo, type TaskAddViewHandle } from './TaskAddView'
 
@@ -52,20 +53,21 @@ export function TaskAddPanel({
   return (
     <aside
       aria-label={ADD_MODE_LABEL[mode]}
-      className="bg-canvas border-line shadow-pop fixed inset-0 z-40 flex animate-[slide-in-right_180ms_ease-out] flex-col sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[420px] sm:border-l xl:shadow-none"
+      className="bg-bg-surface border-border-subtle shadow-pop fixed inset-0 z-40 flex animate-[slide-in-right_180ms_ease-out] flex-col sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[420px] sm:border-l xl:shadow-none"
     >
-      <div className="border-line bg-surface flex h-14 shrink-0 items-center gap-2 border-b px-4">
-        <p className="text-h4">{ADD_MODE_LABEL[mode]}</p>
+      {/* 명세 13.2 — 머리: H3 제목 왼쪽 · 닫기 IconButton / 내용: 좌우 24 · 위 20 · 안쪽 카드 테두리 · 그림자 없이 */}
+      <div className="flex shrink-0 items-center gap-2 px-6 pt-6 pb-1">
+        <h2 className="text-h3 text-text-primary min-w-0 flex-1 truncate">{ADD_MODE_LABEL[mode]}</h2>
         <button
           type="button"
           onClick={() => closeWith('x_button')}
           aria-label={`${ADD_MODE_LABEL[mode]} 닫기`}
-          className="text-ink-3 hover:bg-subtle hover:text-ink ml-auto rounded-lg p-1.5"
+          className={iconButtonClass('md')}
         >
-          <X className="size-5" />
+          <X className="size-[18px]" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-[max(24px,env(safe-area-inset-bottom))] [&_.shadow-card]:border-0 [&_.shadow-card]:bg-transparent [&_.shadow-card]:p-0 [&_.shadow-card]:shadow-none">
         <TaskAddView
           ref={viewRef}
           key={`${mode}-${prefill?.date ?? ''}-${prefill?.startTime ?? ''}`}

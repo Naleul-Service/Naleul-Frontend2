@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { ChevronLeft, ChevronUp, type IconComponent } from '@/components/icons'
@@ -41,18 +41,30 @@ export function useGoalTab<T extends string>(tabs: TabDef<T>[]) {
   return [tab, setTab] as const
 }
 
-/** 요소가 화면 위로 지나갔는지 (모바일 머리 아래 기준) */
+/**
+ * 요소의 아래 끝이 화면 위쪽 offset(px) 위로 지나갔는지 (명세 13.4).
+ * IntersectionObserver 는 요소가 나중에 다시 그려지면 놓쳐서, 스크롤 · 크기 변경마다 직접 재요 (rAF 로 한 프레임에 한 번).
+ */
 function useScrolledPast(id: string, offset: number) {
   const [past, setPast] = useState(false)
   useEffect(() => {
-    const el = document.getElementById(id)
-    if (!el) return
-    const io = new IntersectionObserver(
-      ([e]) => setPast(!e.isIntersecting && e.boundingClientRect.top < offset),
-      { rootMargin: `-${offset}px 0px 0px 0px` }
-    )
-    io.observe(el)
-    return () => io.disconnect()
+    let raf = 0
+    const measure = () => {
+      raf = 0
+      const el = document.getElementById(id)
+      setPast(!!el && el.getBoundingClientRect().bottom < offset)
+    }
+    const onScroll = () => {
+      if (!raf) raf = window.requestAnimationFrame(measure)
+    }
+    measure()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+      if (raf) window.cancelAnimationFrame(raf)
+    }
   }, [id, offset])
   return past
 }
@@ -70,7 +82,7 @@ export function GoalTabBar<T extends string>({
   tab: T
   onChange: (t: T) => void
 }) {
-  const past = useScrolledPast('goal-tabs', 92)
+  const past = useScrolledPast('goal-tabs', 92) // 앱 머리 48 + 목표 내비 44
   const current = tabs.find((t) => t.value === tab)
   return (
     <>
@@ -120,31 +132,45 @@ export function GoalTabBar<T extends string>({
 }
 
 /**
- * 모바일 목표 상세 내비 (명세 12.4) — 요약 카드가 위로 지나가면 앱 머리 아래에
- * 단색 bg/surface 줄(← 목표 · 가운데 목표 이름 · 아래 1px border/soft)이 서서히 나타나요.
+ * 모바일 목표 상세 내비 (명세 12.4 · 13.4) — 앱 머리 바로 아래 늘 붙어 있는 단색 bg/surface 줄:
+ * ← 목표 · 가운데 목표 이름(요약 카드가 위로 지나가면 서서히) · ⋯ 더보기. 이름이 보일 때 아래 1px border/soft.
  */
-export function GoalScrollTitle({ title, onBack }: { title: string; onBack?: () => void }) {
-  const past = useScrolledPast('goal-summary', 48)
-  const ref = useRef<HTMLDivElement>(null)
+export function GoalScrollTitle({
+  title,
+  onBack,
+  more,
+}: {
+  title: string
+  onBack?: () => void
+  /** ⋯ 더보기 (예: 목표 마무리) — 없으면 버튼을 숨겨요 */
+  more?: ReactNode
+}) {
+  const past = useScrolledPast('goal-summary', 92)
   return (
     <div
-      ref={ref}
-      aria-hidden={!past}
       className={cn(
-        'bg-bg-surface border-border-soft fixed inset-x-0 top-12 z-20 flex h-11 items-center border-b px-3 transition-opacity duration-200 lg:hidden',
-        past ? 'opacity-100' : 'pointer-events-none opacity-0'
+        'bg-bg-surface sticky top-12 z-20 -mx-5 -mt-6 mb-4 flex h-11 items-center border-b px-3 transition-colors lg:hidden',
+        past ? 'border-border-soft' : 'border-transparent'
       )}
     >
       <Link
         href="/goal"
         onClick={onBack}
-        tabIndex={past ? 0 : -1}
         aria-label="목표 목록"
-        className="text-text-secondary grid size-8 place-items-center rounded-[6px]"
+        className="text-text-secondary hover:bg-bg-subtle grid size-8 place-items-center rounded-[6px]"
       >
         <ChevronLeft className="size-5" />
       </Link>
-      <p className="text-label-lg text-text-primary absolute inset-x-12 truncate text-center">{title}</p>
+      <p
+        aria-hidden={!past}
+        className={cn(
+          'text-label-lg text-text-primary absolute inset-x-12 truncate text-center transition-opacity duration-200',
+          past ? 'opacity-100' : 'pointer-events-none opacity-0'
+        )}
+      >
+        {title}
+      </p>
+      <div className="ml-auto">{more}</div>
     </div>
   )
 }

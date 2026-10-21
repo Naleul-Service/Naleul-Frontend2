@@ -10,11 +10,12 @@ import {
   type KeyboardEvent,
   type RefObject,
 } from 'react'
-import { AlertTriangle, CircleDashed, Flag, ListTodo, Loader, MessageSquareText, PenLine, Share2 } from 'lucide-react'
-import { Check, ChevronDown, Pencil, Plus, SquarePen, Trash2, X } from '@/components/icons'
+import { AlertTriangle, CircleDashed, Flag, ListTodo, Loader, MessageSquareText, PenLine } from 'lucide-react'
+import { Check, ChevronDown, Pencil, Plus, SquarePen, Trash2, Upload, X } from '@/components/icons'
 import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { IconButton } from '@/components/ui/IconButton'
 import { Modal } from '@/components/ui/Modal'
 import { GoalFab, GoalFabs } from '@/features/goal/ui/GoalFab'
 import { Spinner } from '@/components/ui/Spinner'
@@ -48,7 +49,7 @@ import {
   type WorkTask,
   type WorkTopic,
 } from '../api'
-import { COLUMN_LABEL, dayLabel, daysAgo, dueLabel, fullDate, goalDDay } from '../format'
+import { COLUMN_LABEL, dayLabel, daysAgo, dueLabel, goalDDay } from '../format'
 import { WorkShareModal } from './WorkShareModal'
 import { WorkTaskModal } from './WorkTaskModal'
 
@@ -64,7 +65,6 @@ const matchTopic = (t: WorkTask, f: TopicFilter) =>
 type Surface = 'roadmap' | 'board'
 type MoveMethod = 'check' | 'drag' | 'next_button'
 type TopicAction = 'create' | 'update' | 'delete' | 'complete' | 'reopen'
-type PillKind = 'remaining' | 'in_progress' | 'pace' | 'overdue_topic' | 'overdue_task' | 'due_this_week'
 /** 보드 필터를 바꾼 곳 — 보드 위 주제 칩 · 로드맵 주제 이름 · 새 주제를 만든 직후 */
 type FilterEntry = 'topic_bar' | 'roadmap' | 'topic_created'
 
@@ -99,23 +99,6 @@ const trackTopicResult = (goalId: number, topicId: number | null, action: TopicA
 
 // ─── 1. 다음 마감 · 진행 요약 ────────────────────────────────────
 
-function Meter({ label, value, right }: { label: string; value: number | null; right?: string }) {
-  if (value === null) return null
-  return (
-    <div>
-      <div className="text-caption-md text-text-secondary mb-1 flex justify-between">
-        <span>{label}</span>
-        <span className="text-text-primary font-semibold tabular-nums">{right ?? `${value}%`}</span>
-      </div>
-      {/* 트랙 = surface 70% · 채움 = 목표 accent (NowCard) */}
-      <ProgressBar
-        value={Math.min(Math.max(value, 0), 100) / 100}
-        className="bg-bg-surface/70"
-        fillClassName="bg-(--goal-accent)"
-      />
-    </div>
-  )
-}
 
 /** 마감까지 속도 — 하루 1개 이상이면 "하루 2개씩", 적으면 "3일에 1개씩" */
 function paceLabel(perDay: number) {
@@ -138,149 +121,76 @@ function SummaryHero({
   board,
   colorCode,
   onShare,
-  onPill,
   header,
 }: {
-  /** 목표 머리말 (이름 · 태그 · 기간) — 요약 카드 안 맨 위에 합쳐요 (명세 12.1) */
+  /** 목표 머리말 (이름 · 태그 · 시작일) — 요약 카드 맨 위 (명세 13.8) */
   header?: React.ReactNode
   board: WorkBoard
-  /** 목표 색 — 카드 바탕을 목표 톤으로 (Figma NowCard) */
+  /** 목표 색 — 카드 바탕을 목표 톤으로 */
   colorCode?: string | null
   onShare: () => void
-  /** 알약은 눌러도 아무 일이 없어요 — 눌러 보는지만 남겨요 */
-  onPill: (kind: PillKind) => void
 }) {
   const s = board.summary
   const next = s.nextTopic
-  const overdueTopics = board.timeline.filter((t) => t.status === 'OVERDUE').length
-  const topicPercent = s.topicsTotal ? Math.round((s.topicsDone / s.topicsTotal) * 100) : null
+  const overdue = next?.dDay != null && next.dDay < 0
+  const meta = [
+    `끝낸 주제 ${s.topicsDone}/${s.topicsTotal}`,
+    next?.dueDate && `${shortDate(next.dueDate)}까지`,
+    next?.remainingPerDay != null && next.remainingPerDay > 0 && !overdue && `마감까지 ${paceLabel(next.remainingPerDay)}`,
+  ].filter(Boolean) as string[]
 
   return (
-    // 목표 요약 카드 (Figma NowCard) — 목표 톤 바탕 · 1px accent 20% 테두리 · 다크 모드는 목표 dark bg
-    <section
-      style={goalVars(colorCode)}
-      className="text-text-primary rounded-card border border-[color-mix(in_srgb,var(--goal-accent)_20%,transparent)] bg-(--goal-bg) p-5"
-    >
-      {/* 1줄: 목표 이름 · 색 점 · 공유 / 2줄: 태그 — 아래 1px border/soft */}
-      <div className="border-border-soft mb-4 flex items-start gap-3 border-b pb-4">
+    // 업무형 요약 카드 (명세 13.8) — 목표 톤 바탕 · 모서리 16 · 여백 20 · 그림자 없음
+    <section style={goalVars(colorCode)} className="text-text-primary rounded-card bg-(--goal-bg) p-5">
+      {/* 1줄: 이름 · 공유 아이콘 / 2줄: 태그 · 시작일 */}
+      <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">{header}</div>
-        <Button variant="secondary" size="sm" onClick={onShare} className="shrink-0">
-          <Share2 className="size-4" />
-          공유
-        </Button>
+        <IconButton label="공유" onClick={onShare} className="hover:bg-bg-surface/70 -mt-0.5 -mr-1">
+          <Upload />
+        </IconButton>
       </div>
-      <div className="flex flex-wrap items-start gap-x-8 gap-y-5">
-        {/* 다음 마감 */}
-        <div className="max-w-full min-w-[200px]">
-          <p className="text-text-secondary flex items-center gap-1.5 text-[13px]">
-            <Flag className="size-4" strokeWidth={1.5} />
-            다음 마감
-          </p>
-          {next ? (
-            <>
-              <p className="text-label-lg mt-1.5 truncate">
-                {next.emoji ? `${next.emoji} ` : ''}
-                {next.name}
-              </p>
-              <p
-                className={cn(
-                  'text-display-lg mt-1 leading-none text-(--goal-fg)',
-                  next.dDay! < 0 && 'text-status-error-fg'
-                )}
-              >
-                {goalDDay(next.dDay)}
-              </p>
-              <p className="text-text-secondary mt-1.5 text-[14px]">
-                {fullDate(next.dueDate!)}까지
-                {next.remaining > 0 && ` · 남은 ${next.remaining}개`}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="mt-1 text-[26px] leading-tight font-bold">
-                {s.topicsTotal === 0
-                  ? '아직 주제가 없어요'
-                  : s.topicsDone === s.topicsTotal
-                    ? '모든 주제를 끝냈어요'
-                    : '마감 정한 주제가 없어요'}
-              </p>
-              <p className="text-text-secondary mt-1.5 text-[13px]">
-                {s.topicsTotal === 0
-                  ? '로드맵에 주제를 만들고 마감을 정해 보세요'
-                  : s.topicsDone === s.topicsTotal
-                    ? '수고했어요! 다음 주제를 이어서 만들어도 돼요'
-                    : '주제에 마감을 정하면 하루에 몇 개씩 해야 하는지 알려드려요'}
-              </p>
-            </>
-          )}
-        </div>
 
-        {/* 진행 */}
-        <div className="min-w-[220px] flex-1">
-          <p className="text-text-secondary text-[13px]">진행</p>
-          <p className="text-h2 mt-1 leading-none text-(--goal-fg)">
-            {s.done}
-            <span className="text-text-secondary text-body-md font-medium"> / {s.total}개 완료</span>
-          </p>
-          <div className="mt-4 space-y-2.5">
-            <Meter label="Task 완료" value={s.progressPercent} />
-            <Meter label="끝낸 주제" value={topicPercent} right={`${s.topicsDone} / ${s.topicsTotal}`} />
+      <div className="border-border-soft my-4 border-t" />
+
+      {/* 3칸: 다음 마감 · 진행 · 남은 Task */}
+      <dl className="divide-border-soft grid grid-cols-3 divide-x">
+        <div className="min-w-0 pr-3">
+          <dt className="text-caption-md text-text-secondary">다음 마감</dt>
+          <dd className="text-label-md mt-1 truncate">
+            {next ? `${next.emoji ? `${next.emoji} ` : ''}${next.name}` : s.topicsTotal ? '마감 없음' : '주제 없음'}
+          </dd>
+          <dd className={cn('text-h2 mt-0.5 tabular-nums', overdue ? 'text-status-error-fg' : 'text-(--goal-fg)')}>
+            {next ? goalDDay(next.dDay) : '–'}
+          </dd>
+        </div>
+        <div className="min-w-0 px-3">
+          <dt className="text-caption-md text-text-secondary">진행</dt>
+          <dd className="text-h2 mt-1 tabular-nums">
+            {s.done}/{s.total}
+          </dd>
+        </div>
+        <div className="min-w-0 pl-3">
+          <dt className="text-caption-md text-text-secondary">남은 Task</dt>
+          <dd className="text-h2 mt-1 tabular-nums">{s.remaining}개</dd>
+        </div>
+      </dl>
+
+      {/* Task 완료 막대 + 한 줄 설명 */}
+      {s.progressPercent != null && (
+        <div className="mt-4">
+          <div className="text-label-md flex items-center justify-between">
+            <span>Task 완료</span>
+            <span className="tabular-nums">{s.progressPercent}%</span>
           </div>
+          <ProgressBar
+            value={Math.min(Math.max(s.progressPercent, 0), 100) / 100}
+            className="bg-bg-surface/70 mt-1.5 h-1.5 rounded-[3px]"
+            fillClassName="bg-(--goal-accent) rounded-[3px]"
+          />
         </div>
-
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2 text-[13px]">
-        <Pill onClick={() => onPill('remaining')}>남은 Task {s.remaining}개</Pill>
-        {s.inProgress > 0 && <Pill onClick={() => onPill('in_progress')}>진행 중 {s.inProgress}개</Pill>}
-        {next?.remainingPerDay != null && next.remainingPerDay > 0 && next.dDay! >= 0 && (
-          <Pill onClick={() => onPill('pace')}>
-            {next.name} 마감까지 {paceLabel(next.remainingPerDay)}
-          </Pill>
-        )}
-        {overdueTopics > 0 && (
-          <Pill tone="danger" onClick={() => onPill('overdue_topic')}>
-            마감 지난 주제 {overdueTopics}개
-          </Pill>
-        )}
-        {s.overdue > 0 && (
-          <Pill tone="danger" onClick={() => onPill('overdue_task')}>
-            마감 지난 Task {s.overdue}개
-          </Pill>
-        )}
-        {s.dueThisWeek > 0 && (
-          <Pill tone="warning" onClick={() => onPill('due_this_week')}>
-            이번 주 마감 {s.dueThisWeek}개
-          </Pill>
-        )}
-      </div>
-    </section>
-  )
-}
-
-function Pill({
-  children,
-  tone,
-  onClick,
-}: {
-  children: React.ReactNode
-  tone?: 'danger' | 'warning'
-  onClick?: () => void
-}) {
-  return (
-    <span
-      onClick={onClick}
-      className={cn(
-        'rounded-full px-3 py-1 font-semibold',
-        tone === 'danger'
-          ? 'bg-status-error-bg text-status-error-fg'
-          : tone === 'warning'
-            ? 'bg-status-warning-bg text-status-warning-fg'
-            : 'bg-bg-surface/70 text-text-secondary'
       )}
-    >
-      {children}
-    </span>
+      <p className="text-caption-md text-text-secondary mt-2">{meta.join(' · ')}</p>
+    </section>
   )
 }
 
@@ -1812,7 +1722,7 @@ export function WorkSummaryCard({ goal, header }: { goal: GoalCategory; header: 
     return (
       <section
         style={goalVars(goal.colorCode)}
-        className="rounded-card border border-[color-mix(in_srgb,var(--goal-accent)_20%,transparent)] bg-(--goal-bg) p-5"
+        className="rounded-card bg-(--goal-bg) p-5"
       >
         {header}
       </section>
@@ -1828,7 +1738,6 @@ export function WorkSummaryCard({ goal, header }: { goal: GoalCategory; header: 
           track('work_board.share_click', { goal_category_id: goalId, open_task_count: board.summary.remaining })
           setSharing(true)
         }}
-        onPill={(kind) => track('work_board.pill_dead_click', { goal_category_id: goalId, pill_kind: kind })}
       />
       <WorkShareModal goalId={goalId} open={sharing} onClose={() => setSharing(false)} />
     </>

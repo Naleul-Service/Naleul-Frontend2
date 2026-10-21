@@ -220,6 +220,16 @@ export function useTimetableInteractions(
   const [ask, setAsk] = useState<ScopeAsk | null>(null)
   // 묶음 드래그로 같이 옮길 Task id (Shift·⌘·Ctrl+클릭, 또는 상세의 "이어진 N개 묶어 옮기기")
   const [group, setGroup] = useState<number[]>([])
+  // 마지막으로 누른 입력 종류 (명세 13.1) — click 이벤트에 pointerType 이 없는 브라우저(구형 iOS Safari)도
+  // 묶음 고르는 중 터치 탭이 상세 창을 열지 않고 묶음만 토글하게
+  const lastPointer = useRef<string>('mouse')
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      lastPointer.current = e.pointerType
+    }
+    document.addEventListener('pointerdown', onDown, true)
+    return () => document.removeEventListener('pointerdown', onDown, true)
+  }, [])
   // "AI로 배치하기" 미리보기 제안 (저장 전 점선 블록). null 이면 미리보기 중 아님
   const [proposals, setProposals] = useState<Proposal[] | null>(null)
   const [proposalUnscheduled, setProposalUnscheduled] = useState(0)
@@ -442,10 +452,12 @@ export function useTimetableInteractions(
     }
     // 터치로 묶음을 고르는 중이면 탭 = 넣기/빼기 (명세 10.5)
     const touchTap =
-      'pointerType' in e.nativeEvent && (e.nativeEvent as globalThis.PointerEvent).pointerType === 'touch'
-    if (touchTap && groupIds.size > 0 && groupable(task)) {
+      ('pointerType' in e.nativeEvent && (e.nativeEvent as globalThis.PointerEvent).pointerType === 'touch') ||
+      lastPointer.current === 'touch'
+    // 묶음 고르는 중 터치 탭은 묶음 토글만 — 상세 창은 열지 않아요 (묶을 수 없는 Task 도 창을 열지 않음)
+    if (touchTap && groupIds.size > 0) {
       e.preventDefault()
-      toggleGroup(task, 'touch_tap')
+      if (groupable(task)) toggleGroup(task, 'touch_tap')
       return
     }
     const anchor = rectOf(e.currentTarget)
@@ -1073,7 +1085,7 @@ export function useTimetableInteractions(
      * TimeGrid 에 그대로 펼쳐 넘겨요: <TimeGrid {...gridEvents} … />. 홈(surface='home')에서는 아무것도 안 보내요.
      */
     gridEvents: {
-      // 터치 묶음 고르기 (명세 10.5) — 3초 꾹 = 묶음에 넣기 · 빈 곳 탭 = 묶음 풀기
+      // 터치 묶음 고르기 (명세 10.5 · 13.1) — 2초 꾹 = 묶음에 넣기 · 빈 곳 탭 = 묶음 풀기
       onTaskHold: (t: TimeBlockTask) => {
         if (groupable(t)) toggleGroup(t, 'long_press', true)
       },

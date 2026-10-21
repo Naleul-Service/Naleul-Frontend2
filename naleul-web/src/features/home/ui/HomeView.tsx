@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react
 import { PencilLine } from 'lucide-react'
 import { ChevronLeft, ChevronRight, X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
+import { iconButtonClass } from '@/components/ui/IconButton'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
@@ -379,21 +380,23 @@ function RetroSidePanel({
   return (
     <aside
       aria-label={title}
-      className="bg-canvas border-line shadow-pop fixed inset-0 z-40 flex animate-[slide-in-right_180ms_ease-out] flex-col sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[400px] sm:border-l 2xl:shadow-none"
+      className="bg-bg-surface border-border-subtle shadow-pop fixed inset-0 z-40 flex animate-[slide-in-right_180ms_ease-out] flex-col sm:inset-y-0 sm:right-0 sm:left-auto sm:w-[400px] sm:border-l 2xl:shadow-none"
     >
-      <div className="border-line bg-surface flex h-14 shrink-0 items-center gap-2 border-b px-4">
-        <PencilLine className="size-4" />
-        <p className="text-[16px] font-bold">{title}</p>
+      {/* 명세 13.2 — 머리: H3 제목 왼쪽 · 닫기 / 내용: 좌우 24 · 위 20 · 안쪽 카드 테두리 · 그림자 없이 */}
+      <div className="flex shrink-0 items-center gap-2 px-6 pt-6 pb-1">
+        <h2 className="text-h3 text-text-primary min-w-0 flex-1 truncate">{title}</h2>
         <button
           type="button"
           onClick={() => onClose('x_button')}
           aria-label={`${title} 닫기`}
-          className="text-ink-3 hover:bg-subtle hover:text-ink ml-auto rounded-lg p-1.5"
+          className={iconButtonClass('md')}
         >
-          <X className="size-5" />
+          <X className="size-[18px]" />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-5 pb-[max(24px,env(safe-area-inset-bottom))] [&_.shadow-card]:border-0 [&_.shadow-card]:bg-transparent [&_.shadow-card]:p-0 [&_.shadow-card]:shadow-none">
+        {children}
+      </div>
     </aside>
   )
 }

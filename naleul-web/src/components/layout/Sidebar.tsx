@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Library, LogIn } from 'lucide-react'
-import { BarChart3, CalendarDays, Home, LogOut, Plus, Settings, Target, type IconComponent } from '@/components/icons'
+import { BarChart3, CalendarDays, Home, LogOut, Plus, Settings, Target, X, type IconComponent } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { logout } from '@/lib/client/api'
 import { COMMON_EVENTS as CE, EVENTS, track } from '@/lib/client/analytics'
@@ -82,15 +82,26 @@ function NavLink({
   )
 }
 
-export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigate?: () => void }) {
+export function Sidebar({
+  user,
+  onNavigate,
+  onClose,
+}: {
+  user: SessionUserView
+  onNavigate?: () => void
+  /** 모바일 서랍: 머리 오른쪽 X */
+  onClose?: () => void
+}) {
   const pathname = usePathname()
   const surface: NavSurface = onNavigate ? 'drawer' : 'sidebar'
+  // 서랍은 구분선을 더 연하게 (border/soft)
+  const line = onClose ? 'border-border-soft' : 'border-border-subtle'
   const ev = { nav_surface: surface, current_path: currentPath() }
 
   return (
     <div className="flex h-full flex-col">
       {/* 머리 56 — 워드마크 */}
-      <div className="border-border-subtle flex h-14 shrink-0 items-center border-b px-4">
+      <div className={cn(line, 'flex h-14 shrink-0 items-center border-b px-4')}>
         <Link
           href="/"
           onClick={() => {
@@ -100,6 +111,11 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
         >
           <Logo />
         </Link>
+        {onClose && (
+          <button type="button" onClick={onClose} aria-label="메뉴 닫기" className={cn(iconButtonClass('md'), 'ml-auto -mr-1.5')}>
+            <X className="size-[18px]" />
+          </button>
+        )}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4">
@@ -162,7 +178,7 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
       </div>
 
       {isGuestUser(user) ? (
-        <div className="border-border-subtle border-t p-4">
+        <div className={cn(line, 'border-t p-4')}>
           <p className="text-body-sm text-text-secondary px-1">둘러보는 중이에요. 로그인하면 만든 목표와 Task가 저장돼요.</p>
           <button
             type="button"
@@ -179,7 +195,7 @@ export function Sidebar({ user, onNavigate }: { user: SessionUserView; onNavigat
         </div>
       ) : (
         // 디자인 시스템 UserCard — 56 · 아바타 28 + 이름 + 플랜 Tag + 버튼
-        <div className="border-border-subtle flex h-14 shrink-0 items-center gap-2 border-t px-4">
+        <div className={cn(line, 'flex h-14 shrink-0 items-center gap-2 border-t px-4')}>
           <span
             onClick={() => track(CE.sidebarDeadClick, { dead_target: 'avatar', nav_surface: surface })}
             className="from-ai-gradient-start to-ai-gradient-end text-label-sm grid size-7 shrink-0 place-items-center rounded-full bg-linear-to-br text-white"
