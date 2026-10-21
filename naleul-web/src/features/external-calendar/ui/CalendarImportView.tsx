@@ -24,11 +24,10 @@ import {
 } from '../google'
 import type { ExternalEvent, ImportResult } from '../types'
 
-type Source = 'GOOGLE' | 'NOTION' | 'APPLE'
+type Source = 'GOOGLE' | 'APPLE'
 
 const SOURCES: { value: Source; label: string; hint: string; mark: string }[] = [
   { value: 'GOOGLE', label: '구글 캘린더', hint: '구글 계정을 연결해서 가져와요', mark: 'G' },
-  { value: 'NOTION', label: '노션 캘린더', hint: '노션 캘린더에 연결한 계정에서 가져와요', mark: 'N' },
   { value: 'APPLE', label: '아이폰 기본 캘린더', hint: '나를 iOS 앱에서 가져와요', mark: '' },
 ]
 
@@ -65,7 +64,7 @@ export function CalendarImportView() {
         <p className="text-ink-3 mt-1 text-[13px]">
           고른 일정은 나를의 Task가 돼요. 한 번 가져온 뒤에는 원래 캘린더에서 바꿔도 다시 반영되지 않아요.
         </p>
-        <div role="radiogroup" aria-label="가져올 캘린더" className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div role="radiogroup" aria-label="가져올 캘린더" className="mt-4 grid gap-3 sm:grid-cols-2">
           {SOURCES.map((s) => (
             <button
               key={s.value}
@@ -91,38 +90,9 @@ export function CalendarImportView() {
         </div>
       </Card>
 
-      {source === 'NOTION' && <NotionGuide onGoogle={() => setSource('GOOGLE')} />}
       {source === 'APPLE' && <AppleGuide />}
       {source === 'GOOGLE' && <GoogleImport />}
     </div>
-  )
-}
-
-/** 노션 캘린더는 자체 저장소 · 공개 API 가 없어요 → 연결한 계정(구글 · iCloud)에서 가져오게 안내 */
-function NotionGuide({ onGoogle }: { onGoogle: () => void }) {
-  return (
-    <Card className="p-5 sm:p-6">
-      <p className="text-[15px] font-bold">노션 캘린더 일정은 연결한 계정에 저장돼 있어요</p>
-      <p className="text-ink-2 mt-2 text-[14px] leading-relaxed">
-        노션 캘린더는 구글 · iCloud · Outlook 캘린더를 모아서 보여주는 앱이라, 일정은 그 계정에 들어 있어요. 노션
-        캘린더에 연결한 계정으로 가져오면 같은 일정을 그대로 받을 수 있어요.
-      </p>
-      <ul className="text-ink-2 mt-3 space-y-1.5 text-[14px]">
-        <li>· 구글 계정 → 아래 버튼으로 바로 가져와요</li>
-        <li>· iCloud · Outlook 계정 → 나를 iOS 앱의 &ldquo;아이폰 기본 캘린더&rdquo;로 가져와요</li>
-      </ul>
-      <Button
-        variant="brand"
-        className="mt-4"
-        onClick={() => {
-          track('calendar_import.notion_google_click', { import_source: 'GOOGLE' })
-          onGoogle()
-        }}
-      >
-        구글 캘린더로 가져오기
-        <ArrowRight className="size-4" />
-      </Button>
-    </Card>
   )
 }
 
@@ -135,7 +105,7 @@ function AppleGuide() {
         <b>설정 → 외부 캘린더 가져오기</b>에서 캘린더를 고르면, 가져온 Task가 여기 웹에도 그대로 보여요.
       </p>
       <p className="text-ink-3 mt-2 text-[13px]">
-        아이폰에 추가한 iCloud · 구글 · Outlook 계정 일정과 노션 캘린더 일정도 함께 가져올 수 있어요.
+        아이폰에 추가한 iCloud · 구글 · Outlook 계정 일정도 함께 가져올 수 있어요.
       </p>
     </Card>
   )
@@ -321,7 +291,7 @@ function GoogleImport() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block">
                 <span className="text-ink-3 text-[13px] font-semibold">시작일</span>
                 <input

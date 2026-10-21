@@ -12,7 +12,6 @@ export const SETTINGS_EVENTS = [
   'calendar_import.load_click',
   'calendar_import.load_result',
   'calendar_import.not_ready_view',
-  'calendar_import.notion_google_click',
   'calendar_import.option_change',
   'calendar_import.pageview',
   'calendar_import.result_calendar_click',
