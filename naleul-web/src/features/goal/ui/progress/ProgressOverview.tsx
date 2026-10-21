@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Chip } from '@/components/ui/Chip'
 import { Card } from '@/components/ui/Card'
 import { track } from '@/lib/client/analytics'
@@ -156,9 +156,19 @@ function CombinedChart({ goal }: { goal: GoalCategory }) {
   }, [progress.data, tasks.data, heat.data, weeks, today, goal.temporary, goal.colorCode])
 
   const loading = (!goal.temporary && progress.isPending) || tasks.isPending || heat.isPending
-  const W = 320
-  const H = 150
-  const PAD = { l: 28, r: 8, t: 8, b: 20 }
+  // 그래프는 실제 너비대로 그려요 (viewBox 를 늘리면 큰 화면에서 글자 · 높이가 같이 커져요)
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [boxW, setBoxW] = useState(640)
+  useEffect(() => {
+    const el = boxRef.current
+    if (!el) return
+    const ro = new ResizeObserver(([e]) => setBoxW(Math.max(240, Math.round(e.contentRect.width))))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [loading, series.length])
+  const W = boxW
+  const H = 200
+  const PAD = { l: 36, r: 12, t: 10, b: 24 }
   const x = (i: number) => PAD.l + (i / (WEEKS - 1)) * (W - PAD.l - PAD.r)
   const y = (v: number) => PAD.t + (1 - v / 100) * (H - PAD.t - PAD.b)
 
@@ -173,18 +183,19 @@ function CombinedChart({ goal }: { goal: GoalCategory }) {
         </p>
       ) : (
         <>
-          <svg viewBox={`0 0 ${W} ${H}`} className="mt-4 h-auto w-full" role="img" aria-label="주별 진행 · 실천률">
+          <div ref={boxRef} className="mt-4 w-full">
+          <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block" role="img" aria-label="주별 진행 · 실천률">
             {[0, 50, 100].map((t) => (
               <g key={t}>
                 <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} className="stroke-border-soft" />
-                <text x={PAD.l - 6} y={y(t) + 3} textAnchor="end" fontSize="9" className="fill-text-tertiary">
+                <text x={PAD.l - 6} y={y(t) + 3} textAnchor="end" fontSize="11" className="fill-text-tertiary">
                   {t}%
                 </text>
               </g>
             ))}
             {weeks.map((w, i) =>
               i % 3 === 0 || i === WEEKS - 1 ? (
-                <text key={w} x={x(i)} y={H - 5} textAnchor="middle" fontSize="9" className="fill-text-tertiary">
+                <text key={w} x={x(i)} y={H - 5} textAnchor="middle" fontSize="11" className="fill-text-tertiary">
                   {Number(w.slice(5, 7))}/{Number(w.slice(8, 10))}
                 </text>
               ) : null
@@ -196,12 +207,13 @@ function CombinedChart({ goal }: { goal: GoalCategory }) {
                 .join(' ')
               return (
                 <g key={s.key} style={{ stroke: s.color, fill: s.color }}>
-                  <path d={d} fill="none" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-                  {pts.map((pt, i) => (pt ? <circle key={i} cx={pt[0]} cy={pt[1]} r="2.5" stroke="none" /> : null))}
+                  <path d={d} fill="none" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                  {pts.map((pt, i) => (pt ? <circle key={i} cx={pt[0]} cy={pt[1]} r="3.5" stroke="none" /> : null))}
                 </g>
               )
             })}
           </svg>
+          </div>
           {/* 범례 + 지금 값 */}
           <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5" aria-label="범례">
             {series.map((s) => (
