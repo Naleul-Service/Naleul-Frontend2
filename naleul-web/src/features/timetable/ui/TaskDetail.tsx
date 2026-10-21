@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Ellipsis, Flag, Layers, Link2, PinOff, Undo2 } from 'lucide-react'
-import { CalendarClock, Check, Clock, Pin, Pencil, Repeat, Trash, X } from '@/components/icons'
+import { CalendarClock, Check, Clock, Pencil, Repeat, Trash, X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Chip'
 import { cn } from '@/lib/cn'
@@ -102,7 +102,7 @@ function currentInput(t: TimeBlockTask): GoalTaskInput {
     date: day,
     startTime,
     endTime,
-    durationMinutes: !t.plannedStartAt && dur && dur >= 5 && dur <= 720 ? dur : null,
+    durationMinutes: !t.plannedStartAt && dur && dur >= 5 && dur <= 1440 ? dur : null,
     dueDate: t.dueDate ?? null,
   }
 }
@@ -467,10 +467,7 @@ export function TaskDetail({
         {t.sourceType === 'MISSION' && <Badge>미션</Badge>}
         {t.taskKind === 'APPOINTMENT' && <Badge tone="warning">약속</Badge>}
         {t.locked ? (
-          <Badge>
-            <Pin className="size-3 rotate-45" />
-            직접 정한 시간
-          </Badge>
+          <Badge>직접 정한 시간</Badge>
         ) : (
           t.placedBy === 'ENGINE' && (
             <Badge tone="brand">

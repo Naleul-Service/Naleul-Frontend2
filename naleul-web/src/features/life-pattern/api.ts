@@ -28,6 +28,8 @@ export interface LifePatternInput {
 
 export interface LifePatternCreateInput extends LifePatternInput {
   patternType: LifePatternType
+  /** 이날만 (2026-10, 캘린더 "기본 생활 패턴 추가 → 이날만"). "YYYY-MM-DD" — 있으면 그 날짜에만 블록이 생겨요 */
+  onlyDate?: string | null
 }
 
 const errorMessage = (e: unknown) => (isApiError(e) ? e.message : '문제가 생겼어요. 다시 시도해 주세요.')

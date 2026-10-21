@@ -193,7 +193,7 @@ export function StepResult({
       key={p.taskId}
       title={titleOf.get(p.taskId) ?? '새 Task'}
       when={`${formatMonthDay(p.start.slice(0, 10))} ${hm(p.start)}–${hm(p.end)}`}
-      reason={p.start !== p.proposedStart ? '직접 옮긴 시간이에요 📌' : p.reason}
+      reason={p.start !== p.proposedStart ? '직접 옮긴 시간이에요' : p.reason}
       dashed={proposing}
     />
   )
@@ -332,7 +332,7 @@ export function StepResult({
               key={p.taskId}
               title={p.title}
               when={`${formatMonthDay(p.date)} ${hm(p.start)}–${hm(p.end)}`}
-              reason="직접 정한 시간이에요 📌"
+              reason="직접 정한 시간이에요"
             />
           ))}
           {result.placements.length === 0 && shownProposals.length === 0 && (

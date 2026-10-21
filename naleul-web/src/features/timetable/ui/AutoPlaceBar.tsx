@@ -69,7 +69,7 @@ export function AutoPlaceBar({
               : '모든 Task가 TimeTable에 배치돼 있어요'}
         </p>
         <p className="text-ink-3 text-xs leading-relaxed">
-          직접 정한 시간(📌)과 고정 시간은 그대로 두고, 남은 빈 시간에 집중이 잘 되는 시간대부터 넣어요.
+          직접 정한 시간과 고정 시간은 그대로 두고, 남은 빈 시간에 집중이 잘 되는 시간대부터 넣어요.
           {targets.some((d) => d.date === today) && ' 오늘은 지금 이후 시간만 써요.'}
         </p>
       </div>

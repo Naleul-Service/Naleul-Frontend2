@@ -2,7 +2,7 @@
 
 import type { CSSProperties, MouseEvent, PointerEvent } from 'react'
 import { GripHorizontal } from 'lucide-react'
-import { Check, Clock, Pin, Sparkles, X } from '@/components/icons'
+import { Check, Clock, Sparkles, X } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { goalAccent, goalVars } from '@/lib/goalTone'
 import { shownTime, type Placed, type PlacedSleep } from '../layout'
@@ -205,12 +205,6 @@ export function TaskBlock({
           >
             {t.proposed ? 'AI 제안' : '옮길까요?'}
           </span>
-        )}
-        {t.locked && (
-          <Pin
-            aria-label="직접 정한 시간"
-            className="size-3 shrink-0 rotate-45 opacity-70"
-          />
         )}
       </span>
       {heightPx >= (dense ? 40 : 34) && (

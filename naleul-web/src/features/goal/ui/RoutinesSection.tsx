@@ -9,7 +9,7 @@ import { BellOff, CalendarPlus } from 'lucide-react'
 import { Bell } from '@/components/icons'
 import { cn } from '@/lib/cn'
 import { addDays, todayKst, weekdayIndex } from '@/features/timetable/time'
-import type { GoalCategory, JavaDayOfWeek, RoutineSummary } from '../api'
+import { useRoutineHeatmap, type GoalCategory, type JavaDayOfWeek, type RoutineSummary } from '../api'
 import { useAddRoutineExtraDay, useCreateRoutine, useDeleteRoutine, useUpdateRoutine } from '../edit/mutations'
 import {
   AddButton,
@@ -25,6 +25,7 @@ import {
 } from '../edit/inline'
 import { JAVA_DAYS, JAVA_DAY_LABEL, formatDot, hhmm } from '../format'
 import { Section } from './sections'
+import { byDayLine } from './RoutineHeatmapSection'
 import { activeSubGoals, areasOf, bucketOf, defaultPeriod } from './SubGoalsSection'
 
 type DayTimeMap = Partial<Record<JavaDayOfWeek, { start: string; end: string }>>
@@ -627,6 +628,14 @@ function RoutineRow({
   const start = hhmm(routine.repeatStartTime)
   const active = routine.routineStatus !== 'STOPPED' && routine.routineStatus !== 'DELETED'
   const goalId = goal.goalCategoryId
+  // 실제로 가장 많이 한 시간 (히트맵 API · 같은 쿼리 캐시를 써요)
+  const heat = useRoutineHeatmap(goalId).data?.find((h) => h.routineId === routine.routineId)
+  const practiceLine = (() => {
+    const t = heat?.timeStats
+    if (!t || t.practiceCount === 0) return null
+    const days = byDayLine(t)
+    return days ? `${days}에 가장 많이 실천했어요` : `주로 ${t.bestStart}~${t.bestEnd}에 실천했어요`
+  })()
   const ids = { goal_category_id: goalId, routine_id: routine.routineId }
   useTrackOtherOpen(edit.isOpen, edit.current, goalId, false)
   const openEdit = (entryPoint: 'row' | 'icon') => {
@@ -681,16 +690,18 @@ function RoutineRow({
           {routine.routineName}
           {routine.notificationEnabled && <Bell className="text-ink-3 size-3.5" aria-label="알림 켜짐" />}
         </p>
-        <p className="text-ink-3 mt-0.5 flex flex-wrap items-center gap-1.5 text-[13px]">
-          {/* 영역은 부모가 아니라 라벨 — "기타 할 일"이면 안 보여줘요 */}
-          {subGoal && (
+        {/* 영역은 부모가 아니라 라벨 — "기타 할 일"이면 안 보여줘요 */}
+        {subGoal && (
+          <p className="mt-1">
             <span className="bg-subtle text-ink-2 rounded-full px-2 py-0.5 text-[12px] font-medium">{subGoal}</span>
-          )}
-          <span>
-            {routineTimeText(routine)}
-            {!start && !routine.dayTimes?.length && routine.durationMinutes ? ` · ${routine.durationMinutes}분` : ''}
-          </span>
+          </p>
+        )}
+        {/* 계획한 시간 — 실천 통계와 헷갈리지 않게 "계획"을 붙여요 */}
+        <p className="text-ink-3 mt-1 text-[13px]">
+          <span className="text-ink-2 font-medium">계획</span> · {routineTimeText(routine)}
+          {!start && !routine.dayTimes?.length && routine.durationMinutes ? ` · ${routine.durationMinutes}분` : ''}
         </p>
+        {practiceLine && <p className="text-text-brand mt-0.5 text-[12px] font-medium">{practiceLine}</p>}
         {routine.description && (
           <p className="bg-subtle text-ink-2 mt-2 rounded-lg px-2.5 py-1.5 text-[13px] leading-relaxed whitespace-pre-wrap">
             {routine.description}

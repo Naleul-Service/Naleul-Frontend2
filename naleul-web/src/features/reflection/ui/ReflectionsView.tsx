@@ -203,7 +203,7 @@ function periodOffset(period: ReflectionPeriod, from: string, today: string) {
 }
 
 /** 같은 타임라인이 쓰인 화면 (Amplitude surface) */
-export type ReflectionTimelineSurface = 'reflections' | 'goal_detail'
+export type ReflectionTimelineSurface = 'reflections' | 'goal_detail' | 'work_board'
 
 /** 기간 이동 (‹ ›) */
 const shift = (period: ReflectionPeriod, anchor: string, n: number) =>

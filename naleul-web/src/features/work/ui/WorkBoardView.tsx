@@ -46,12 +46,14 @@ import {
   type TopicStatus,
   type WorkBoard,
   type WorkColumn,
+  type WorkRetro,
   type WorkTask,
   type WorkTopic,
 } from '../api'
 import { COLUMN_LABEL, dayLabel, daysAgo, dueLabel, goalDDay } from '../format'
 import { WorkShareModal } from './WorkShareModal'
 import { WorkTaskModal } from './WorkTaskModal'
+import { ReflectionDetailModal } from '@/features/reflection/ui/ReflectionDetailModal'
 
 /** 주제 필터: 전체 · 주제 id · 주제 없음 */
 type TopicFilter = 'ALL' | 'NONE' | number
@@ -1077,6 +1079,7 @@ function TaskCompose({
 function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
   const create = useCreateWorkRetro(goalId)
   const remove = useDeleteWorkRetro(goalId)
+  const [openRetro, setOpenRetro] = useState<WorkRetro | null>(null)
   const [text, setText] = useState('')
   const retroResult = (action: 'create' | 'delete', req: Promise<unknown>) =>
     req.then(
@@ -1148,11 +1151,34 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
           </div>
           <ul className="divide-line divide-y">
             {board.retrospectives.map((r) => (
-              <li key={r.retrospectiveId} className="group flex gap-2 py-2">
+              <li
+                key={r.retrospectiveId}
+                role="button"
+                tabIndex={0}
+                aria-haspopup="dialog"
+                onClick={(ev) => {
+                  if (ev.target instanceof Element && ev.target.closest('button')) return
+                  track('reflection_timeline.entry_click', {
+                    surface: 'work_board',
+                    entry_kind: 'RETRO',
+                    days_ago: daysAgo(r.reviewDate, board.today),
+                    goal_mode: 'RECORD',
+                  })
+                  setOpenRetro(r)
+                }}
+                onKeyDown={(ev) => {
+                  if (ev.target !== ev.currentTarget) return
+                  if (ev.key === 'Enter' || ev.key === ' ') {
+                    ev.preventDefault()
+                    setOpenRetro(r)
+                  }
+                }}
+                className="group hover:bg-bg-sunken/60 -mx-2 flex cursor-pointer gap-2 rounded-lg px-2 py-2"
+              >
                 <span className="text-ink-3 w-12 shrink-0 text-[12px] leading-5">
                   {dayLabel(r.reviewDate, board.today)}
                 </span>
-                <p className="min-w-0 flex-1 text-[13px] leading-5 whitespace-pre-wrap">{r.content}</p>
+                <p className="min-w-0 flex-1 line-clamp-3 text-[13px] leading-5 whitespace-pre-wrap">{r.content}</p>
                 <button
                   type="button"
                   onClick={() => {
@@ -1163,7 +1189,7 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
                     retroResult('delete', remove.mutateAsync(r.retrospectiveId))
                   }}
                   aria-label="회고 지우기"
-                  className="text-ink-4 hover:text-danger shrink-0 self-start p-0.5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                  className="text-ink-4 hover:text-danger shrink-0 self-start p-0.5 [@media(hover:hover)]:opacity-50 [@media(hover:hover)]:group-hover:opacity-100"
                 >
                   <Trash2 className="size-3.5" />
                 </button>
@@ -1171,6 +1197,30 @@ function RetroCompose({ goalId, board }: { goalId: number; board: WorkBoard }) {
             ))}
           </ul>
         </>
+      )}
+      {openRetro && (
+        <ReflectionDetailModal
+          entry={{
+            kind: 'RETRO',
+            date: openRetro.reviewDate,
+            goalCategoryId: goalId,
+            goalName: board.goalName,
+            goalEmoji: board.emoji,
+            colorCode: null,
+            goalMode: 'RECORD',
+            retrospectiveId: openRetro.retrospectiveId,
+            reviewType: openRetro.reviewType,
+            mood: null,
+            note: openRetro.content,
+            value: null,
+            metricName: null,
+            unit: null,
+          }}
+          open
+          onClose={() => setOpenRetro(null)}
+          surface="work_board"
+          daysAgo={daysAgo(openRetro.reviewDate, board.today)}
+        />
       )}
     </div>
   )

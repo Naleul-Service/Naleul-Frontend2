@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CalendarClock, ChevronLeft, ChevronRight, NotebookPen, Pencil, Pin, Plus, Sparkles, SquarePen, Trash2 } from '@/components/icons'
+import { CalendarClock, ChevronLeft, ChevronRight, NotebookPen, Pencil, Plus, Repeat, Sparkles, SquarePen, Trash2 } from '@/components/icons'
 import { rectOf, type AnchorRect } from '@/components/ui/Popover'
 import { PageHeader } from '@/components/layout/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -76,6 +76,8 @@ export function CalendarView() {
   } | null>(null)
   // 우클릭 "고정할 일 추가" → 기본 생활 패턴(고정 시간) 추가 창에 미리 채울 값
   const [fixedForm, setFixedForm] = useState<LifePatternFormValue | null>(null)
+  // 기본 생활 패턴을 연 빈 칸의 날짜 · 어느 클릭으로 열었는지 (이날만 / 앞으로 계속 고르기 · 분석)
+  const [fixedAt, setFixedAt] = useState<{ date: string; trigger: 'left_click' | 'right_click' } | null>(null)
   const lifePatterns = useLifePatterns(!!fixedForm)
   const router = useRouter()
   const createPattern = useCreateLifePattern()
@@ -241,7 +243,9 @@ export function CalendarView() {
     ]
   }
 
-  // ── 우클릭 메뉴 — 빈 곳: 실제로 한 일 · 계획한 일 · 고정할 일 추가 / Task 블록: 수정 · 삭제 ──
+  // ── 빈 칸 메뉴 — 왼쪽 클릭 · 우클릭 모두 같은 4개 (2026-10) ──
+  //  1. AI로 자동 Task 추가  2. 계획 할 일 추가  3. 실제 한 일 추가  4. 기본 생활 패턴 추가 (이날만 / 앞으로 계속)
+  //  Task 블록 우클릭은 수정 · 삭제
   const contextBase = (slot: { date: string; minutes: number }) => {
     const at = slot.minutes >= 1440 ? { date: addDays(slot.date, 1), minutes: slot.minutes - 1440 } : slot
     const nowMin = nowKst().minutes
@@ -254,31 +258,36 @@ export function CalendarView() {
       is_past: at.date < today || (at.date === today && at.minutes < nowMin),
     }
   }
-  const contextMenuItems = (slot: { date: string; minutes: number }, anchor: AnchorRect) => {
+  const slotMenuItems = (
+    slot: { date: string; minutes: number },
+    anchor: AnchorRect,
+    trigger: 'left_click' | 'right_click'
+  ) => {
     const { at, ...props } = contextBase(slot)
-    const base = addMenuItems(slot, anchor, 'context_menu')
-    const pick = (key: string, label: string, option: string) => {
+    const base = addMenuItems(slot, anchor, trigger === 'left_click' ? 'empty_tap' : 'context_menu')
+    const pick = (key: string, option: string) => {
       const item = base.find((i) => i.key === key)!
       return {
         ...item,
-        label,
         onSelect: () => {
-          track('calendar.context_menu_select', { ...props, target: 'empty_slot', option })
+          track('calendar.context_menu_select', { ...props, target: 'empty_slot', option, trigger })
           item.onSelect()
         },
       }
     }
     const hhmm = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
     return [
-      pick('log', '실제로 한 일 추가', 'actual_add'),
-      pick('manual', '계획한 일 추가', 'plan_add'),
+      pick('ai', 'ai_add'),
+      pick('manual', 'plan_add'),
+      pick('log', 'actual_add'),
       {
-        key: 'fixed',
-        label: '고정할 일 추가',
-        icon: <Pin />,
-        hint: '매주 이 요일 · 이 시간 (기본 생활 패턴)',
+        key: 'pattern',
+        label: '기본 생활 패턴 추가',
+        icon: <Repeat />,
+        hint: '이날만 · 앞으로 계속 중에서 골라요',
         onSelect: () => {
-          track('calendar.context_menu_select', { ...props, target: 'empty_slot', option: 'fixed_add' })
+          track('calendar.context_menu_select', { ...props, target: 'empty_slot', option: 'pattern_add', trigger })
+          setFixedAt({ date: at.date, trigger })
           setFixedForm({
             patternType: 'CUSTOM',
             title: '',
@@ -612,8 +621,8 @@ export function CalendarView() {
         <ActionMenu
           anchor={menu.anchor}
           onClose={() => setMenu(null)}
-          label="추가"
-          items={addMenuItems(menu.slot, menu.anchor)}
+          label={menu.slot ? '이 시간에 추가' : '추가'}
+          items={menu.slot ? slotMenuItems(menu.slot, menu.anchor, 'left_click') : addMenuItems(undefined, menu.anchor)}
         />
       )}
       {menu?.kind === 'context' && menu.slot && (
@@ -621,7 +630,7 @@ export function CalendarView() {
           anchor={menu.anchor}
           onClose={() => setMenu(null)}
           label="이 시간에 추가"
-          items={contextMenuItems(menu.slot, menu.anchor)}
+          items={slotMenuItems(menu.slot, menu.anchor, 'right_click')}
         />
       )}
       {menu?.kind === 'task' && menu.task && (
@@ -637,11 +646,17 @@ export function CalendarView() {
           initial={fixedForm}
           patterns={lifePatterns.data ?? []}
           loading={createPattern.isPending}
+          scopeDate={fixedAt?.date}
+          scopeIsToday={fixedAt?.date === today}
           onEditExisting={() => {
             setFixedForm(null)
+            setFixedAt(null)
             router.push('/settings/life-pattern')
           }}
-          onClose={() => setFixedForm(null)}
+          onClose={() => {
+            setFixedForm(null)
+            setFixedAt(null)
+          }}
           onSubmit={(v) =>
             createPattern.mutate(v, {
               onSuccess: () => {
@@ -649,9 +664,11 @@ export function CalendarView() {
                   is_new: true,
                   result: 'success',
                   pattern_type: v.patternType,
-                  entry_source: 'calendar_context_menu',
+                  pattern_scope: v.onlyDate ? 'once' : 'repeat',
+                  entry_source: fixedAt?.trigger === 'left_click' ? 'calendar_empty_tap' : 'calendar_context_menu',
                 })
                 setFixedForm(null)
+                setFixedAt(null)
               },
               onError: (err: unknown) =>
                 track('life_pattern.save_result', {
@@ -659,7 +676,8 @@ export function CalendarView() {
                   result: 'fail',
                   error_status: errorStatusOf(err),
                   pattern_type: v.patternType,
-                  entry_source: 'calendar_context_menu',
+                  pattern_scope: v.onlyDate ? 'once' : 'repeat',
+                  entry_source: fixedAt?.trigger === 'left_click' ? 'calendar_empty_tap' : 'calendar_context_menu',
                 }),
             })
           }
@@ -746,7 +764,6 @@ function Legend() {
         <span className="border-border-subtle size-2.5 rounded-sm border" style={HATCH} />
         고정 시간
       </li>
-      <li className={item}>📌 직접 정한 시간</li>
       <li className={item}>
         <span className="border-success border-line bg-surface size-2.5 rounded-sm border border-l-2" />
         실제로 한 일

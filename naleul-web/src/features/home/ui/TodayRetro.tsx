@@ -482,7 +482,7 @@ function RetroItem({ retro, goalCategoryId }: { retro: HomeRetro; goalCategoryId
   return (
     <li className="bg-subtle/70 group flex gap-2 rounded-xl px-3 py-2">
       <p className="min-w-0 flex-1 text-[13px] leading-5 whitespace-pre-wrap">{retro.content}</p>
-      <span className="flex shrink-0 gap-0.5 self-start [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
+      <span className="flex shrink-0 gap-0.5 self-start [@media(hover:hover)]:opacity-50 [@media(hover:hover)]:group-hover:opacity-100">
         <button
           type="button"
           onClick={() => {

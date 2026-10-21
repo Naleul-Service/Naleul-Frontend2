@@ -5,7 +5,7 @@ import { Flame } from 'lucide-react'
 import { Spinner } from '@/components/ui/Spinner'
 import { cn } from '@/lib/cn'
 import { addDays, startOfWeek, todayKst, weekdayIndex } from '@/features/timetable/time'
-import { useRoutineHeatmap, type GoalCategory, type RoutineHeatmap, type RoutineTimeStats } from '../api'
+import { useRoutineHeatmap, type GoalCategory, type JavaDayOfWeek, type RoutineHeatmap, type RoutineTimeStats } from '../api'
 import { JAVA_DAYS, JAVA_DAY_LABEL } from '../format'
 import { Section } from './sections'
 
@@ -13,11 +13,13 @@ import { Section } from './sections'
 const CELL = 13
 const GAP = 3
 
-type CellState = 'none' | 'done' | 'missed' | 'today' | 'future'
+type CellState = 'none' | 'done' | 'extra' | 'missed' | 'today' | 'future'
 
 const CELL_CLASS: Record<CellState, string> = {
   none: 'bg-transparent',
   done: 'bg-brand',
+  // 반복 요일이 아닌 날에 '다른 날 추가'로 한 날 — 같은 색, 점선 테두리로 구분
+  extra: 'bg-brand/60 ring-brand ring-1 ring-inset',
   missed: 'bg-heat-empty ring-line ring-1 ring-inset', // 명세 8.1 — 안 한 날은 연하게
   today: 'bg-surface ring-brand ring-[1.5px] ring-inset',
   future: 'bg-subtle',
@@ -37,7 +39,17 @@ function stats(r: RoutineHeatmap, today: string) {
     due++
     if (done.has(d)) completed++
   }
-  return { due, completed, rate: due ? Math.round((completed / due) * 100) : null }
+  // 반복 요일이 아닌 날에 한 것 ('다른 날 추가') — 실천률에는 넣지 않고 따로 보여줘요
+  const extra = r.completedDates.filter((d) => !isScheduled(r, d, weekdayIndex(d))).length
+  return { due, completed, extra, rate: due ? Math.round((completed / due) * 100) : null }
+}
+
+/** 히트맵 줄: 반복 요일 + '다른 날 추가'로 한 적이 있는 요일 */
+function rowDays(r: RoutineHeatmap) {
+  const extraDays = new Set(
+    r.completedDates.filter((d) => !isScheduled(r, d, weekdayIndex(d))).map((d) => JAVA_DAYS[weekdayIndex(d)])
+  )
+  return JAVA_DAYS.map((d, i) => ({ d, i })).filter(({ d }) => r.repeatDays.includes(d) || extraDays.has(d))
 }
 
 /**
@@ -102,7 +114,7 @@ export function RoutineHeatmapSection({ goal }: { goal: GoalCategory }) {
       aside={allDue ? `전체 ${allDone} / ${allDue}회 · ${Math.round((allDone / allDue) * 100)}%` : undefined}
     >
       <p className="text-ink-3 -mt-2 mb-4 text-[13px]">
-        해야 하는 요일만 칸으로 보여줘요. 실천한 날은 색이 채워지고, 놓친 날은 회색이에요.
+        해야 하는 요일만 칸으로 보여줘요. 실천한 날은 색이 채워지고, 놓친 날은 회색이에요. 다른 날에 추가로 한 날은 테두리로 표시해요.
       </p>
 
       <div ref={scroller} className="-mx-1 overflow-x-auto px-1 pb-2">
@@ -122,13 +134,14 @@ export function RoutineHeatmapSection({ goal }: { goal: GoalCategory }) {
           {routines.map((r, ri) => {
             const s = totals[ri]
             const done = new Set(r.completedDates)
-            const rows = JAVA_DAYS.map((d, i) => ({ d, i })).filter(({ d }) => r.repeatDays.includes(d))
+            const rows = rowDays(r)
             return (
               <div key={r.routineId}>
                 <div className="mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pr-2">
                   <span className="text-[14px] font-semibold">{r.routineName}</span>
                   <span className="text-ink-3 text-[12px] tabular-nums">
                     {s.completed} / {s.due}회{s.rate !== null ? ` · ${s.rate}%` : ''}
+                    {s.extra > 0 ? ` · 다른 날 +${s.extra}회` : ''}
                   </span>
                   {r.currentStreak > 1 && (
                     <span className="inline-flex items-center gap-0.5 text-[12px] font-semibold text-goal-orange-fg">
@@ -144,7 +157,9 @@ export function RoutineHeatmapSection({ goal }: { goal: GoalCategory }) {
                       {weeks.map((w) => {
                         const ymd = addDays(w, i)
                         const state: CellState = !isScheduled(r, ymd, i)
-                          ? 'none'
+                          ? done.has(ymd)
+                            ? 'extra'
+                            : 'none'
                           : done.has(ymd)
                             ? 'done'
                             : ymd > today
@@ -174,7 +189,7 @@ export function RoutineHeatmapSection({ goal }: { goal: GoalCategory }) {
 
       {/* 범례 */}
       <div className="text-ink-3 mt-3 flex flex-wrap items-center gap-3 text-[12px]">
-        {(['done', 'missed', 'today', 'future'] as const).map((k) => (
+        {(['done', 'extra', 'missed', 'today', 'future'] as const).map((k) => (
           <span key={k} className="inline-flex items-center gap-1.5">
             <span className={cn('inline-block rounded-[3px]', CELL_CLASS[k])} style={{ width: 11, height: 11 }} />
             {STATE_LABEL[k]}
@@ -187,6 +202,7 @@ export function RoutineHeatmapSection({ goal }: { goal: GoalCategory }) {
 
 const STATE_LABEL: Record<Exclude<CellState, 'none'>, string> = {
   done: '실천',
+  extra: '다른 날 실천',
   missed: '놓침',
   today: '오늘',
   future: '예정',
@@ -217,7 +233,18 @@ function RoutineTimeStatsList({ routines }: { routines: RoutineHeatmap[] }) {
 
 export function timeStatsSentence(t: RoutineTimeStats | null | undefined) {
   if (!t || t.practiceCount === 0) return '아직 시간 기록이 없어요'
-  return `주로 ${t.bestStart}~${t.bestEnd}에 실천 · ${t.practiceCount}회 중 ${t.inWindowCount}회`
+  const days = byDayLine(t)
+  if (days) return `${days}에 가장 많이 실천했어요`
+  return `주로 ${t.bestStart}~${t.bestEnd}에 실천했어요 · ${t.practiceCount}회 중 ${t.inWindowCount}회`
+}
+
+/** "화 19:00~19:30 · 목 17:10~17:40" (요일별 최빈 시간대가 없으면 null) */
+export function byDayLine(t: RoutineTimeStats | null | undefined) {
+  const list = t?.byDay ?? []
+  if (!list.length) return null
+  return list
+    .map((d) => `${JAVA_DAY_LABEL[d.day as JavaDayOfWeek] ?? d.day} ${d.start}~${d.end}`)
+    .join(' · ')
 }
 
 function HourBars({ stats }: { stats: RoutineTimeStats }) {

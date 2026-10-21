@@ -208,6 +208,19 @@ export interface RoutineTimeStats {
   inWindowCount: number
   /** 0~23시 각 시간에 걸친 실천 횟수 */
   hourly: number[]
+  /** 요일별로 가장 많이 한 시간대 (많이 한 요일 순, 최대 3개 · 2026-10) */
+  byDay?: RoutineDayTimeStat[]
+}
+
+export interface RoutineDayTimeStat {
+  /** MONDAY ~ SUNDAY */
+  day: string
+  start: string
+  end: string
+  /** 그 요일 실천 중 이 시간대에 걸친 횟수 */
+  count: number
+  /** 그 요일에 실천한 횟수 */
+  total: number
 }
 
 export function useRoutineHeatmap(goalId: number) {

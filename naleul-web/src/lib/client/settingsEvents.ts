@@ -27,6 +27,7 @@ export const SETTINGS_EVENTS = [
   'life_pattern.form_close',
   'life_pattern.form_error_view',
   'life_pattern.form_per_day_toggle',
+  'life_pattern.form_scope_change',
   'life_pattern.form_save_click',
   'life_pattern.form_suggestion_click',
   'life_pattern.limit_view',

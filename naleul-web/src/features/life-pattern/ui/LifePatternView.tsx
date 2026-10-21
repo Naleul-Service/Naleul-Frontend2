@@ -202,7 +202,11 @@ export function LifePatternView() {
                       <p className="text-ink-3 mt-0.5 text-[13px]">
                         {toHm(p.startTime)} – {toHm(p.endTime)}
                         {p.crossesMidnight && ' (다음 날)'} · {durationOf(p)} ·{' '}
-                        <span className="text-ink-2 font-medium">{formatDays(p.days)}</span>
+                        <span className="text-ink-2 font-medium">
+                          {p.onlyDate
+                            ? `${Number(p.onlyDate.slice(5, 7))}/${Number(p.onlyDate.slice(8, 10))} 하루만`
+                            : formatDays(p.days)}
+                        </span>
                         {!!p.dayTimes?.length && (
                           <span className="text-text-brand font-medium"> · 요일별 시간 {p.dayTimes.length}일</span>
                         )}

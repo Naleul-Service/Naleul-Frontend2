@@ -86,8 +86,8 @@ export function GoalTaskForm({
         ? '시작·종료 시간을 함께 입력하거나 둘 다 비워 주세요.'
         : hasTime && span === 0
           ? '시작과 종료 시간이 같아요.'
-          : !hasTime && duration !== null && (Number.isNaN(duration) || duration < 5 || duration > 720)
-            ? '소요 시간은 5~720분으로 입력해 주세요.'
+          : !hasTime && duration !== null && (Number.isNaN(duration) || duration < 5 || duration > 1440)
+            ? '소요 시간은 5~1440분(24시간)으로 입력해 주세요.'
             : null
   const valid = !!f.name.trim() && !error
   const isNew = !task

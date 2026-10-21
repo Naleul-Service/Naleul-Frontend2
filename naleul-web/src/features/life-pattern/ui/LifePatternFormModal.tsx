@@ -12,6 +12,7 @@ import { Field, inputClass } from '@/features/goal-creation/ui/formParts'
 import { formatDuration, timeToMinutes } from '@/features/timetable/time'
 import type { LifePattern, LifePatternDayTime, LifePatternType } from '@/features/timetable/types'
 import type { LifePatternCreateInput } from '../api'
+import { ScopeChips, type ScopeOption } from '@/features/timetable/ui/ScopeChooser'
 import { nightsToDayTimes, sleepConflictDay, sleepNights, type SleepNight } from '../dayTimes'
 import {
   ALL_DAYS,
@@ -46,6 +47,13 @@ interface Props {
   /** 추천을 눌렀는데 같은 종류(수면 등)가 이미 있으면 그걸 수정하러 가요 */
   onEditExisting: (p: LifePattern) => void
   onClose: () => void
+  /**
+   * 캘린더 빈 칸에서 열었을 때 그 날짜 "YYYY-MM-DD" (2026-10).
+   * 있으면 맨 아래에 "이날만 / 앞으로 계속"을 고르게 해요 (루틴 · 고정 시간 수정의 적용 범위와 같은 모양).
+   */
+  scopeDate?: string
+  /** scopeDate 가 오늘이면 "오늘만" */
+  scopeIsToday?: boolean
 }
 
 const EMPTY: LifePatternFormValue = {
@@ -97,8 +105,23 @@ export function LifePatternFormModal({
   onSubmit,
   onEditExisting,
   onClose,
+  scopeDate,
+  scopeIsToday,
 }: Props) {
   const isEdit = !!editing
+  // 이날만(DAY) / 앞으로 계속(FOLLOWING) — 캘린더에서 열었을 때만
+  const [scope, setScope] = useState<'DAY' | 'FOLLOWING'>('DAY')
+  const once = !!scopeDate && !isEdit && scope === 'DAY'
+  const scopeOpts: ScopeOption[] = scopeDate
+    ? [
+        {
+          scope: 'DAY',
+          label: scopeIsToday ? '오늘만' : '이날만',
+          hint: `${Number(scopeDate.slice(5, 7))}월 ${Number(scopeDate.slice(8, 10))}일 하루만 이 시간을 비워요`,
+        },
+        { scope: 'FOLLOWING', label: '앞으로 계속', hint: '고른 요일마다 매주 이 시간을 비워요 (기본 생활 패턴)' },
+      ]
+    : []
   const [form, setForm] = useState<LifePatternFormValue>(() => (editing ? fromPattern(editing) : (initial ?? EMPTY)))
   const set = <K extends keyof LifePatternFormValue>(k: K, v: LifePatternFormValue[K]) =>
     setForm((f) => ({ ...f, [k]: v }))
@@ -235,9 +258,10 @@ export function LifePatternFormModal({
       startTime: form.startTime,
       endTime: form.endTime,
       // 7개 다 고르면 매일 (백엔드는 빈 배열도 매일로 봐요)
-      days: form.days.length === 7 ? [] : form.days,
+      days: once ? form.days : form.days.length === 7 ? [] : form.days,
       // 요일별을 끄면 [] → 모든 요일이 기본 시간으로 돌아가요
-      dayTimes,
+      dayTimes: once ? [] : dayTimes,
+      ...(once ? { onlyDate: scopeDate } : {}),
     })
   }
 
@@ -247,7 +271,9 @@ export function LifePatternFormModal({
       onClose={close}
       title={isEdit ? '고정 시간 수정' : '고정 시간 추가'}
       description={
-        isEdit
+        scopeDate && !isEdit
+          ? '이 시간은 비워두고 Task를 배치해요. 아래에서 이날만 · 앞으로 계속을 골라 주세요.'
+          : isEdit
           ? '저장하면 오늘부터 모든 날짜의 기본 시간이 바뀌어요.'
           : '매주 반복되는 시간을 등록하면 이 시간은 비워두고 Task를 배치해요.'
       }
@@ -361,7 +387,8 @@ export function LifePatternFormModal({
           </p>
         </div>
 
-        {/* 반복 요일 */}
+        {/* 반복 요일 (이날만이면 그 날짜 하루라 숨겨요) */}
+        {!once && (
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <span className="text-ink-2 text-[13px] font-semibold">반복 요일</span>
@@ -394,9 +421,11 @@ export function LifePatternFormModal({
           </div>
           {form.days.length === 0 && <p className="text-danger mt-1.5 text-xs">요일을 하나 이상 골라 주세요.</p>}
         </div>
+        )}
 
         {/* 요일별 시간 — 예: 주말에는 늦게 일어나기 */}
-        {timeValid &&
+        {!once &&
+          timeValid &&
           form.days.length > 0 &&
           (perDay ? (
             <div className="bg-subtle/60 space-y-2 rounded-xl p-3">
@@ -540,6 +569,18 @@ export function LifePatternFormModal({
               + 요일마다 시간을 다르게 하기{isSleep ? ' (예: 주말엔 늦게 일어나기)' : ''}
             </button>
           ))}
+
+        {/* 적용 범위 — 캘린더 빈 칸에서 열었을 때 (루틴 · 고정 시간 수정과 같은 모양) */}
+        {scopeDate && !isEdit && (
+          <ScopeChips
+            options={scopeOpts}
+            value={scope}
+            onChange={(s) => {
+              track('life_pattern.form_scope_change', { pattern_scope: s === 'DAY' ? 'once' : 'repeat' })
+              setScope(s === 'DAY' ? 'DAY' : 'FOLLOWING')
+            }}
+          />
+        )}
 
         <button type="submit" hidden />
       </form>

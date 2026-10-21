@@ -61,7 +61,7 @@ export function FillProposalBar({
             <p className="text-caption-md text-text-secondary mt-0.5">
               {count > 0 && '마음에 안 드는 블록은 끌어서 옮겨 보세요. 시간 미정 칸으로 끌면 이번 배치에서 빠져요.'}
               {isNew && ' Task는 이미 추가됐어요 — 아니요를 누르면 시간 미정으로 남아요.'}
-              {edited > 0 && ` 직접 옮긴 ${edited}개는 📌 고정돼요.`}
+              {edited > 0 && ` 직접 옮긴 ${edited}개는 그 시간에 고정돼요.`}
               {unscheduled > 0 && ` 빈 시간이 없어 ${unscheduled}개는 시간 미정으로 남아요.`}
             </p>
           </div>

@@ -176,6 +176,8 @@ export interface LifePattern {
   sortOrder: number
   /** 요일별로 다른 시간 (기본 시간과 다른 요일만) */
   dayTimes?: LifePatternDayTime[]
+  /** 이날만 패턴이면 그 날짜 "YYYY-MM-DD" (매주 반복이면 null) */
+  onlyDate?: string | null
 }
 
 /**
