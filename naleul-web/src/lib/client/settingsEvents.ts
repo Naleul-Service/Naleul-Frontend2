@@ -60,6 +60,7 @@ export const SETTINGS_EVENTS = [
   'notification_settings.retry_click',
   'notification_settings.toggle',
   'notification_settings.toggle_result',
+  'settings.admin_view_plan_change',
   'settings.menu_click',
   'settings.pageview',
   'settings.profile_edit_close',

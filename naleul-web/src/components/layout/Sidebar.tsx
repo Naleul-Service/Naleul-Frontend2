@@ -15,7 +15,7 @@ import { iconButtonClass } from '@/components/ui/IconButton'
 import { GoalNavList } from '@/features/goal/ui/GoalNavList'
 import { AdSlot } from '@/components/ads/AdSlot'
 import { openLoginDialog } from '@/components/auth/loginHref'
-import { isGuestUser, type SessionUserView } from './types'
+import { isGuestUser, planRole, type SessionUserView } from './types'
 
 interface NavItem {
   href: string
@@ -174,7 +174,7 @@ export function Sidebar({
 
       {/* 아래 프로필을 바닥으로 밀어요 (광고가 안 보일 때도) */}
       <div className="mt-auto" />
-      <AdSlot placement="sidebar" role={user.role} className="mt-3" />
+      <AdSlot placement="sidebar" role={planRole(user)} className="mt-3" />
       </div>
 
       {isGuestUser(user) ? (
@@ -210,8 +210,10 @@ export function Sidebar({
               {user.name}
             </p>
             <p onClick={() => track(CE.sidebarDeadClick, { dead_target: 'plan_label', nav_surface: surface })}>
-              <Badge tone={user.role === 'PRO' || user.role === 'ADMIN' ? 'mint' : 'neutral'} className="h-5 px-2">
-                {PLAN_LABEL[user.role ?? 'FREE'] ?? 'Free plan'}
+              <Badge tone={planRole(user) === 'PRO' ? 'mint' : 'neutral'} className="h-5 px-2">
+                {user.role === 'ADMIN'
+                  ? `Admin · ${planRole(user) === 'PRO' ? 'Pro' : 'Free'}`
+                  : (PLAN_LABEL[user.role ?? 'FREE'] ?? 'Free plan')}
               </Badge>
             </p>
           </div>

@@ -11,6 +11,7 @@ export default async function MainLayout({ children }: { children: React.ReactNo
   const user = {
     name: store.get(COOKIE.userName)?.value || '나를 사용자',
     role: store.get(COOKIE.userRole)?.value as UserRole | undefined,
+    adminViewPlan: store.get(COOKIE.adminViewPlan)?.value === 'FREE' ? ('FREE' as const) : ('PRO' as const),
   }
 
   return <AppShell user={user}>{children}</AppShell>

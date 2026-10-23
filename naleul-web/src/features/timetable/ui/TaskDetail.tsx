@@ -965,7 +965,7 @@ const REASON_TAG: Record<string, string> = {
   HIGH_EFFICIENCY: '📈 잘 지키는 시간',
   BEST_REMAINING: '📈 남은 시간 중 최선',
   PREFERRED_TIME: '⭐ 고른 선호 시간',
-  LOW_LOAD_SLOT: '🪶 가벼운 일',
+  LOW_LOAD_SLOT: '🗓️ 마감 여유',
   GOAL_TIME_FIT: '🎯 이 목표와 잘 맞는 시간',
   MOVE_HABIT: '↔️ 자주 옮겨 온 시간',
   DURATION_ADJUSTED: '⏱️ 실제 걸린 시간 반영',

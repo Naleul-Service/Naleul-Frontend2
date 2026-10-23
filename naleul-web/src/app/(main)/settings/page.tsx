@@ -10,6 +10,7 @@ import { isPremiumRole, type SettingsDestination } from '@/features/account/sett
 import { SettingsMenuLink, SettingsPageview } from '@/features/account/ui/SettingsAnalytics'
 import { ThemePicker } from '@/features/theme/ThemePicker'
 import { UsageCard } from '@/features/usage/ui/UsageCard'
+import { AdminPlanSwitch } from '@/features/admin-dashboard/ui/AdminPlanSwitch'
 import { COOKIE, type UserRole } from '@/lib/server/session'
 
 export const metadata: Metadata = { title: '설정' }
@@ -66,8 +67,10 @@ export default async function SettingsPage() {
   const user = {
     name: store.get(COOKIE.userName)?.value || '나를 사용자',
     role: store.get(COOKIE.userRole)?.value as UserRole | undefined,
+    adminViewPlan: store.get(COOKIE.adminViewPlan)?.value === 'FREE' ? ('FREE' as const) : ('PRO' as const),
   }
-  const isPremium = isPremiumRole(user.role)
+  const isAdmin = user.role === 'ADMIN'
+  const isPremium = isPremiumRole(user.role, user.adminViewPlan)
 
   return (
     <>
@@ -102,29 +105,31 @@ export default async function SettingsPage() {
           <ThemePicker />
         </Card>
 
-        {/* ⚠️ DEV 전용 — 운영 대시보드 버튼. main 에 머지할 때 이 블록을 주석 처리해요 (시작) */}
-        <Card>
-          <SettingsMenuLink
-            href="/settings/dashboard"
-            destination="dashboard"
-            isPremium={isPremium}
-            className={rowClass}
-          >
-            <span className="bg-warning-soft grid size-10 shrink-0 place-items-center rounded-xl text-warning-ink">
-              <BarChart3 className="size-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[15px] font-bold">
-                운영 대시보드 <span className="text-ink-3 ml-1 text-[11px] font-semibold">DEV</span>
-              </p>
-              <p className="text-ink-3 mt-0.5 text-[13px]">
-                목표 달성률 · Task/루틴 실천률 · AI 비용 · 매출 · 서버 비용
-              </p>
-            </div>
-            <ChevronRight className="text-ink-4 size-4" />
-          </SettingsMenuLink>
-        </Card>
-        {/* ⚠️ DEV 전용 — 운영 대시보드 버튼 (끝) */}
+        {/* 운영진(ADMIN)만 — 운영 대시보드 · 플랜 바꿔 보기 (2026-10-24). 주소를 알아도 백엔드가 403 으로 막아요 */}
+        {isAdmin && (
+          <Card className="divide-line divide-y">
+            <AdminPlanSwitch initial={user.adminViewPlan} />
+            <SettingsMenuLink
+              href="/settings/dashboard"
+              destination="dashboard"
+              isPremium={isPremium}
+              className={rowClass}
+            >
+              <span className="bg-warning-soft text-warning-ink grid size-10 shrink-0 place-items-center rounded-xl">
+                <BarChart3 className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-bold">
+                  운영 대시보드 <span className="text-ink-3 ml-1 text-[11px] font-semibold">운영진</span>
+                </p>
+                <p className="text-ink-3 mt-0.5 text-[13px]">
+                  목표 달성률 · Task/루틴 실천률 · AI 비용 · 매출 · 서버 비용
+                </p>
+              </div>
+              <ChevronRight className="text-ink-4 size-4" />
+            </SettingsMenuLink>
+          </Card>
+        )}
 
         {/* 하루 횟수가 정해진 기능 (AI 목표 만들기 · AI 계획 초안 · Task 추가) */}
         <UsageCard />

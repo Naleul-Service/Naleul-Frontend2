@@ -1,12 +1,16 @@
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { DashboardView } from '@/features/admin-dashboard/ui/DashboardView'
+import { COOKIE } from '@/lib/server/session'
 
 export const metadata: Metadata = { title: '운영 대시보드' }
 
 /**
- * /settings/dashboard — 운영 대시보드 (dev 전용).
- * 설정 화면의 버튼은 main 배포 전에 주석 처리해요. 주소를 알아도 운영진이 아니면 백엔드가 403 을 줘요.
+ * /settings/dashboard — 운영 대시보드 (운영진 전용, 2026-10-24).
+ * 운영진이 아니면 설정으로 돌려보내요. 쿠키를 바꿔도 백엔드(AdminGuard)가 403 으로 한 번 더 막아요.
  */
-export default function AdminDashboardPage() {
+export default async function AdminDashboardPage() {
+  if ((await cookies()).get(COOKIE.userRole)?.value !== 'ADMIN') redirect('/settings')
   return <DashboardView />
 }

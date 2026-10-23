@@ -7,5 +7,9 @@
 export type SettingsDestination =
   'membership' | 'life_pattern' | 'calendar_import' | 'notifications' | 'terms' | 'withdraw' | 'dashboard'
 
-/** 쿠키의 역할로 Pro 여부 (ADMIN 은 Pro 로 보지 않아요) */
-export const isPremiumRole = (role: string | undefined) => role === 'PRO'
+/**
+ * 쿠키의 역할로 Pro 여부 (이벤트 is_premium · 화면 표시).
+ * 운영진(ADMIN)은 "플랜 바꿔 보기"로 고른 플랜을 따라요 (기본 PRO) — 2026-10-24
+ */
+export const isPremiumRole = (role: string | undefined, adminViewPlan?: string) =>
+  role === 'PRO' || (role === 'ADMIN' && adminViewPlan !== 'FREE')

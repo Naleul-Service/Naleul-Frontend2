@@ -23,10 +23,15 @@ export const COOKIE = {
   userId: 'userId',
   userName: 'userName',
   userRole: 'userRole',
+  /** 운영진(ADMIN)이 보고 있는 플랜 FREE | PRO — 없으면 PRO (2026-10-24) */
+  adminViewPlan: 'adminViewPlan',
 } as const
 
 /** GUEST = 로그인 없이 둘러보기 (읽기 전용 토큰) */
 export type UserRole = 'FREE' | 'PRO' | 'ADMIN' | 'GUEST'
+
+/** 운영진이 보고 있는 플랜 */
+export type AdminViewPlan = 'FREE' | 'PRO'
 
 export const GUEST_NAME = '둘러보기'
 
@@ -65,6 +70,8 @@ export interface SessionUser {
   userId?: number | string
   userName?: string
   userRole?: UserRole
+  /** 운영진일 때만 (로그인 응답 · 플랜 바꿔 보기) */
+  adminViewPlan?: AdminViewPlan | null
 }
 
 /** 토큰 쿠키 저장. 쿠키 수명을 토큰 실제 만료 시각에 맞춰요. */
@@ -91,6 +98,9 @@ export function setUserCookies(writer: CookieWriter, user: SessionUser) {
   if (user.userId !== undefined && user.userId !== null) writer.set(COOKIE.userId, String(user.userId), opts)
   if (user.userName) writer.set(COOKIE.userName, user.userName, opts)
   if (user.userRole) writer.set(COOKIE.userRole, user.userRole, opts)
+  if (user.adminViewPlan) writer.set(COOKIE.adminViewPlan, user.adminViewPlan, opts)
+  // 운영진이 아닌 계정으로 로그인하면 예전 운영진 플랜 쿠키를 지워요
+  else if (user.userRole && user.userRole !== 'ADMIN') writer.delete(COOKIE.adminViewPlan)
 }
 
 /** 둘러보기 세션 저장: 읽기 전용 토큰 + 표시용 이름/역할 */

@@ -15,14 +15,16 @@ export function ProfileSummaryCard({ user }: { user: SessionUserView }) {
   // 모달을 열 때마다 현재 이름으로 입력칸을 새로 채우려고 key 를 바꿔요
   const [modalKey, setModalKey] = useState(0)
   const role = user.role ?? 'FREE'
+  // 운영진은 지금 보고 있는 플랜도 같이 (ADMIN · FREE)
+  const badge = role === 'ADMIN' ? `ADMIN · ${user.adminViewPlan === 'FREE' ? 'FREE' : 'PRO'}` : role
 
   return (
     <Card className="flex items-center gap-4 p-5">
-      <span className="grid size-12 shrink-0 place-items-center rounded-full from-ai-gradient-start to-ai-gradient-end text-h3 bg-linear-to-br text-white">
+      <span className="from-ai-gradient-start to-ai-gradient-end text-h3 grid size-12 shrink-0 place-items-center rounded-full bg-linear-to-br text-white">
         {user.name.slice(0, 1)}
       </span>
       <div className="flex min-w-0 flex-1 items-center gap-2">
-        <Badge tone={role === 'FREE' ? 'neutral' : 'brand'}>{role}</Badge>
+        <Badge tone={role === 'FREE' ? 'neutral' : 'brand'}>{badge}</Badge>
         <p className="truncate text-[18px] font-bold">{user.name}</p>
       </div>
       <Button
@@ -31,7 +33,9 @@ export function ProfileSummaryCard({ user }: { user: SessionUserView }) {
         onClick={() => {
           setModalKey((k) => k + 1)
           setEditing(true)
-          track('settings.profile_edit_open', { is_premium: isPremiumRole(user.role) })
+          track('settings.profile_edit_open', {
+            is_premium: isPremiumRole(user.role, user.adminViewPlan),
+          })
         }}
       >
         프로필 수정

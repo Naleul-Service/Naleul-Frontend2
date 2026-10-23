@@ -11,6 +11,9 @@ export const metadata: Metadata = { title: '알림 설정' }
  * BM(2026-10): 알림은 Free 도 쓸 수 있어요 (AI 만 횟수 제한) → 잠금 없음
  */
 export default async function NotificationSettingsPage() {
-  const role = (await cookies()).get(COOKIE.userRole)?.value
-  return <NotificationSettingsView locked={false} isPremium={isPremiumRole(role)} />
+  const store = await cookies()
+  const role = store.get(COOKIE.userRole)?.value
+  return (
+    <NotificationSettingsView locked={false} isPremium={isPremiumRole(role, store.get(COOKIE.adminViewPlan)?.value)} />
+  )
 }
