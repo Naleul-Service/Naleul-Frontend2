@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { KanbanSquare, LayoutDashboard, Library } from 'lucide-react'
+import { CalendarCheck, KanbanSquare, Library, ListChecks, Sparkles } from 'lucide-react'
 import { BarChart3, EllipsisVertical, NotebookPen } from '@/components/icons'
 import { Flag } from 'lucide-react'
 import { IconButton } from '@/components/ui/IconButton'
@@ -345,23 +345,30 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
 }
 
 /**
- * 달성형 목표 — 탭 두 개 (?tab=reflections).
- *  - 개요(기본)
- *    · 위: 진행 요약 → 오늘 기록(수치 + 회고) → "말로 고치기" → 이 목표를 시작한 이유
- *    · 왼쪽: 매일 보는 "할 것" — 루틴 · 루틴 실천 히트맵 · Task (세부 목표는 각 줄의 라벨)
- *    · 오른쪽: 수치 그래프(여러 개) · Task 실천률
- *  - 회고: 이 목표에 남긴 기록 · 회고를 날짜별로
+ * 달성형 목표 — 탭 세 개 (2026-10: 개요 → 실천 · 계획 분리).
+ *  - 실천(기본, ?tab 없음): 주간 점검 제안 · 진행(수치 그래프 · 결과 · 추가 그래프 · 달성 기록)
+ *  - 계획(?tab=plan): 마일스톤 → 루틴 설정 → 관련 Task
+ *  - 회고(?tab=reflections): 이 목표에 남긴 기록 · 회고를 날짜별로
+ *  "말로 고치기"(AI)는 계획 탭 안 입력 바 대신 오른쪽 아래 떠 있는 AI 버튼으로 (오늘 기록 버튼 위)
  */
-type AchievementTab = 'overview' | 'reflections'
+type AchievementTab = 'practice' | 'plan' | 'reflections'
 
 const ACHIEVEMENT_TABS: TabDef<AchievementTab>[] = [
-  { value: 'overview', label: '개요', icon: LayoutDashboard },
+  { value: 'practice', label: '실천', icon: CalendarCheck },
+  { value: 'plan', label: '계획', icon: ListChecks },
   { value: 'reflections', label: '회고', icon: Library },
 ]
 
 function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
   const [tab, setTab] = useGoalTab(ACHIEVEMENT_TABS)
   const [checkInOpen, setCheckInOpen] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)
+  const canAiEdit = !goal.temporary && goal.goalCategoryStatus !== 'COMPLETED'
+  const gid = goal.goalCategoryId
+  const openAi = (entry: 'fab' | 'prefill') => {
+    track('goal_detail.ai_edit_open', { goal_category_id: gid, entry_point: entry, tab })
+    setAiOpen(true)
+  }
   return (
     <>
       {/* 요약 (진행 링 · 경과) — 탭 위에 두어 어느 탭에서도 보여요. 임시 목표는 기간·수치가 없어 빼요 */}
@@ -383,6 +390,10 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
       {goal.goalCategoryStatus !== 'COMPLETED' && (
         <>
           <GoalFabs>
+            {/* AI 로 계획 고치기 — "오늘 기록" 위 (예전엔 개요 탭 계획 위 입력 바) */}
+            {canAiEdit && (
+              <GoalFab label="AI로 계획 고치기" tone="ai" icon={<Sparkles />} onClick={() => openAi('fab')} />
+            )}
             <GoalFab label="오늘 기록" icon={<NotebookPen />} onClick={() => setCheckInOpen(true)} />
           </GoalFabs>
           <Modal open={checkInOpen} onClose={() => setCheckInOpen(false)} size="md">
@@ -394,26 +405,48 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
         </>
       )}
 
+      {canAiEdit && (
+        <GoalAiEditBar
+          goal={goal}
+          asSheet
+          open={aiOpen}
+          onOpenChange={(next, how) => {
+            if (next) {
+              if (how === 'prefill') {
+                setCheckInOpen(false)   // "오늘 기록" 창의 "계획 조정받기"에서 왔으면 그 창은 닫고 AI 창으로
+                openAi('prefill')
+              }
+              return
+            }
+            if (how !== 'applied') track('goal_detail.ai_edit_close', { goal_category_id: gid, close_method: how })
+            setAiOpen(false)
+          }}
+        />
+      )}
+
       <GoalTabBar tabs={ACHIEVEMENT_TABS} tab={tab} onChange={(t) => setTab(t, goal)} />
-      {tab === 'overview' ? (
-        <div id="goal-panel-overview" role="tabpanel" aria-labelledby="goal-tab-overview">
-          <AchievementOverview goal={goal} />
+      {tab === 'practice' ? (
+        <div id="goal-panel-practice" role="tabpanel" aria-labelledby="goal-tab-practice">
+          <AchievementPractice goal={goal} />
+        </div>
+      ) : tab === 'plan' ? (
+        <div id="goal-panel-plan" role="tabpanel" aria-labelledby="goal-tab-plan">
+          <AchievementPlan goal={goal} onAiEdit={canAiEdit ? () => openAi('fab') : undefined} />
         </div>
       ) : (
         <ReflectionsPanel
           goal={goal}
-          hint="개요 탭의 '오늘 기록'이나 홈의 '오늘 회고'에서 수치 · 기분 · 한 줄 회고를 남기면 여기 모여요."
+          hint="오른쪽 아래 '오늘 기록'이나 홈의 '오늘 회고'에서 수치 · 기분 · 한 줄 회고를 남기면 여기 모여요."
         />
       )}
     </>
   )
 }
 
-/** 달성형 "개요" 탭 — 예전 목표 상세 화면 그대로 */
-function AchievementOverview({ goal }: { goal: GoalCategory }) {
+/** 달성형 "실천" 탭 — 주간 점검 제안 · 진행 (예전 개요의 위쪽) */
+function AchievementPractice({ goal }: { goal: GoalCategory }) {
   const completed = goal.goalCategoryStatus === 'COMPLETED'
   const ongoing = !goal.temporary && goal.goalCategoryStatus === 'IN_PROGRESS'
-  const hasMilestones = (goal.milestones ?? []).length > 0
   return (
     <>
       {/* 주간 점검: 2주 연속 너무 힘들거나 너무 쉬우면 루틴 하루 빼기/더하기 제안 */}
@@ -424,8 +457,8 @@ function AchievementOverview({ goal }: { goal: GoalCategory }) {
       )}
 
       {/* ── 진행 (명세 13.5 · 13.7): 칩으로 고르는 그래프 · 결과 · 추가 그래프 ── */}
-      <section className="mt-6 space-y-5" aria-labelledby="overview-progress">
-        <h2 id="overview-progress" className="text-h3">
+      <section className="mt-6 space-y-5" aria-labelledby="practice-progress">
+        <h2 id="practice-progress" className="text-h3">
           진행
         </h2>
         {completed && !goal.temporary && <GoalOutcomeSection goal={goal} />}
@@ -438,17 +471,33 @@ function AchievementOverview({ goal }: { goal: GoalCategory }) {
           </Section>
         )}
       </section>
+    </>
+  )
+}
 
-      {/* ── 계획: 마일스톤 → 루틴 → Task (목표 마무리는 ⋯ 더보기로 옮겼어요) ── */}
-      <section className="mt-8 space-y-5" aria-labelledby="overview-plan">
-        <h2 id="overview-plan" className="text-h3">
+/** 달성형 "계획" 탭 — 마일스톤 → 루틴 설정 → 관련 Task (AI 로 고치기는 떠 있는 AI 버튼) */
+function AchievementPlan({ goal, onAiEdit }: { goal: GoalCategory; onAiEdit?: () => void }) {
+  const hasMilestones = (goal.milestones ?? []).length > 0
+  return (
+    <section className="mt-6 space-y-5" aria-labelledby="plan-title">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <h2 id="plan-title" className="text-h3">
           계획
         </h2>
-        {!goal.temporary && !completed && <GoalAiEditBar goal={goal} />}
-        {hasMilestones && <MilestonesSection goal={goal} />}
-        <RoutinesSection goal={goal} />
-        <GoalTaskList goal={goal} />
-      </section>
-    </>
+        {onAiEdit && (
+          <button
+            type="button"
+            onClick={onAiEdit}
+            className="text-text-brand inline-flex items-center gap-1 text-[13px] font-semibold hover:underline"
+          >
+            <Sparkles className="size-3.5" />
+            AI로 고치기
+          </button>
+        )}
+      </div>
+      {hasMilestones && <MilestonesSection goal={goal} />}
+      <RoutinesSection goal={goal} />
+      <GoalTaskList goal={goal} />
+    </section>
   )
 }

@@ -98,6 +98,7 @@ export function TaskBlock({
   faded,
   focused,
   dense,
+  noResize,
 }: {
   placed: Placed<TimeBlockTask>
   geometry: Geometry
@@ -118,6 +119,8 @@ export function TaskBlock({
   focused?: boolean
   /** 주간처럼 좁은 칸 (명세 9.8): Caption/SM 11 Medium · 두 줄까지 · 안쪽 3/4 · 40px 미만이면 시간 숨김 */
   dense?: boolean
+  /** 나눠 넣은 조각: 길이 조절 손잡이를 숨겨요 (옮기면 한 덩어리가 돼요) */
+  noResize?: boolean
 }) {
   const t = placed.item
   const heightPx = (placed.bottom - placed.top) * geometry.ppm
@@ -213,10 +216,10 @@ export function TaskBlock({
           {formatMinutes(placed.start)} – {formatMinutes(placed.end)}
         </span>
       )}
-      {drag && !placed.clippedTop && heightPx >= TOP_HANDLE_MIN_PX && (
+      {drag && !noResize && !placed.clippedTop && heightPx >= TOP_HANDLE_MIN_PX && (
         <ResizeHandle onDrag={drag} edge="top" />
       )}
-      {drag && !placed.clippedBottom && <ResizeHandle onDrag={drag} />}
+      {drag && !noResize && !placed.clippedBottom && <ResizeHandle onDrag={drag} />}
     </button>
   )
 }

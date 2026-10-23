@@ -30,8 +30,21 @@ const ACTION_KEY: Record<string, string> = { 추가: 'add', 변경: 'update', �
  *  1) 문장을 보내면 AI 가 "바뀔 항목 목록"을 만들어요 — 이때는 아무것도 안 바뀌어요
  *  2) 바뀌기 전/후를 보고 원하는 것만 골라 [적용]
  * 실행 중인 목표라 바로 바꾸지 않고 꼭 확인을 거쳐요.
+ *
+ * asSheet (2026-10): 목표 상세 오른쪽 아래 떠 있는 AI 버튼으로 여는 창. 늘 그려 두고(open 만 바뀜)
+ *   "오늘 기록"의 "최근 기록 보고 계획 조정받기"가 문장을 채우면 창을 스스로 열어요.
  */
-export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
+export function GoalAiEditBar({
+  goal,
+  asSheet = false,
+  open = false,
+  onOpenChange,
+}: {
+  goal: GoalCategory
+  asSheet?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean, how: 'prefill' | 'applied' | ModalCloseMethod) => void
+}) {
   const [text, setText] = useState('')
   const [preview, setPreview] = useState<GoalEditPreview | null>(null)
   const [picked, setPicked] = useState<boolean[]>([])
@@ -41,6 +54,10 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
   const gid = goal.goalCategoryId
   /** 예시 칩 · "오늘 기록" 카드가 채워 준 문장 (is_prefilled 비교용) */
   const prefilled = useRef<string | null>(null)
+  const onOpenChangeRef = useRef(onOpenChange)
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange
+  }, [onOpenChange])
 
   // "오늘 기록" 카드의 "최근 기록 보고 계획 조정받기" → 문장을 채우고 이 칸으로 이동
   useEffect(() => {
@@ -49,12 +66,16 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
       if (!v) return
       setText(v.slice(0, MAX))
       prefilled.current = v.slice(0, MAX)
+      if (asSheet) {
+        onOpenChangeRef.current?.(true, 'prefill')
+        return
+      }
       inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       inputRef.current?.focus()
     }
     window.addEventListener(AI_EDIT_PREFILL_EVENT, onPrefill)
     return () => window.removeEventListener(AI_EDIT_PREFILL_EVENT, onPrefill)
-  }, [])
+  }, [asSheet])
 
   const submit = (method: 'button' | 'enter') => {
     const value = text.trim()
@@ -114,6 +135,7 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
         setPreview(null)
         setText('')
         prefilled.current = null
+        if (asSheet) onOpenChange?.(false, 'applied')
       })
       .catch((e: unknown) =>
         track('goal_detail.ai_edit_apply_result', {
@@ -125,9 +147,8 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
       )
   }
 
-  return (
-    // AI 요청 바 (명세 6B)
-    <section className="ai-border-flat rounded-card px-4 py-3 sm:px-5">
+  const inputUi = (
+    <>
       <div className="flex items-center gap-2">
         <AIBadge size="sm" />
         <input
@@ -143,6 +164,7 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
           disabled={ask.isPending}
           placeholder="바꾸고 싶은 걸 말로 적어 보세요. 예) 운동은 주 2회로 줄여줘"
           aria-label="말로 고치기"
+          autoFocus={asSheet}
           className="placeholder:text-text-placeholder h-10 min-w-0 flex-1 bg-transparent text-[15px] outline-none"
         />
         <Button
@@ -175,6 +197,10 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
         </div>
       )}
 
+    </>
+  )
+
+  const previewModal = (
       <Modal
         open={!!preview}
         onClose={close}
@@ -244,6 +270,32 @@ export function GoalAiEditBar({ goal }: { goal: GoalCategory }) {
           </>
         )}
       </Modal>
+  )
+
+  if (asSheet) {
+    return (
+      <>
+        {/* 떠 있는 AI 버튼으로 여는 창 — 바뀔 항목 확인 창이 뜨면 잠깐 숨겨요 */}
+        <Modal
+          open={open && !preview}
+          onClose={(m) => onOpenChange?.(false, m)}
+          title="AI로 계획 고치기"
+          description="루틴 · 할 일 · 기간을 한 문장으로 고쳐요. 적용 전에 바뀔 항목을 먼저 보여줘요."
+          size="md"
+          dismissible={!ask.isPending}
+        >
+          <div className="ai-border-flat rounded-card px-4 py-3">{inputUi}</div>
+        </Modal>
+        {previewModal}
+      </>
+    )
+  }
+
+  return (
+    // AI 요청 바 (명세 6B)
+    <section className="ai-border-flat rounded-card px-4 py-3 sm:px-5">
+      {inputUi}
+      {previewModal}
     </section>
   )
 }

@@ -118,7 +118,8 @@ export function TaskAddView({
   const [result, setResult] = useState<ConfirmResponse | null>(null)
 
   const quota = useTaskQuota()
-  const goals = useGoalCategories()
+  // 기본 생활 습관으로도 분류할 수 있게 (2026-10)
+  const goals = useGoalCategories({ includeHabit: true })
   const parse = useParseBrainDump()
   const confirm = useConfirmBrainDump()
   const ongoingGoals = (goals.data ?? []).filter((g) => isOngoing(g.goalCategoryStatus))

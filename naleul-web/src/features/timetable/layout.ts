@@ -161,7 +161,10 @@ export function placeTasks(
     .filter((t) => basis !== 'done' || t.taskStatus === 'COMPLETED')
     .flatMap((t) => {
       // 여러 번 나눠서 한 완료 Task 는 실제로 한 구간마다 블록 하나씩 (계획 기준일 땐 계획 자리 하나)
-      const segs = basis !== 'planned' && t.taskStatus === 'COMPLETED' ? (t.actualSegments ?? []) : []
+      const actualSegs = basis !== 'planned' && t.taskStatus === 'COMPLETED' ? (t.actualSegments ?? []) : []
+      // 자동 배치가 점심 앞뒤로 나눠 넣은 Task 는 계획 구간마다 블록 하나씩 (실제 시각으로 그릴 땐 제외)
+      const drawnAtActual = basis !== 'planned' && t.taskStatus === 'COMPLETED' && !!t.actualStartAt
+      const segs = actualSegs.length > 1 ? actualSegs : drawnAtActual ? [] : (t.plannedSegments ?? [])
       const ranges =
         segs.length > 1
           ? segs.map((g) => ({ start: minutesFrom(day.date, g.start), end: minutesFrom(day.date, g.end) }))
@@ -268,12 +271,13 @@ export function applyPending(
           date: d.date,
           plannedStartAt: toDateTime(d.date, p.start),
           plannedEndAt: toDateTime(d.date, p.end),
+          plannedSegments: undefined, // 옮기면 한 덩어리 (서버 응답 전까지 옛 조각 자리에 그리지 않게)
           locked: true,
           placedBy: 'USER',
           missed: false,
         })
       } else if (p.date === null && (p.toDate ?? t.date ?? t.plannedStartAt?.slice(0, 10)) === d.date) {
-        unscheduledTasks.push({ ...t, plannedStartAt: null, plannedEndAt: null, locked: false })
+        unscheduledTasks.push({ ...t, plannedStartAt: null, plannedEndAt: null, plannedSegments: undefined, locked: false })
       }
     }
     const fixedBlocks = d.fixedBlocks.map((b) => {
@@ -321,6 +325,7 @@ export function applyProposals(days: TimetableDay[], proposals: Proposal[] | nul
         date: d.date,
         plannedStartAt: p.start,
         plannedEndAt: p.end,
+        plannedSegments: undefined,
         placedBy: 'ENGINE',
         locked: false,
         missed: false,

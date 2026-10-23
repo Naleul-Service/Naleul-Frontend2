@@ -5,7 +5,7 @@ import { Link2 } from 'lucide-react'
 import { Trash2, X } from '@/components/icons'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
-import { useGoalCategories } from '@/features/goal/api'
+import { isHabitGoal, useGoalCategories } from '@/features/goal/api'
 import { isOngoing } from '@/features/goal/format'
 import { errorStatusOf } from '@/features/home/analytics'
 import { track } from '@/lib/client/analytics'
@@ -62,7 +62,8 @@ export function ActivityForm({
 }) {
   const save = useSaveActivity()
   const remove = useDeleteActivity()
-  const goals = useGoalCategories()
+  // 기본 생활 습관으로도 분류할 수 있게 (2026-10)
+  const goals = useGoalCategories({ includeHabit: true })
   const a = draft.activity
 
   const [title, setTitle] = useState(a?.title ?? '')
@@ -158,6 +159,7 @@ export function ActivityForm({
       duration_minutes: minutes,
       crosses_midnight: e > 1440,
       has_goal: goalId != null,
+      is_habit_goal: isHabitGoal((goals.data ?? []).find((g) => g.goalCategoryId === goalId)),
       memo_length: memo.trim().length,
       is_replacement: !!replaced,
       days_ago: daysAgo(date),

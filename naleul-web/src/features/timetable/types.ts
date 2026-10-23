@@ -54,6 +54,11 @@ export interface TimeBlockTask {
   actualEndAt?: string | null
   /** 여러 번 나눠서 했을 때만 각 구간 (예: 13~15시, 16~18시). 한 번에 했으면 비어 있어요 */
   actualSegments?: { start: string; end: string }[]
+  /**
+   * 자동 배치가 연속된 빈 시간이 없어 나눠 넣었을 때만 계획 구간 (예: 09~12시, 13~14시 — 점심 앞뒤).
+   * plannedStartAt ~ plannedEndAt 은 첫 시작 ~ 마지막 끝, plannedDurationMinutes 는 구간 합계예요
+   */
+  plannedSegments?: { start: string; end: string }[]
   missed: boolean
   /** 22시 이월로 놓였지만 아직 확인 안 함 → 점선 블록 + "옮길까요?" */
   carryPending?: boolean

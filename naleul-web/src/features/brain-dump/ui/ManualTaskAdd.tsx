@@ -7,7 +7,7 @@ import { CalendarDays, Check, Sparkles } from '@/components/icons'
 import { Button, buttonClass } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Spinner } from '@/components/ui/Spinner'
-import { useGoalCategories, useGoalCategory } from '@/features/goal/api'
+import { isHabitGoal, useGoalCategories, useGoalCategory } from '@/features/goal/api'
 import { isOngoing } from '@/features/goal/format'
 import { GoalTaskForm } from '@/features/goal/ui/GoalTaskForm'
 import { useFillTimetable } from '@/features/timetable/api'
@@ -51,7 +51,8 @@ export function ManualTaskAdd({
   inPanel?: boolean
   onCreated?: (t: TimeBlockTask) => void
 } = {}) {
-  const goals = useGoalCategories()
+  // 기본 생활 습관으로도 분류할 수 있게 (2026-10)
+  const goals = useGoalCategories({ includeHabit: true })
   const ongoing = (goals.data ?? []).filter((g) => isOngoing(g.goalCategoryStatus))
   const [goalId, setGoalId] = useState<number | null>(null)
   const selectedId = goalId ?? ongoing[0]?.goalCategoryId ?? null
@@ -118,6 +119,7 @@ export function ManualTaskAdd({
               surface,
               goal_category_id: id,
               is_temporary: !!ongoing.find((g) => g.goalCategoryId === id)?.temporary,
+              is_habit_goal: isHabitGoal(ongoing.find((g) => g.goalCategoryId === id)),
               has_input: formHasInput(formRef.current),
             })
             setGoalId(id)

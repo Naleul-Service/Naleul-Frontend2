@@ -120,6 +120,8 @@ export const isHabitGoal = (g: Pick<GoalCategory, 'goalMode'> | null | undefined
 export const goalKeys = {
   all: ['goals'] as const,
   list: () => [...goalKeys.all, 'list'] as const,
+  /** list() 로 무효화하면 같이 무효화돼요 (앞부분이 같아서) */
+  listWithHabit: () => [...goalKeys.all, 'list', 'with-habit'] as const,
   detail: (id: number) => [...goalKeys.all, 'detail', id] as const,
   tasks: (id: number) => [...goalKeys.all, 'tasks', id] as const,
   progress: (id: number) => [...goalKeys.all, 'progress', id] as const,
@@ -127,12 +129,22 @@ export const goalKeys = {
   outcomePrompts: () => [...goalKeys.all, 'outcome-prompts'] as const,
 }
 
-export function useGoalCategories() {
+/**
+ * 내 목표 목록.
+ * @param includeHabit 기본 생활 습관 그릇(HABIT)도 같이 (맨 뒤) — 실제로 한 일 · 할 일의 목표를 직접 고르는 곳에서
+ *   "기본 생활 습관"으로도 분류할 수 있게 (2026-10). 목표 목록 화면 · 통계에는 넣지 않아요
+ */
+export function useGoalCategories({ includeHabit = false }: { includeHabit?: boolean } = {}) {
   return useQuery({
-    queryKey: goalKeys.list(),
+    queryKey: includeHabit ? goalKeys.listWithHabit() : goalKeys.list(),
     // 삭제된 목표는 혹시 내려와도 화면에서 제외
-    queryFn: async () =>
-      ((await api.get<GoalCategory[]>('/v1/goal-categories')) ?? []).filter((g) => g.goalCategoryStatus !== 'DELETED'),
+    queryFn: async () => {
+      const list = (
+        (await api.get<GoalCategory[]>(`/v1/goal-categories${includeHabit ? '?includeHabit=true' : ''}`)) ?? []
+      ).filter((g) => g.goalCategoryStatus !== 'DELETED')
+      // 서버는 습관 그릇을 맨 앞에 줘요 → 고르는 목록에선 맨 뒤로 (첫 목표가 기본 선택이라)
+      return [...list.filter((g) => !isHabitGoal(g)), ...list.filter((g) => isHabitGoal(g))]
+    },
   })
 }
 

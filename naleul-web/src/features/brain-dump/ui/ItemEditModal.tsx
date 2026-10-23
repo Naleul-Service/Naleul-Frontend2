@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Chip } from '@/components/ui/Chip'
 import { Modal, type ModalCloseMethod } from '@/components/ui/Modal'
 import { track } from '@/lib/client/analytics'
-import type { GoalCategory } from '@/features/goal/api'
+import { isHabitGoal, type GoalCategory } from '@/features/goal/api'
 import type { TaskPriority } from '@/features/timetable/types'
 import type { DateType, TempGoalInput } from '../types'
 import type { TaskAddSurface } from '../analytics'
@@ -209,7 +209,11 @@ export function ItemEditModal({
             value={goalSel}
             onChange={(e) => {
               setGoalSel(e.target.value)
-              track('task_add_item_edit.goal_select', { surface, goal_match: goalMatchOfSel(e.target.value) })
+              track('task_add_item_edit.goal_select', {
+                surface,
+                goal_match: goalMatchOfSel(e.target.value),
+                is_habit_goal: isHabitGoal(goals.find((g) => `g${g.goalCategoryId}` === e.target.value)),
+              })
               set({ generalCategoryId: null, milestoneId: null })
             }}
             className={field}

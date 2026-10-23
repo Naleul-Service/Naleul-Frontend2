@@ -150,6 +150,12 @@ function validateActual(
   return null
 }
 
+/** 자동 배치가 나눠 넣은 Task 의 전체 길이(분) — 나눠 넣지 않았으면 null */
+function splitLength(t: TimeBlockTask): number | null {
+  if (t.taskStatus === 'COMPLETED' || (t.plannedSegments?.length ?? 0) < 2) return null
+  return t.plannedDurationMinutes ?? null
+}
+
 function sameAsSource(source: DragSource, target: DropTarget) {
   // 시간 미정 → 같은 날 시간 미정은 그대로 (다른 날 시간 미정 칸이면 날짜만 옮겨요)
   if (target.type === 'unscheduled') return source.start === null && source.date === target.date
@@ -652,6 +658,7 @@ export function TimeGrid({
                       grouped={grouped}
                       planned={compare}
                       dense={!single}
+                      noResize={splitLength(p.item) != null}
                       drag={
                         enabled && canDragTask(p.item)
                           ? (e, mode) =>
@@ -662,7 +669,11 @@ export function TimeGrid({
                                   task: p.item,
                                   date: d.date,
                                   start: p.start,
-                                  end: p.end,
+                                  // 점심 앞뒤로 나눠 넣은 Task 는 어느 조각을 끌어도 전체 길이 한 덩어리로 옮겨요
+                                  end:
+                                    mode === 'move' && splitLength(p.item) != null
+                                      ? p.start + splitLength(p.item)!
+                                      : p.end,
                                   group: mode === 'move' && group.length ? group : undefined,
                                 },
                                 mode

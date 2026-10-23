@@ -359,7 +359,7 @@ function AddHabit({ existing, dueCount }: { existing: Habit[]; dueCount: number 
 /** 기본 생활 습관 탭 (명세 12.5) — 오늘(체크) · 할 일 · 진행(잔디) */
 type HabitTab = 'today' | 'tasks' | 'progress'
 const HABIT_TABS: TabDef<HabitTab>[] = [
-  { value: 'today', label: '오늘', icon: CalendarCheck },
+  { value: 'today', label: '루틴', icon: CalendarCheck }, // 2026-10: '오늘' → '루틴' (값은 분석 연속성 때문에 today 그대로)
   { value: 'tasks', label: '할 일', icon: ListChecks },
   { value: 'progress', label: '진행', icon: BarChart3 },
 ]
