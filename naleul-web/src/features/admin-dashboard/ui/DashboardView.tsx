@@ -11,6 +11,7 @@ import { useAdminDashboard } from '../api'
 import type { AdminDashboard } from '../types'
 import { dateTimeLabel, dotDate, num, pct } from '../format'
 import { GoalGroups, GoalHero } from './GoalSection'
+import { AiQualityPanel, OutcomeCheckPanel } from './AiQualitySection'
 import { AiCostPanel, ProfitPanel, RevenueAndServerPanel } from './MoneySection'
 import { Panel, Stat, Tile } from './Panel'
 import { MiniBars, RateTrend } from './RateTrend'
@@ -116,6 +117,13 @@ export function DashboardView() {
           <GoalGroups title="만든 방법별 목표 달성률" rows={data.goals.bySource} aside="기간 중 끝난 목표" />
           <GoalGroups title="목표 종류별 달성률" rows={data.goals.byType} aside="기간 중 끝난 목표" />
         </div>
+
+        {data.aiQuality && (
+          <>
+            <AiQualityPanel quality={data.aiQuality} />
+            <OutcomeCheckPanel check={data.aiQuality.outcomeCheck} />
+          </>
+        )}
 
         <UsersPanel data={data} />
 

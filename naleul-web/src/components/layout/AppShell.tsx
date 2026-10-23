@@ -10,6 +10,7 @@ import { COMMON_EVENTS as CE, track } from '@/lib/client/analytics'
 import { currentPath } from '@/lib/client/commonEvents'
 import { cn } from '@/lib/cn'
 import { iconButtonClass } from '@/components/ui/IconButton'
+import { GoalOutcomePromptModal } from '@/features/goal/ui/GoalOutcomePromptModal'
 import { MobileTabBar } from './MobileTabBar'
 import { Sidebar } from './Sidebar'
 
@@ -111,6 +112,8 @@ export function AppShell({ user, children }: { user: SessionUserView; children: 
       </main>
 
       <MobileTabBar />
+      {/* 기한이 지나 자동 판정된 목표 — "목표는 만족했나요?" (둘러보기 사용자는 목표가 없어 묻지 않아요) */}
+      <GoalOutcomePromptModal enabled={!isGuestUser(user)} />
     </div>
   )
 }

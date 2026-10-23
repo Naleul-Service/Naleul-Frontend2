@@ -28,7 +28,7 @@ export const OUTCOME_OPTIONS: { value: OutcomeResult; emoji: string; label: stri
   { value: 'PARTIAL', emoji: '🙂', label: '일부 달성', hint: '절반 이상은 해냈어요' },
   { value: 'NOT_ACHIEVED', emoji: '😣', label: '못 했어요', hint: '이번엔 어려웠어요' },
 ]
-const outcomeOf = (r: OutcomeResult) => OUTCOME_OPTIONS.find((o) => o.value === r)!
+export const outcomeOf = (r: OutcomeResult) => OUTCOME_OPTIONS.find((o) => o.value === r)!
 
 const ACHIEVEMENT_MAX = 500
 
@@ -38,7 +38,7 @@ function todayYmd() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-function OutcomePicker({
+export function OutcomePicker({
   value,
   onChange,
   disabled,
@@ -235,6 +235,9 @@ function OutcomeStats({ outcome }: { outcome: GoalOutcome }) {
       {outcome.metricUnrecorded && (
         <p className="text-ink-3 mt-2 text-[13px]">수치 기록이 없어서 실천률로 판정했어요.</p>
       )}
+      {outcome.source === 'AUTO' && outcome.autoMessage && (
+        <p className="text-ink-3 mt-2 text-[13px]">{outcome.autoMessage}</p>
+      )}
     </>
   )
 }
@@ -252,6 +255,8 @@ export function GoalOutcomeSection({ goal }: { goal: GoalCategory }) {
   const ask = !outcome || outcome.source === 'AUTO' || editing
   const gid = goal.goalCategoryId
   const source = outcome?.source ?? 'none'
+  const autoResult = outcome?.autoResult ?? undefined
+  const autoReason = outcome?.autoReason ?? undefined
 
   // '이 목표 어땠나요?' 칸이 보일 때 한 번 (결과를 불러온 뒤, 다시 고르기는 제외)
   const askVisible = progress.isSuccess && ask && !editing
@@ -259,8 +264,13 @@ export function GoalOutcomeSection({ goal }: { goal: GoalCategory }) {
   useEffect(() => {
     if (!askVisible || askSent.current) return
     askSent.current = true
-    track('goal_detail.outcome_ask_view', { goal_category_id: gid, outcome_source: source })
-  }, [askVisible, source, gid])
+    track('goal_detail.outcome_ask_view', {
+      goal_category_id: gid,
+      outcome_source: source,
+      auto_result: autoResult,
+      auto_reason: autoReason,
+    })
+  }, [askVisible, source, gid, autoResult, autoReason])
 
   const toggleEditing = (next: boolean) => {
     track('goal_detail.outcome_change_click', { goal_category_id: gid, outcome_action: next ? 'open' : 'cancel' })
@@ -273,6 +283,8 @@ export function GoalOutcomeSection({ goal }: { goal: GoalCategory }) {
       outcome_result: r,
       outcome_source: source,
       is_change: editing,
+      auto_result: autoResult,
+      is_match: autoResult ? r === autoResult : undefined,
     })
     update
       .mutateAsync(r)

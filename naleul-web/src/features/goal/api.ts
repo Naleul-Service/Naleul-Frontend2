@@ -124,6 +124,7 @@ export const goalKeys = {
   tasks: (id: number) => [...goalKeys.all, 'tasks', id] as const,
   progress: (id: number) => [...goalKeys.all, 'progress', id] as const,
   heatmap: (id: number) => [...goalKeys.all, 'heatmap', id] as const,
+  outcomePrompts: () => [...goalKeys.all, 'outcome-prompts'] as const,
 }
 
 export function useGoalCategories() {
@@ -324,6 +325,31 @@ export interface GoalOutcome {
   taskRate: number | null
   /** 수치 목표인데 수치 기록이 없어 실천률로 판정했어요 (이때 metricPercent 는 null) */
   metricUnrecorded?: boolean
+  /** 서버 자동 판정 (사용자가 직접 골라도 남아 있어요 — 판정 일치율 비교용) */
+  autoResult?: OutcomeResult | null
+  autoReason?: OutcomeAutoReason | null
+  /** 자동 판정 안내 — 예) "마지막 기록이 목표 수치의 86%예요. 80% 이상이라 자동으로 달성 처리했어요." */
+  autoMessage?: string | null
+}
+
+/** 자동 판정 근거: 수치 · 루틴 실천률 · 할 일 실천률 · 기록 없음 */
+export type OutcomeAutoReason = 'METRIC' | 'ROUTINE_RATE' | 'TASK_RATE' | 'NO_RECORD'
+
+/** 결과 확인 모달 한 건 — 기한이 지나 자동 판정된 목표 (GET /v1/goal-outcomes/prompts) */
+export interface OutcomePrompt {
+  goalCategoryId: number
+  goalName: string
+  emoji: string | null
+  colorCode: string | null
+  startDate: string | null
+  endDate: string | null
+  autoResult: OutcomeResult
+  autoReason: OutcomeAutoReason | null
+  autoMessage: string | null
+  metricPercent: number | null
+  routineRate: number | null
+  taskRate: number | null
+  aiGenerated: boolean
 }
 
 export interface GoalAdjustment {
@@ -464,6 +490,46 @@ export function useUpdateOutcome(goalId: number) {
       toast.success('결과를 남겼어요.')
     },
     onError: (e) => toast.error(isApiError(e) ? e.message : '저장하지 못했어요. 다시 시도해 주세요.'),
+  })
+}
+
+/** 기한이 지나 자동 판정된 목표 — 앱을 열 때 "목표는 만족했나요?" 로 물어요 (오래된 순) */
+export function useOutcomePrompts(enabled = true) {
+  return useQuery({
+    queryKey: goalKeys.outcomePrompts(),
+    queryFn: async () => (await api.get<OutcomePrompt[]>('/v1/goal-outcomes/prompts')) ?? [],
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    // 모달은 부가 기능 — 실패해도 조용히 넘어가요
+    retry: false,
+  })
+}
+
+/** 결과 확인 모달에서 결과 고르기 — 목표 상세의 "다시 고르기"와 같은 API (자동 판정을 덮어써요) */
+export function useAnswerOutcomePrompt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ goalId, result }: { goalId: number; result: OutcomeResult }) =>
+      api.patch<GoalProgress>(`/v1/goal-categories/${goalId}/outcome`, { result }),
+    onSuccess: (data, { goalId }) => {
+      qc.setQueryData(goalKeys.progress(goalId), data)
+      qc.setQueryData<OutcomePrompt[]>(goalKeys.outcomePrompts(), (list) =>
+        (list ?? []).filter((p) => p.goalCategoryId !== goalId)
+      )
+    },
+    onError: (e) => toast.error(isApiError(e) ? e.message : '저장하지 못했어요. 다시 시도해 주세요.'),
+  })
+}
+
+/** 결과 확인 모달 "나중에" — 자동 판정을 그대로 두고 다시 묻지 않아요 (목표 상세에서는 언제든 고를 수 있어요) */
+export function useDismissOutcomePrompt() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (goalId: number) => api.post<void>(`/v1/goal-outcomes/prompts/${goalId}/dismiss`),
+    onSettled: (_d, _e, goalId) =>
+      qc.setQueryData<OutcomePrompt[]>(goalKeys.outcomePrompts(), (list) =>
+        (list ?? []).filter((p) => p.goalCategoryId !== goalId)
+      ),
   })
 }
 

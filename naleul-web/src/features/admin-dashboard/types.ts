@@ -11,6 +11,8 @@ export interface AdminDashboard {
   tasks: Execution
   routines: Execution
   aiGoalFunnel: AiGoalFunnel
+  /** AI 품질 — 기능마다 ① 채택 ② 수정 ③ 결과 + 자동 판정 신뢰도 */
+  aiQuality?: AiQuality
   series: DailyPoint[]
   notes: string[]
 }
@@ -162,4 +164,48 @@ export interface DailyPoint {
   routineRate: number | null
   aiUsd: number
   activeUsers: number
+}
+
+/** AI 품질 (채택 · 수정 · 결과) — 백엔드 AdminDashboardResponse.AiQuality */
+export interface AiQuality {
+  features: AiQualityRow[]
+  outcomeCheck: OutcomeCheck
+}
+
+/**
+ * key: GOAL_PLAN · TIMETABLE · GOAL_EDIT · SCHEDULE_EDIT · BRAIN_DUMP · PATTERN
+ * 비율은 분모(…Base)가 0 이면 null. editLabel 이 null 이면 해당 없음.
+ */
+export interface AiQualityRow {
+  key: string
+  label: string
+  adoptLabel: string
+  adoptRate: number | null
+  adoptBase: number
+  editLabel: string | null
+  editRate: number | null
+  editBase: number
+  resultLabel: string
+  resultRate: number | null
+  resultBase: number
+  /** ③과 비교할 기준 (적용 전 같은 기간 실천률) */
+  beforeRate: number | null
+  extraLabel: string | null
+  extraRate: number | null
+  extraBase: number
+}
+
+/** 자동 판정 신뢰도 — 결과 확인 모달 응답률 · 직접 고른 결과와의 일치율 */
+export interface OutcomeCheck {
+  autoJudged: number
+  answered: number
+  dismissed: number
+  pending: number
+  responseRate: number | null
+  compared: number
+  matched: number
+  matchRate: number | null
+  /** 수치 80~99% 라 자동 "달성" 처리된 목표 수 */
+  metric80: number
+  byReason: { reason: string; label: string; compared: number; matched: number; matchRate: number | null }[]
 }
