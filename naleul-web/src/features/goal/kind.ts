@@ -25,6 +25,7 @@ export type GoalSubType =
   | 'MEDITATION'
   | 'CLEANING'
   | 'JOURNAL'
+  | 'SAVING'
   | 'OTHER'
   | 'COMPANY_WORK'
   | 'SIDE_PROJECT'
@@ -112,8 +113,16 @@ export const GOAL_TYPES: { value: GoalType; label: string; emoji: string; hint: 
     value: 'ETC',
     label: '기타',
     emoji: '✨',
-    hint: '직접 적기',
-    subs: [{ value: 'OTHER', label: '기타', emoji: '✏️', custom: true, examples: [] }],
+    hint: '돈 모으기 · 직접 적기',
+    subs: [
+      {
+        value: 'SAVING',
+        label: '돈 모으기',
+        emoji: '💰',
+        examples: ['6개월 안에 300만 원 모으기', '한 달 식비 40만 원 이하로'],
+      },
+      { value: 'OTHER', label: '기타', emoji: '✏️', custom: true, examples: [] },
+    ],
   },
 ]
 
@@ -121,16 +130,15 @@ export const GOAL_TYPES: { value: GoalType; label: string; emoji: string; hint: 
  * AI 목표형 만들기에서 고를 수 있는 카테고리 (2026-10).
  * 세수 · 물 마시기 · 기상 같은 "기본 생활 패턴"은 생활 습관(HABIT)으로 따로 체크하니 빼고,
  * 이뤄야 하고 수치로 잴 수 있는 것만 남겨요. 개수가 적어서 1·2단계 없이 칩 한 줄로 보여줘요.
+ * 2026-10-24: 금주 · 금연 · 코딩 빼고 돈 모으기 추가 (직접 만드는 목표에는 그대로 있어요)
  */
 export const AI_KIND_CHIPS: { goalType: GoalType; goalSubType: GoalSubType }[] = [
   { goalType: 'HEALTH', goalSubType: 'EXERCISE' },
   { goalType: 'HEALTH', goalSubType: 'DIET' },
-  { goalType: 'HEALTH', goalSubType: 'NO_ALCOHOL' },
-  { goalType: 'HEALTH', goalSubType: 'NO_SMOKING' },
   { goalType: 'LEARNING', goalSubType: 'LANGUAGE' },
   { goalType: 'LEARNING', goalSubType: 'CERTIFICATE' },
   { goalType: 'LEARNING', goalSubType: 'READING' },
-  { goalType: 'LEARNING', goalSubType: 'CODING' },
+  { goalType: 'ETC', goalSubType: 'SAVING' },
   { goalType: 'ETC', goalSubType: 'OTHER' },
 ]
 
@@ -148,6 +156,7 @@ export const MUST_DO_SUGGESTIONS: Partial<Record<GoalSubType, string[]>> = {
   CERTIFICATE: ['이론 공부', '기출 풀이', '오답 정리', '모의고사'],
   READING: ['매일 읽기', '독서 기록'],
   CODING: ['알고리즘 문제 풀이', '강의 듣기', '프로젝트 개발'],
+  SAVING: ['가계부 쓰기', '자동 이체', '무지출 데이', '지출 점검'],
   WAKE_UP: ['기상 인증', '아침 스트레칭'],
   SLEEP: ['취침 준비 루틴', '자기 전 휴대폰 끄기'],
   MEDITATION: ['아침 명상', '호흡 연습'],
