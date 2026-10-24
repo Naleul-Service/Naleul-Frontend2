@@ -227,10 +227,21 @@ function HabitRow({ habit, day, isToday, daysAgo }: { habit: Habit; day: string;
           {habit.streak}일
         </span>
       )}
-      {/* 최근 7일 */}
+      {/* 최근 7일 — 점 아래 작은 요일 범례 (기준 날짜로 끝나서 요일 순서가 날마다 달라요, 2026-10-24) */}
       <span className="hidden shrink-0 gap-[3px] sm:flex" aria-label="최근 7일">
         {habit.recent7.map((c) => (
-          <i key={c.date} title={c.date} className={cn('block size-2.5 rounded-[3px]', DOT[c.state])} />
+          <span key={c.date} className="flex w-2.5 flex-col items-center gap-[3px]">
+            <i
+              title={`${Number(c.date.slice(5, 7))}/${Number(c.date.slice(8, 10))} (${WEEKDAY_LABEL[weekdayIndex(c.date)]})`}
+              className={cn('block size-2.5 rounded-[3px]', DOT[c.state])}
+            />
+            <span
+              aria-hidden
+              className={cn('text-[9px] leading-none', c.date === day ? 'text-text-primary font-semibold' : 'text-ink-4')}
+            >
+              {WEEKDAY_LABEL[weekdayIndex(c.date)]}
+            </span>
+          </span>
         ))}
       </span>
 

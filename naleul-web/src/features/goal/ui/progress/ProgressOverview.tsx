@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Chip } from '@/components/ui/Chip'
 import { Card } from '@/components/ui/Card'
 import { track } from '@/lib/client/analytics'
@@ -29,8 +29,9 @@ const pct = (n: number) => Math.round(Math.max(0, Math.min(100, n)))
  * 달성형 목표 "진행" (명세 13.7) — 칩(전체 · 지금 어디쯤? · Task 실천률 · 루틴 실천, 하나만 고르기)
  *  - 전체: 세 가지를 주(월요일 시작) 단위 하나의 선 그래프로 (0~100%)
  *  - 나머지: 기존 영역 그대로 하나만
+ *  - "함께 보는 그래프"(positionExtra)는 "지금 어디쯤?" 을 골랐을 때만 그 아래에 보여요 (2026-10-24)
  */
-export function ProgressOverview({ goal }: { goal: GoalCategory }) {
+export function ProgressOverview({ goal, positionExtra }: { goal: GoalCategory; positionExtra?: ReactNode }) {
   const [view, setView] = useState<View>('all')
   const views: View[] = goal.temporary
     ? ['all', 'task_rate', 'routine_rate']
@@ -57,7 +58,10 @@ export function ProgressOverview({ goal }: { goal: GoalCategory }) {
       {view === 'all' ? (
         <CombinedChart goal={goal} />
       ) : view === 'position' ? (
-        <ProgressSection goal={goal} />
+        <>
+          <ProgressSection goal={goal} />
+          {positionExtra}
+        </>
       ) : view === 'task_rate' ? (
         <TaskRateSection goal={goal} />
       ) : (
@@ -171,6 +175,15 @@ function CombinedChart({ goal }: { goal: GoalCategory }) {
   const PAD = { l: 36, r: 12, t: 10, b: 24 }
   const x = (i: number) => PAD.l + (i / (WEEKS - 1)) * (W - PAD.l - PAD.r)
   const y = (v: number) => PAD.t + (1 - v / 100) * (H - PAD.t - PAD.b)
+  // 점에 커서를 올리면(키보드는 포커스) 그 주의 값을 보여줘요 (2026-10-24)
+  const [hover, setHover] = useState<{ key: string; i: number } | null>(null)
+  const hovered = hover ? series.find((s) => s.key === hover.key) : undefined
+  const hoveredValue = hovered && hover ? hovered.values[hover.i] : null
+  const weekLabel = (i: number) => {
+    const s = weeks[i]
+    const e = addDays(s, 6)
+    return `${Number(s.slice(5, 7))}/${Number(s.slice(8, 10))}~${Number(e.slice(5, 7))}/${Number(e.slice(8, 10))}`
+  }
 
   return (
     <Card className="p-5 sm:p-6">
@@ -183,36 +196,86 @@ function CombinedChart({ goal }: { goal: GoalCategory }) {
         </p>
       ) : (
         <>
-          <div ref={boxRef} className="mt-4 w-full">
-          <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="block" role="img" aria-label="주별 진행 · 실천률">
-            {[0, 50, 100].map((t) => (
-              <g key={t}>
-                <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} className="stroke-border-soft" />
-                <text x={PAD.l - 6} y={y(t) + 3} textAnchor="end" fontSize="11" className="fill-text-tertiary">
-                  {t}%
-                </text>
-              </g>
-            ))}
-            {weeks.map((w, i) =>
-              i % 3 === 0 || i === WEEKS - 1 ? (
-                <text key={w} x={x(i)} y={H - 5} textAnchor="middle" fontSize="11" className="fill-text-tertiary">
-                  {Number(w.slice(5, 7))}/{Number(w.slice(8, 10))}
-                </text>
-              ) : null
-            )}
-            {series.map((s) => {
-              const pts = s.values.map((v, i) => (v == null ? null : ([x(i), y(v)] as const)))
-              const d = pts
-                .map((pt, i) => (pt ? `${i > 0 && pts[i - 1] ? 'L' : 'M'}${pt[0].toFixed(1)},${pt[1].toFixed(1)}` : ''))
-                .join(' ')
-              return (
-                <g key={s.key} style={{ stroke: s.color, fill: s.color }}>
-                  <path d={d} fill="none" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
-                  {pts.map((pt, i) => (pt ? <circle key={i} cx={pt[0]} cy={pt[1]} r="3.5" stroke="none" /> : null))}
+          <div ref={boxRef} className="relative mt-4 w-full">
+            <svg
+              width={W}
+              height={H}
+              viewBox={`0 0 ${W} ${H}`}
+              className="block"
+              role="img"
+              aria-label="주별 진행 · 실천률"
+            >
+              {[0, 50, 100].map((t) => (
+                <g key={t}>
+                  <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} className="stroke-border-soft" />
+                  <text x={PAD.l - 6} y={y(t) + 3} textAnchor="end" fontSize="11" className="fill-text-tertiary">
+                    {t}%
+                  </text>
                 </g>
-              )
-            })}
-          </svg>
+              ))}
+              {weeks.map((w, i) =>
+                i % 3 === 0 || i === WEEKS - 1 ? (
+                  <text key={w} x={x(i)} y={H - 5} textAnchor="middle" fontSize="11" className="fill-text-tertiary">
+                    {Number(w.slice(5, 7))}/{Number(w.slice(8, 10))}
+                  </text>
+                ) : null
+              )}
+              {series.map((s) => {
+                const pts = s.values.map((v, i) => (v == null ? null : ([x(i), y(v)] as const)))
+                const d = pts
+                  .map((pt, i) =>
+                    pt ? `${i > 0 && pts[i - 1] ? 'L' : 'M'}${pt[0].toFixed(1)},${pt[1].toFixed(1)}` : ''
+                  )
+                  .join(' ')
+                return (
+                  <g key={s.key} style={{ stroke: s.color, fill: s.color }}>
+                    <path d={d} fill="none" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+                    {pts.map((pt, i) =>
+                      pt ? (
+                        <g key={i}>
+                          <circle
+                            cx={pt[0]}
+                            cy={pt[1]}
+                            r={hover?.key === s.key && hover.i === i ? 5.5 : 3.5}
+                            stroke="none"
+                          />
+                          {/* 커서를 올리기 쉬운 투명한 큰 원 */}
+                          <circle
+                            cx={pt[0]}
+                            cy={pt[1]}
+                            r="11"
+                            fill="transparent"
+                            stroke="none"
+                            className="cursor-pointer outline-none"
+                            tabIndex={0}
+                            role="img"
+                            aria-label={`${s.label} ${weekLabel(i)} ${s.values[i]}%`}
+                            onMouseEnter={() => setHover({ key: s.key, i })}
+                            onMouseLeave={() => setHover(null)}
+                            onFocus={() => setHover({ key: s.key, i })}
+                            onBlur={() => setHover(null)}
+                          />
+                        </g>
+                      ) : null
+                    )}
+                  </g>
+                )
+              })}
+            </svg>
+            {hover && hovered && hoveredValue != null && (
+              <div
+                role="tooltip"
+                className="bg-bg-inverse text-text-inverse text-caption-md shadow-pop pointer-events-none absolute z-10 rounded-lg px-2.5 py-1.5 whitespace-nowrap"
+                style={{
+                  left: Math.min(Math.max(x(hover.i), 60), W - 60),
+                  top: y(hoveredValue) - 10,
+                  transform: 'translate(-50%, -100%)',
+                }}
+              >
+                <span className="opacity-70">{weekLabel(hover.i)}</span> · {hovered.label}{' '}
+                <b className="font-semibold tabular-nums">{hoveredValue}%</b>
+              </div>
+            )}
           </div>
           {/* 범례 + 지금 값 */}
           <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5" aria-label="범례">

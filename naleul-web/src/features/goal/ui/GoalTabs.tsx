@@ -88,7 +88,7 @@ export function GoalTabBar<T extends string>({
     <>
       <div
         id="goal-tabs"
-        className="border-border-soft mt-6 flex scroll-mt-28 gap-1 overflow-x-auto border-b"
+        className="border-border-soft mt-6 flex scroll-mt-28 scrollbar-none gap-1 overflow-x-auto border-b"
         role="tablist"
         aria-label="보기"
       >

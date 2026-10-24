@@ -580,6 +580,15 @@ svg.lucide:is(.size-3, .size-3\.5, .size-4, .size-2\.5) {
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 /* ── AI 처리 (명세 6) ── */
+/* 가로로 넘치는 탭 줄 등 — 스크롤은 되고 스크롤바만 숨겨요 (큰 화면에서 탭 줄 오른쪽에 막대가 생기던 문제, 2026-10-24) */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @utility bg-ai-gradient {
   background-image: var(--gradient-ai);
 }

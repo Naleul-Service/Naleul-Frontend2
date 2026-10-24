@@ -187,7 +187,10 @@ function RecordGoalBody({ goal }: { goal: GoalCategory }) {
           </div>
         </section>
       ) : (
-        <ReflectionsPanel goal={goal} hint="업무관리 탭의 '적기' 버튼(회고)이나 홈의 '오늘 회고'에서 남기면 여기 모여요." />
+        <ReflectionsPanel
+          goal={goal}
+          hint="업무관리 탭의 '적기' 버튼(회고)이나 홈의 '오늘 회고'에서 남기면 여기 모여요."
+        />
       )}
     </>
   )
@@ -302,10 +305,7 @@ export function GoalDetailView({ goalId, justCreated = false }: { goalId: number
     <EditingContext.Provider value={editingCtx}>
       {/* goal-detail: 이 화면 카드 그림자는 더 연하게 (명세 12.3 — globals.css) */}
       <div className="goal-detail">
-        <GoalScrollTitle
-          title={`${goal.emoji ? `${goal.emoji} ` : ''}${goal.goalCategoryName}`}
-          more={moreButton}
-        />
+        <GoalScrollTitle title={`${goal.emoji ? `${goal.emoji} ` : ''}${goal.goalCategoryName}`} more={moreButton} />
         {canWrapUp && (
           <>
             <GoalWrapUpSection goal={goal} headless ref={wrapUp} />
@@ -413,7 +413,7 @@ function AchievementGoalBody({ goal }: { goal: GoalCategory }) {
           onOpenChange={(next, how) => {
             if (next) {
               if (how === 'prefill') {
-                setCheckInOpen(false)   // "오늘 기록" 창의 "계획 조정받기"에서 왔으면 그 창은 닫고 AI 창으로
+                setCheckInOpen(false) // "오늘 기록" 창의 "계획 조정받기"에서 왔으면 그 창은 닫고 AI 창으로
                 openAi('prefill')
               }
               return
@@ -462,9 +462,11 @@ function AchievementPractice({ goal }: { goal: GoalCategory }) {
           진행
         </h2>
         {completed && !goal.temporary && <GoalOutcomeSection goal={goal} />}
-        <ProgressOverview goal={goal} />
-        {/* 그래프 여러 개 (V52) — 예: 메인 "모의고사 점수" + 추가 "기출 회독" */}
-        {!goal.temporary && <ExtraMetricsSection goal={goal} readOnly={completed} />}
+        {/* 그래프 여러 개 (V52, "함께 보는 그래프") — "지금 어디쯤?" 칩을 골랐을 때만 그 아래에 (2026-10-24) */}
+        <ProgressOverview
+          goal={goal}
+          positionExtra={!goal.temporary ? <ExtraMetricsSection goal={goal} readOnly={completed} /> : null}
+        />
         {goal.achievement && (
           <Section title="달성 기록">
             <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{goal.achievement}</p>

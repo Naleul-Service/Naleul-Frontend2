@@ -57,7 +57,8 @@ function monthWeeks(month: string) {
 }
 
 /**
- * 습관별 잔디 — 한 달씩 넘겨 봐요 (‹ ›). 세로는 요일(월~일), 가로는 그 달의 주.
+ * 습관별 잔디 — 한 달씩 넘겨 봐요 (‹ ›). 가로는 요일(월~일), 세로는 그 달의 주 — 달력처럼 (2026-10-24).
+ * 넓은 화면에서는 습관을 2~3열로 나란히 놓아 빈 공간을 줄여요.
  * 습관을 추가한 달부터 볼 수 있고, 그 달보다 앞은 비어 있어요.
  * (전체를 합친 잔디는 없앴어요: 습관마다 시작한 날이 달라서 합치면 "언제부터 했는지"가 안 보여요)
  */
@@ -144,7 +145,7 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
           <Spinner className="text-ink-3 size-5" />
         </div>
       ) : (
-        <ul className="divide-line -my-3 divide-y">
+        <ul className="grid gap-x-8 gap-y-6 sm:grid-cols-2 xl:grid-cols-3">
           {shown.map((h) => (
             <HabitMonth
               key={h.habitId}
@@ -167,7 +168,7 @@ export function HabitHeatmap({ habits, today }: { habits: Habit[]; today: string
   )
 }
 
-/** 습관 한 줄 — 왼쪽 이름 · 기록, 오른쪽 그 달 잔디 (세로 요일 × 가로 주) */
+/** 습관 하나 — 위 이름 · 기록, 아래 그 달 잔디 (가로 요일 × 세로 주, 달력 모양) */
 function HabitMonth({
   habit: h,
   today,
@@ -190,20 +191,20 @@ function HabitMonth({
   const notYet = h.startDate > lastOfMonth(month)
 
   return (
-    <li className={cn('flex flex-wrap items-start gap-x-4 gap-y-2 py-3', h.status === 'PAUSED' && 'opacity-60')}>
-      <div className="w-[150px] min-w-0 shrink-0">
+    <li className={cn('flex min-w-0 flex-col gap-2.5', h.status === 'PAUSED' && 'opacity-60')}>
+      <div className="min-w-0">
         <p className="truncate text-[14px] font-bold">
           {h.emoji ? `${h.emoji} ` : ''}
           {h.name}
         </p>
         <p className="text-ink-3 mt-0.5 text-[12px] tabular-nums">
           {notYet ? '아직 시작 전' : dueDays > 0 ? `이 달 ${doneDays}/${dueDays}일` : '이 달 할 날 없음'}
-        </p>
-        <p className="text-ink-4 text-[11px]">
-          {Number(h.startDate.slice(5, 7))}월 {Number(h.startDate.slice(8, 10))}일부터
+          <span className="text-ink-4 ml-1.5 text-[11px]">
+            · {Number(h.startDate.slice(5, 7))}월 {Number(h.startDate.slice(8, 10))}일부터
+          </span>
         </p>
         {h.streak > 1 && (
-          <p className="mt-0.5 inline-flex items-center gap-0.5 text-[12px] font-semibold text-goal-orange-fg">
+          <p className="text-goal-orange-fg mt-0.5 inline-flex items-center gap-0.5 text-[12px] font-semibold">
             <Flame className="size-3.5" />
             {h.streak}일 연속
           </p>
@@ -211,21 +212,22 @@ function HabitMonth({
         {h.status === 'PAUSED' && <p className="text-ink-3 text-[12px]">쉬는 중</p>}
       </div>
 
-      <div className="flex" style={{ gap: GAP }} role="grid" aria-label={`${h.name} ${Number(month.slice(5, 7))}월`}>
-        {/* 요일 눈금 */}
-        <div className="flex flex-col" style={{ gap: GAP }} aria-hidden>
-          {WEEKDAY_LABEL.map((w, i) => (
-            <span
-              key={w}
-              className="text-ink-4 pr-1 text-right text-[10px]"
-              style={{ height: CELL, lineHeight: `${CELL}px` }}
-            >
-              {i % 2 === 0 ? w : ''}
+      <div
+        className="flex flex-col self-start"
+        style={{ gap: GAP }}
+        role="grid"
+        aria-label={`${h.name} ${Number(month.slice(5, 7))}월`}
+      >
+        {/* 요일 눈금 (가로, 월~일) */}
+        <div className="flex" style={{ gap: GAP }} aria-hidden>
+          {WEEKDAY_LABEL.map((w) => (
+            <span key={w} className="text-ink-4 text-center text-[10px] leading-none" style={{ width: CELL }}>
+              {w}
             </span>
           ))}
         </div>
         {weeks.map((col, wi) => (
-          <div key={wi} className="flex flex-col" style={{ gap: GAP }} role="row">
+          <div key={wi} className="flex" style={{ gap: GAP }} role="row">
             {col.map((d, di) =>
               d === null ? (
                 <span key={di} style={{ width: CELL, height: CELL }} />
